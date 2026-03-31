@@ -15,6 +15,6 @@ MonoBehaviour:
   extentX: 100
   extentZ: 100
   seed: 12
-  noiseScale: -0.02
+  noiseScale: -0.005
   noiseOffset: {x: 50, y: 0}
-  heightMultiplier: 0
+  heightMultiplier: 20
