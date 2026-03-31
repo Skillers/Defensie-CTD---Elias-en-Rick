@@ -5,7 +5,9 @@ using UnityEngine.Rendering;
 [RequireComponent(typeof(MeshFilter), typeof(MeshRenderer))]
 public class MarchingCubesTerrain : MonoBehaviour
 {
-    public PerlinNoisePlane noisePlane;
+    public PerlinNoisePlane    noisePlane;
+    public TerrainConfigHolder configHolder;
+    private PlaneConfig config => configHolder?.config;
 
     private const float Step      = 0.5f;
     private const float RoundStep = 0.25f;
@@ -46,14 +48,14 @@ public class MarchingCubesTerrain : MonoBehaviour
     [ContextMenu("Regenerate")]
     public void Generate()
     {
-        if (noisePlane == null) { Debug.LogError("MarchingCubesTerrain: assign a PerlinNoisePlane."); return; }
+        if (noisePlane == null)   { Debug.LogError("MarchingCubesTerrain: assign a PerlinNoisePlane."); return; }
+        if (configHolder == null) { Debug.LogError("MarchingCubesTerrain: assign a TerrainConfigHolder."); return; }
+        if (config == null)       { Debug.LogError("MarchingCubesTerrain: TerrainConfigHolder has no PlaneConfig."); return; }
         if (noisePlane.NoiseValues == null || noisePlane.NoiseValues.Length == 0)
         {
             Debug.LogWarning("MarchingCubesTerrain: waiting for PerlinNoisePlane data.");
             return;
         }
-
-        var   config     = noisePlane.config;
         int   vertsX     = noisePlane.VertsX;
         int   vertsZ     = noisePlane.VertsZ;
         float extX       = config.extentX;
@@ -117,9 +119,26 @@ public class MarchingCubesTerrain : MonoBehaviour
             MarchCube(cube, corners, verts, tris);
         }
 
+        var vertsArray = verts.ToArray();
+
+        // Height range across all vertices
+        float meshMinY = float.MaxValue, meshMaxY = float.MinValue;
+        foreach (var v in vertsArray)
+        {
+            if (v.y < meshMinY) meshMinY = v.y;
+            if (v.y > meshMaxY) meshMaxY = v.y;
+        }
+        float range = Mathf.Max(meshMaxY - meshMinY, 0.001f);
+
+        // Encode normalised height into UV.x so the gradient texture maps to it
+        var uvs = new Vector2[vertsArray.Length];
+        for (int i = 0; i < vertsArray.Length; i++)
+            uvs[i] = new Vector2((vertsArray[i].y - meshMinY) / range, 0.5f);
+
         var mesh = new Mesh { name = "MarchingCubesTerrain" };
         if (verts.Count > 65535) mesh.indexFormat = IndexFormat.UInt32;
-        mesh.vertices  = verts.ToArray();
+        mesh.vertices  = vertsArray;
+        mesh.uv        = uvs;
         mesh.triangles = tris.ToArray();
         mesh.RecalculateNormals();
 
@@ -129,6 +148,29 @@ public class MarchingCubesTerrain : MonoBehaviour
         var shader = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
         if (mr.sharedMaterial == null)
             mr.sharedMaterial = new Material(shader);
+
+        mr.sharedMaterial.mainTexture = BuildGreenGradient();
+    }
+
+    private static Texture2D BuildGreenGradient()
+    {
+        const int width = 256;
+        var tex = new Texture2D(width, 1, TextureFormat.RGB24, false)
+        {
+            wrapMode   = TextureWrapMode.Clamp,
+            filterMode = FilterMode.Bilinear
+        };
+
+        var brightGreen = new Color(0.3f, 1f,    0.15f);
+        var darkGreen   = new Color(0f,   0.35f, 0.05f);
+
+        var pixels = new Color[width];
+        for (int i = 0; i < width; i++)
+            pixels[i] = Color.Lerp(brightGreen, darkGreen, i / (float)(width - 1));
+
+        tex.SetPixels(pixels);
+        tex.Apply();
+        return tex;
     }
 
     // -------------------------------------------------------------------------

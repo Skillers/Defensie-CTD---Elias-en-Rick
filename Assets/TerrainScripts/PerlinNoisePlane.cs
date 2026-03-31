@@ -4,7 +4,8 @@ using UnityEngine.Rendering;
 [RequireComponent(typeof(MeshFilter), typeof(MeshRenderer))]
 public class PerlinNoisePlane : MonoBehaviour
 {
-    public PlaneConfig config;
+    public TerrainConfigHolder configHolder;
+    public PlaneConfig config => configHolder?.config;
 
     // 2 vertices per unit = 0.5 step
     private const float Step      = 0.5f;
@@ -33,7 +34,8 @@ public class PerlinNoisePlane : MonoBehaviour
     [ContextMenu("Regenerate")]
     public void Generate()
     {
-        if (config == null) { Debug.LogError("PerlinNoisePlane: no PlaneConfig assigned."); return; }
+        if (configHolder == null) { Debug.LogError("PerlinNoisePlane: no TerrainConfigHolder assigned."); return; }
+        if (config == null) { Debug.LogError("PerlinNoisePlane: TerrainConfigHolder has no PlaneConfig."); return; }
 
         int stepsX = Mathf.RoundToInt(config.extentX * 2f / Step);
         int stepsZ = Mathf.RoundToInt(config.extentZ * 2f / Step);

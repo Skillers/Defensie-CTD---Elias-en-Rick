@@ -2,8 +2,9 @@ using UnityEngine;
 
 public class StartEndPoints : MonoBehaviour
 {
-    public PlaneConfig    config;
-    public PerlinNoisePlane noisePlane;
+    public TerrainConfigHolder configHolder;
+    public PerlinNoisePlane    noisePlane;
+    private PlaneConfig config => configHolder?.config;
 
     private const float EdgeMargin  = 10f;
     private const float SphereSize  = 2f;
@@ -42,7 +43,8 @@ public class StartEndPoints : MonoBehaviour
     [ContextMenu("Replace")]
     public void Place()
     {
-        if (config == null) { Debug.LogError("StartEndPoints: assign a PlaneConfig."); return; }
+        if (configHolder == null) { Debug.LogError("StartEndPoints: assign a TerrainConfigHolder."); return; }
+        if (config == null) { Debug.LogError("StartEndPoints: TerrainConfigHolder has no PlaneConfig."); return; }
 
         float xMax =  config.extentX - EdgeMargin;
         float xMin = -config.extentX + EdgeMargin;

@@ -4,8 +4,9 @@ using UnityEngine.Rendering;
 [RequireComponent(typeof(MeshFilter), typeof(MeshRenderer))]
 public class SlopeMap : MonoBehaviour
 {
-    public PerlinNoisePlane noisePlane;
-    public PlaneConfig      config;
+    public PerlinNoisePlane    noisePlane;
+    public TerrainConfigHolder configHolder;
+    private PlaneConfig config => configHolder?.config;
 
     private const float Step      = 0.5f;
     private const float RoundStep = 0.25f;
