@@ -148,7 +148,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4f99cfe7b72f5044b986b85b8253b2f8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::StartEndPoints
-  config: {fileID: 11400000, guid: dad4df72b74f335489be1bf5a8170656, type: 2}
+  configHolder: {fileID: 411654529}
   noisePlane: {fileID: 1313885675}
 --- !u!4 &108440886
 Transform:
@@ -292,6 +292,101 @@ MonoBehaviour:
   m_ShadowLayerMask: 1
   m_RenderingLayers: 1
   m_ShadowRenderingLayers: 1
+--- !u!1 &411654528
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 411654530}
+  - component: {fileID: 411654529}
+  m_Layer: 0
+  m_Name: Terrain Config
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &411654529
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 411654528}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 94fad860de293644089a2b14015ea46d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TerrainConfigHolder
+  config: {fileID: 11400000, guid: dad4df72b74f335489be1bf5a8170656, type: 2}
+--- !u!4 &411654530
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 411654528}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 1.99554, y: 6.54426, z: -0.32974}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &787993664
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 787993666}
+  - component: {fileID: 787993665}
+  m_Layer: 0
+  m_Name: VoronoiBiome
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &787993665
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 787993664}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 34fbec7473e6b65438d04ef8135214de, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::BiomeVoronoiMap
+  configHolder: {fileID: 411654529}
+  noisePlane: {fileID: 1313885675}
+  regionsX: 12
+  regionsZ: 6
+  snowMinHeight: 0.7
+  dirtMaxHeight: 0.45
+--- !u!4 &787993666
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 787993664}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 1.99554, y: 6.54426, z: -0.32974}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &871929910
 GameObject:
   m_ObjectHideFlags: 0
@@ -583,7 +678,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SlopeMap
   noisePlane: {fileID: 1313885675}
-  config: {fileID: 11400000, guid: dad4df72b74f335489be1bf5a8170656, type: 2}
+  configHolder: {fileID: 411654529}
 --- !u!23 &1156077263
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -687,7 +782,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 97c999fb0f6eff6419cad7aa7562ce1a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PerlinNoisePlane
-  config: {fileID: 11400000, guid: dad4df72b74f335489be1bf5a8170656, type: 2}
+  configHolder: {fileID: 411654529}
 --- !u!23 &1313885676
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -838,6 +933,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MarchingCubesTerrain
   noisePlane: {fileID: 1313885675}
+  configHolder: {fileID: 411654529}
+  voronoiMap: {fileID: 787993665}
 --- !u!23 &1903033985
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -1042,3 +1139,5 @@ SceneRoots:
   - {fileID: 1903033987}
   - {fileID: 108440886}
   - {fileID: 1156077265}
+  - {fileID: 787993666}
+  - {fileID: 411654530}

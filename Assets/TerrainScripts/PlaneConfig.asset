@@ -12,9 +12,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ef8897991bc1492488ae5b367883918f, type: 3}
   m_Name: PlaneConfig
   m_EditorClassIdentifier: Assembly-CSharp::PlaneConfig
-  extentX: 100
-  extentZ: 100
+  extentX: 150
+  extentZ: 150
   seed: 12
-  noiseScale: -0.005
+  noiseScale: -0.01
   noiseOffset: {x: 50, y: 0}
-  heightMultiplier: 20
+  heightMultiplier: 45
