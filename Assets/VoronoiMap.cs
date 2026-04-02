@@ -8,8 +8,9 @@ public class VoronoiMap : MonoBehaviour
     public int height = 400;
 
     [Header("Voronoi")]
-    public int unitsPerRegion = 32;   // one seed point per this many cells
-    public int seed           = 42;
+    public int regionsX = 20;
+    public int regionsZ = 20;
+    public int seed     = 42;
 
     [HideInInspector] public TerrainCell[,] grid;
 
@@ -49,25 +50,34 @@ public class VoronoiMap : MonoBehaviour
     {
         Random.InitState(seed);
 
-        int regionCount = Mathf.Max(1, (width * height) / unitsPerRegion);
+        int nx         = Mathf.Max(1, regionsX);
+        int nz         = Mathf.Max(1, regionsZ);
+        int regionCount = nx * nz;
+        int cellW      = Mathf.Max(1, width  / nx);
+        int cellH      = Mathf.Max(1, height / nz);
 
         var seeds     = new Vector2Int[regionCount];
         var seedTypes = new TerrainType[regionCount];
         var types     = new[] { TerrainType.Grass, TerrainType.Dirt, TerrainType.Sand };
 
-        for (int i = 0; i < regionCount; i++)
+        // One seed placed randomly within each grid cell
+        for (int rx = 0; rx < nx; rx++)
+        for (int ry = 0; ry < nz; ry++)
         {
-            seeds[i]     = new Vector2Int(Random.Range(0, width), Random.Range(0, height));
+            int i    = rx * nz + ry;
+            int sx   = rx * cellW + Random.Range(0, cellW);
+            int sy   = ry * cellH + Random.Range(0, cellH);
+            seeds[i]     = new Vector2Int(Mathf.Clamp(sx, 0, width - 1), Mathf.Clamp(sy, 0, height - 1));
             seedTypes[i] = types[Random.Range(0, types.Length)];
         }
 
         for (int x = 0; x < width; x++)
         for (int y = 0; y < height; y++)
         {
-            int   closest = 0;
+            int   closest  = 0;
             float bestDist = float.MaxValue;
 
-            for (int i = 0; i < regionCount; i++)
+                for (int i = 0; i < regionCount; i++)
             {
                 float d = Vector2.Distance(new Vector2(x, y), seeds[i]);
                 if (d < bestDist) { bestDist = d; closest = i; }

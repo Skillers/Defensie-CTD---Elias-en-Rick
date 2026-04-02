@@ -27,6 +27,26 @@ public class MapRenderer : MonoBehaviour
 
     public void Render(TerrainCell[,] grid, int width, int height)
     {
+        Color[] cellColors = new Color[width * height];
+        for (int x = 0; x < width; x++)
+        for (int z = 0; z < height; z++)
+            cellColors[x * height + z] = grid[x, z].color;
+
+        RenderColors(cellColors, width, height);
+    }
+
+    public void Render(MilitaryTerrainCell[,] grid, int width, int height)
+    {
+        Color[] cellColors = new Color[width * height];
+        for (int x = 0; x < width; x++)
+        for (int z = 0; z < height; z++)
+            cellColors[x * height + z] = grid[x, z].color;
+
+        RenderColors(cellColors, width, height);
+    }
+
+    void RenderColors(Color[] cellColors, int width, int height)
+    {
         // Lazy-init in case Awake order on the same GameObject was wrong
         if (mf == null) mf = GetComponent<MeshFilter>();
         if (mr == null) mr = GetComponent<MeshRenderer>();
@@ -58,7 +78,7 @@ public class MapRenderer : MonoBehaviour
             verts[vi + 2] = new Vector3(wx + 1f,  0, wz + 1f );
             verts[vi + 3] = new Vector3(wx,        0, wz + 1f );
 
-            Color c = grid[x, z].color;
+            Color c = cellColors[x * height + z];
             colors[vi + 0] = c;
             colors[vi + 1] = c;
             colors[vi + 2] = c;
