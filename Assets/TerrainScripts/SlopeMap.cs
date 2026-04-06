@@ -33,37 +33,7 @@ public class SlopeMap : MonoBehaviour
         return Mathf.Atan2(h2 - h1, distance) * Mathf.Rad2Deg;
     }
 
-    private PerlinNoisePlane _subscribedTo;
-
-    void OnEnable()  => Subscribe();
-    void OnDisable() => Unsubscribe();
-
-    void Start()
-    {
-        Subscribe();
-        if (noisePlane != null && noisePlane.NoiseValues != null && noisePlane.NoiseValues.Length > 0)
-            Generate();
-    }
-
-    private void Subscribe()
-    {
-        if (_subscribedTo == noisePlane) return;
-        Unsubscribe();
-        if (noisePlane != null)
-        {
-            noisePlane.OnGenerated += Generate;
-            _subscribedTo = noisePlane;
-        }
-    }
-
-    private void Unsubscribe()
-    {
-        if (_subscribedTo != null)
-        {
-            _subscribedTo.OnGenerated -= Generate;
-            _subscribedTo = null;
-        }
-    }
+    // Generation is driven by MapGenerator — no auto-subscribe or auto-start.
 
     public void Generate()
     {

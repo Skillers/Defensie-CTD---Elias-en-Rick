@@ -13,55 +13,7 @@ public class MarchingCubesTerrain : MonoBehaviour
     private const float Step      = 0.5f;
     private const float RoundStep = 0.25f;
 
-    private PerlinNoisePlane _subscribedTo;
-    private TerrainDataStore _subscribedDataStore;
-
-    void OnEnable()  { Subscribe(); SubscribeBiome(); }
-    void OnDisable() { Unsubscribe(); UnsubscribeBiome(); }
-
-    void Start()
-    {
-        Subscribe();
-        SubscribeBiome();
-        // If the perlin plane already has data (e.g. it ran before us), generate now
-        if (noisePlane != null && noisePlane.NoiseValues != null && noisePlane.NoiseValues.Length > 0)
-            Generate();
-    }
-
-    private void Subscribe()
-    {
-        if (_subscribedTo == noisePlane) return;
-        Unsubscribe();
-        if (noisePlane != null)
-        {
-            noisePlane.OnGenerated += Generate;
-            _subscribedTo = noisePlane;
-        }
-    }
-
-    private void Unsubscribe()
-    {
-        if (_subscribedTo != null)
-        {
-            _subscribedTo.OnGenerated -= Generate;
-            _subscribedTo = null;
-        }
-    }
-
-    private void SubscribeBiome()
-    {
-        if (_subscribedDataStore != terrainDataStore)
-        {
-            if (_subscribedDataStore != null) _subscribedDataStore.OnGridReady -= ApplyBiomeColors;
-            _subscribedDataStore = terrainDataStore;
-            if (_subscribedDataStore != null) _subscribedDataStore.OnGridReady += ApplyBiomeColors;
-        }
-    }
-
-    private void UnsubscribeBiome()
-    {
-        if (_subscribedDataStore != null) { _subscribedDataStore.OnGridReady -= ApplyBiomeColors; _subscribedDataStore = null; }
-    }
+    // Generation is driven by MapGenerator — no auto-subscribe or auto-start.
 
     [ContextMenu("Regenerate")]
     public void Generate()

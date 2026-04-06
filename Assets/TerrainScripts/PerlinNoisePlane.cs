@@ -29,7 +29,7 @@ public class PerlinNoisePlane : MonoBehaviour
         RebuildFromStoredValues();
     }
 
-    void Start() => Generate();
+    // Generation is driven by MapGenerator — no auto-start.
 
     [ContextMenu("Regenerate")]
     public void Generate()
