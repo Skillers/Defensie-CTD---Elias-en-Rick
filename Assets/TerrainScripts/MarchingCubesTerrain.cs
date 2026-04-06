@@ -197,7 +197,7 @@ public class MarchingCubesTerrain : MonoBehaviour
             int gx = Mathf.Clamp(Mathf.FloorToInt(vertices[i].x + gridW * 0.5f), 0, gridW - 1);
             int gz = Mathf.Clamp(Mathf.FloorToInt(vertices[i].z + gridH * 0.5f), 0, gridH - 1);
             var cell = biomeGrid[gx, gz];
-            colors[i] = cell?.biome != null ? cell.biome.color : Color.white;
+            colors[i] = cell.biome != null ? cell.biome.color : Color.white;
         }
 
         mesh.colors = colors;

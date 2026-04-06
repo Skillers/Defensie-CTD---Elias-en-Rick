@@ -1,6 +1,6 @@
 # Defensie CTD - Elias en Rick
 
-A tactical terrain simulation and pathfinding system built in Unity. The project features procedurally generated terrain, real-time A* pathfinding for military unit movement, and a central terrain data store for querying height, slope, and terrain type per cell.
+A tactical terrain simulation and pathfinding system built in Unity. The project features procedurally generated terrain, real-time A* pathfinding for military unit movement, and a central terrain data store for querying height, slope, and biome per cell.
 
 ---
 
@@ -8,8 +8,8 @@ A tactical terrain simulation and pathfinding system built in Unity. The project
 
 ```
 Assets/
-├── *.cs                  — Core gameplay scripts (pathfinding, units, terrain grid)
-├── TerrainScripts/       — Terrain generation, biome maps, slope analysis, data store
+├── *.cs                  — Core gameplay scripts (pathfinding, units, rendering)
+├── TerrainScripts/       — Terrain generation, biome definitions, slope analysis, data store
 ├── Scenes/               — Unity scene files
 └── Settings/             — URP render pipeline configuration
 ```
@@ -20,7 +20,7 @@ Assets/
 
 | Scene | Description |
 |---|---|
-| `Main scene.unity` | Primary gameplay scene with Voronoi terrain, units, and pathfinding |
+| `Main scene.unity` | Primary gameplay scene with terrain, units, and pathfinding |
 | `TerrainTest.unity` | Testing scene for 3D Perlin noise + marching cubes terrain |
 | `SampleScene.unity` | Default Unity template scene |
 
@@ -28,32 +28,19 @@ Assets/
 
 ## Core Scripts (`Assets/`)
 
-### Terrain Grid
-
-**`TerrainCell.cs`**
-Data model for a single terrain cell. Defines three terrain types with movement costs:
-- `Grass` — cost 2
-- `Dirt` — cost 3
-- `Sand` — cost 5
-
-**`VoronoiMap.cs`**
-Generates a terrain grid using a Voronoi diagram. Grid size is derived from `PlaneConfig`. Regions are placed on a jittered grid controlled by `regionsX` and `regionsZ` — e.g. `regionsX=10, regionsZ=5` creates 50 regions. Provides coordinate conversion between grid and world space.
-
-**`MapRenderer.cs`**
-Renders the terrain grid as a single combined mesh. Uses vertex colors to encode terrain type. Accepts both `TerrainCell[,]` and `MilitaryTerrainCell[,]` grids.
-
----
-
 ### Pathfinding & Units
 
 **`AStarPathfinder.cs`**
-8-directional A* pathfinder with diagonal movement cost (√2 × terrain cost). Supports squad footprints (e.g. 5×5 tiles) and rejects paths where the squad doesn't fully fit.
+8-directional A* pathfinder with diagonal movement cost (sqrt(2) x biome cost). Supports squad footprints (e.g. 5x5 tiles) and rejects paths where the squad doesn't fully fit. Accepts an optional `UnitTypeSO` to resolve per-biome movement costs.
 
 **`UnitMover.cs`**
-Moves a unit along a path from `AStarPathfinder`. Speed scales with terrain cost. Automatically recalculates the path when the goal flag moves. Draws the current path as a yellow line via `LineRenderer`.
+Moves a unit along a path from `AStarPathfinder`. Speed scales with biome movement cost. Automatically recalculates the path when the goal flag moves. References `TerrainDataStore` for all grid/world conversion and terrain queries.
 
 **`UnitFacer.cs`**
 Rotates the unit's visual to face its movement direction. Attached as a child of `UnitMover`.
+
+**`MapRenderer.cs`**
+Renders the biome grid as a single combined mesh using vertex colors from `BiomeSO.color`.
 
 ---
 
@@ -73,41 +60,21 @@ ScriptableObject holding all terrain generation parameters: extents (X, Z), nois
 
 ---
 
-### Military Terrain Types
+### Biome Definitions (ScriptableObjects)
 
-**`MilitaryTerrainCell.cs`**
-Defines `MilitaryTerrainType` and `MilitaryTerrainCell` used by all biome map scripts. Movement costs per type:
+**`BiomeSO.cs`** — `Create > Config > Biome`
+Defines a biome type as a ScriptableObject asset. Fields:
+- `biomeName` — display name
+- `color` — vertex color used for rendering
+- `defaultMovementCost` — base movement cost for all units
+- `unitWeights[]` — optional per-unit-type movement cost overrides
+- `GetMovementCost(UnitTypeSO)` — resolves the cost for a given unit type
 
-| Type | Cost | Description |
-|---|---|---|
-| `Grass` | 3 | Open grassy area |
-| `GrassyPlain` | 3 | Wide flat grass |
-| `Snow` | 5 | Flat snow |
-| `SnowyHill` | 8 | Elevated snow |
-| `Mud` | 6 | Wet and slow |
-| `MuddyMountain` | 9 | Steep and wet |
-| `DenseForest` | 7 | Dense vegetation |
-| `RockyTerrain` | 7 | Uneven rocky ground |
+**`UnitTypeSO.cs`** — `Create > Config > Unit Type`
+Identity token for a unit type (e.g. Infantry, Vehicle, Helicopter). Referenced by `BiomeSO.unitWeights` for per-unit cost overrides.
 
----
-
-### Biome Maps (pick one per scene)
-
-Both scripts read grid size from `PlaneConfig` (`extentX * 2`, `extentZ * 2`) and seed from `config.seed`. Both fire `OnGenerated` when done — `MarchingCubesTerrain` listens to this to recolor its 3D mesh with terrain type colors.
-
-**`BiomeVoronoiMap.cs`** — Option A
-Voronoi map using military terrain types. Seeds are placed on a jittered grid controlled by `regionsX` and `regionsZ`. Each region gets a randomly assigned `MilitaryTerrainType`.
-
-**`NoiseBiomeMap.cs`** — Option B
-Two Perlin noise maps (height + moisture) are combined to determine terrain type per cell. Thresholds are configurable in the Inspector.
-
-```
-Height \ Moisture |  Dry          |  Moderate     |  Wet
-──────────────────┼───────────────┼───────────────┼──────────────
-High (mountain)   | SnowyHill     | MuddyMountain | MuddyMountain
-Mid  (hills)      | RockyTerrain  | GrassyPlain   | Mud
-Low  (plains)     | GrassyPlain   | Grass         | DenseForest
-```
+**`BiomeCell`** (defined in `BiomeSO.cs`)
+Simple wrapper holding a `BiomeSO` reference. Used in the terrain grid. Movement cost is always resolved dynamically via `biome.GetMovementCost(unitType)`.
 
 ---
 
@@ -117,10 +84,10 @@ Low  (plains)     | GrassyPlain   | Grass         | DenseForest
 Generates a 2D float array of terrain heights using Perlin noise. Fires `OnGenerated` when complete.
 
 **`MarchingCubesTerrain.cs`**
-Builds a 3D volumetric mesh from the height field using the marching cubes algorithm. Listens to `PerlinNoisePlane.OnGenerated`.
+Builds a 3D volumetric mesh from the height field using the marching cubes algorithm. Listens to `PerlinNoisePlane.OnGenerated`. Colors vertices using biome data from `TerrainDataStore`.
 
 **`SlopeMap.cs`**
-Computes slope angles per vertex using central-difference gradients. Exposes `GetSlope(x, z)` and `GetDirectionalSlope(x1,z1, x2,z2)`. Generates a white-to-red visualization mesh.
+Computes slope angles per vertex using central-difference gradients. Exposes `GetSlope(x, z)` and `GetDirectionalSlope(x1,z1, x2,z2)`.
 
 **`StartEndPoints.cs`**
 Places a red sphere (start) and green sphere (end) on the terrain at reproducible seeded positions.
@@ -130,23 +97,23 @@ Places a red sphere (start) and green sphere (end) on the terrain at reproducibl
 ### Central Data Store
 
 **`TerrainDataStore.cs`**
-Single queryable source for all per-cell terrain data. Aggregates terrain type and movement cost from the active biome map, height from `PerlinNoisePlane`, and slope from `SlopeMap`.
+Single queryable source for all per-cell terrain data. Aggregates biome type and movement cost from the biome grid, height from `PerlinNoisePlane`, and slope from `SlopeMap`. Also provides grid/world coordinate conversion for all gameplay systems.
 
 ```csharp
 // Query by world position
-TerrainPoint data = terrainDataStore.GetData(worldPos);
+TerrainPoint data = terrainDataStore.GetData(worldPos, unitType);
 
 // Query by grid coordinate
-TerrainPoint data = terrainDataStore.GetData(gridX, gridZ);
+TerrainPoint data = terrainDataStore.GetData(gridX, gridZ, unitType);
 
 // TerrainPoint fields:
-data.terrainType    // MilitaryTerrainType
-data.movementCost   // int
+data.biome          // BiomeSO
+data.movementCost   // int (resolved for the given unit type)
 data.height         // float (world units)
-data.slopeDegrees   // float (0–90°)
+data.slopeDegrees   // float (0-90)
 ```
 
-Assign `biomeMap` to whichever of the three biome map scripts is active. Rebuilds automatically when `PerlinNoisePlane` fires `OnGenerated`.
+Set the biome grid via `terrainDataStore.SetGrid(biomeGrid)`. Fires `OnGridReady` when the grid is assigned.
 
 ---
 
@@ -154,22 +121,24 @@ Assign `biomeMap` to whichever of the three biome map scripts is active. Rebuild
 
 ```
 PlaneConfig (single source of settings)
-    ├─> PerlinNoisePlane (height field)
-    │       ├─> MarchingCubesTerrain (3D mesh)
-    │       ├─> SlopeMap (slope analysis)
-    │       └─> StartEndPoints (path markers)
-    │
-    └─> BiomeVoronoiMap / NoiseBiomeMap (terrain type grid)
-            └─> MapRenderer (flat mesh with vertex colors)
+    |-> PerlinNoisePlane (height field)
+    |       |-> MarchingCubesTerrain (3D mesh)
+    |       |-> SlopeMap (slope analysis)
+    |       +-> StartEndPoints (path markers)
+    |
+    +-> [Biome generator] (produces BiomeCell[,] grid)
+            +-> TerrainDataStore.SetGrid()
+                    |-> MapRenderer (flat mesh with vertex colors)
+                    +-> MarchingCubesTerrain (vertex coloring)
 
-TerrainDataStore
-    ├─ reads: active biome map  → terrainType, movementCost
-    ├─ reads: PerlinNoisePlane  → height
-    └─ reads: SlopeMap          → slopeDegrees
+TerrainDataStore (central aggregator)
+    |- holds: BiomeCell[,] grid -> biome, movementCost
+    |- reads: PerlinNoisePlane  -> height
+    +- reads: SlopeMap          -> slopeDegrees
 
-AStarPathfinder (path from A to B, uses movementCost)
-    └─> UnitMover (smooth movement)
-            └─> UnitFacer (unit rotation)
+AStarPathfinder (path from A to B, uses biome movement cost)
+    +-> UnitMover (smooth movement via TerrainDataStore)
+            +-> UnitFacer (unit rotation)
 ```
 
 ---
@@ -177,6 +146,7 @@ AStarPathfinder (path from A to B, uses movementCost)
 ## Technology
 
 - **Unity** with URP (Universal Render Pipeline)
-- **Procedural generation**: Voronoi diagrams, Perlin noise, marching cubes
-- **Pathfinding**: Custom A* with squad footprint support
+- **Procedural generation**: Perlin noise, marching cubes
+- **Data-driven biomes**: ScriptableObject-based biome and unit type definitions
+- **Pathfinding**: Custom A* with squad footprint support and per-unit-type costs
 - **Rendering**: Runtime mesh generation with vertex color baking

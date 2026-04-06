@@ -51,12 +51,12 @@ public class ObstaclePlacer : MonoBehaviour
 
             if (block && blockBiome != null)
             {
-                terrainDataStore.grid[cx, cz] = new BiomeCell { biome = blockBiome };
+                terrainDataStore.grid[cx, cz] = new CellData { biome = blockBiome };
             }
             else if (!block)
             {
                 var cell = terrainDataStore.grid[cx, cz];
-                if (cell?.biome != null)
+                if (cell.biome != null)
                     cell.biome.defaultMovementCost += slowCostIncrease;
             }
         }

@@ -22,14 +22,14 @@ public class MapRenderer : MonoBehaviour
         mr = GetComponent<MeshRenderer>();
     }
 
-    public void Render(BiomeCell[,] grid, int width, int height)
+    public void Render(CellData[,] grid, int width, int height)
     {
         Color[] cellColors = new Color[width * height];
         for (int x = 0; x < width; x++)
         for (int z = 0; z < height; z++)
         {
             var cell = grid[x, z];
-            cellColors[x * height + z] = cell?.biome != null ? cell.biome.color : Color.white;
+            cellColors[x * height + z] = cell.biome != null ? cell.biome.color : Color.white;
         }
 
         RenderColors(cellColors, width, height);
@@ -92,12 +92,12 @@ public class MapRenderer : MonoBehaviour
     }
 
     /// <summary>Update a single cell's color without rebuilding the whole mesh.</summary>
-    public void RefreshCell(BiomeCell cell, int x, int z)
+    public void RefreshCell(CellData cell, int x, int z)
     {
         if (mesh == null || colors == null) return;
 
         int vi = CellVertexIndex(x, z);
-        Color c = cell?.biome != null ? cell.biome.color : Color.white;
+        Color c = cell.biome != null ? cell.biome.color : Color.white;
         colors[vi + 0] = c;
         colors[vi + 1] = c;
         colors[vi + 2] = c;

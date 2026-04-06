@@ -21,7 +21,7 @@ public static class AStarPathfinder
     /// unitSize: the squad footprint in cells (e.g. 5 = 5x5).
     /// unitType: optional unit type for resolving per-biome movement costs.
     /// </summary>
-    public static List<Vector2Int> FindPath(BiomeCell[,] grid, int gridWidth, int gridHeight,
+    public static List<Vector2Int> FindPath(CellData[,] grid, int gridWidth, int gridHeight,
                                             Vector2Int start, Vector2Int goal,
                                             int unitSize = 5, UnitTypeSO unitType = null)
     {
@@ -48,7 +48,7 @@ public static class AStarPathfinder
                 if (!CanFit(grid, gridWidth, gridHeight, neighbour, unitSize)) continue;
 
                 var cell = grid[neighbour.x, neighbour.y];
-                int moveCost = cell?.biome != null ? cell.biome.GetMovementCost(unitType) : 3;
+                int moveCost = cell.biome != null ? cell.biome.GetMovementCost(unitType) : 3;
 
                 float stepCost = isDiagonal ? SQRT2 * moveCost : moveCost;
                 float newG     = current.gCost + stepCost;
@@ -75,7 +75,7 @@ public static class AStarPathfinder
         return new List<Vector2Int>();
     }
 
-    static bool CanFit(BiomeCell[,] grid, int w, int h, Vector2Int pos, int unitSize)
+    static bool CanFit(CellData[,] grid, int w, int h, Vector2Int pos, int unitSize)
     {
         int half = unitSize / 2;
         for (int dx = -half; dx <= half; dx++)
@@ -85,7 +85,7 @@ public static class AStarPathfinder
             int ny = pos.y + dy;
             if (nx < 0 || nx >= w || ny < 0 || ny >= h) return false;
             var cell = grid[nx, ny];
-            if (cell?.biome == null) return false;
+            if (cell.biome == null) return false;
             if (cell.biome.defaultMovementCost == int.MaxValue) return false;
         }
         return true;

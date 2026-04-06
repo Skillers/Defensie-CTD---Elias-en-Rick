@@ -30,9 +30,3 @@ public struct UnitWeight
     public UnitTypeSO unitType;
     public int movementCost;
 }
-
-[System.Serializable]
-public class BiomeCell
-{
-    public BiomeSO biome;
-}

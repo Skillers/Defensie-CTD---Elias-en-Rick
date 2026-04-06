@@ -144,7 +144,7 @@ public class UnitMover : MonoBehaviour
 
             Vector2Int currentCell = terrainDataStore.WorldToGrid(transform.position);
             var cell = terrainDataStore.grid[currentCell.x, currentCell.y];
-            int terrainCost = cell?.biome != null ? cell.biome.GetMovementCost(unitType) : 3;
+            int terrainCost = cell.biome != null ? cell.biome.GetMovementCost(unitType) : 3;
             float effectiveSpeed = moveSpeed / terrainCost;
 
             transform.position += desiredDir * effectiveSpeed * Time.deltaTime;
