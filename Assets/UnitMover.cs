@@ -11,21 +11,23 @@ using UnityEngine;
 public class UnitMover : MonoBehaviour
 {
     [Header("References")]
-    public VoronoiMap voronoiMap;
-    public Transform  flag;               // goal flag placed in scene
+    public TerrainDataStore terrainDataStore;
+    public Transform  flag;
+
+    [Header("Unit")]
+    [Tooltip("Optional — used to resolve per-biome movement costs.")]
+    public UnitTypeSO unitType;
 
     [Header("Movement")]
-    public float moveSpeed   = 6f;        // units per second
-    public float turnSpeed   = 90f;       // degrees per second (squad slow turn)
+    public float moveSpeed   = 6f;
+    public float turnSpeed   = 90f;
 
     [Header("Path Visual")]
     public Color pathColor     = Color.yellow;
     public float pathLineWidth = 0.5f;
 
-    // Instant facing direction — shared with UnitFacer so units snap immediately
     [HideInInspector] public Vector3 moveDirection = Vector3.forward;
 
-    // Slowly-rotating direction — drives the parent transform rotation (formation turn)
     Vector3 squadDirection = Vector3.forward;
 
     List<Vector2Int> path = new List<Vector2Int>();
@@ -33,13 +35,13 @@ public class UnitMover : MonoBehaviour
     bool   moving         = false;
 
     Vector3    currentTarget;
-    Vector2Int lastFlagCell;   // tracks flag position so we detect moves
+    Vector2Int lastFlagCell;
     LineRenderer pathLine;
 
     void Start()
     {
         SetupLineRenderer();
-        lastFlagCell = WorldToGrid(flag.position);
+        lastFlagCell = terrainDataStore.WorldToGrid(flag.position);
         RequestPath();
     }
 
@@ -51,7 +53,6 @@ public class UnitMover : MonoBehaviour
         pathLine.endWidth       = pathLineWidth;
         pathLine.positionCount  = 0;
 
-        // Find a shader that renders solid color (same fallback chain as MapRenderer)
         string[] candidates =
         {
             "Universal Render Pipeline/Particles/Unlit",
@@ -75,23 +76,24 @@ public class UnitMover : MonoBehaviour
 
     public void RequestPath()
     {
-        lastFlagCell = WorldToGrid(flag.position);
+        lastFlagCell = terrainDataStore.WorldToGrid(flag.position);
 
-        Vector2Int startCell = WorldToGrid(transform.position);
+        Vector2Int startCell = terrainDataStore.WorldToGrid(transform.position);
         Vector2Int goalCell  = lastFlagCell;
 
         path = AStarPathfinder.FindPath(
-            voronoiMap.grid,
-            voronoiMap.width,
-            voronoiMap.height,
+            terrainDataStore.grid,
+            terrainDataStore.GridWidth,
+            terrainDataStore.GridHeight,
             startCell,
-            goalCell
+            goalCell,
+            unitType: unitType
         );
 
         if (path.Count > 1)
         {
-            waypointIndex = 1;   // 0 is the start cell
-            currentTarget = GridToWorld(path[waypointIndex]);
+            waypointIndex = 1;
+            currentTarget = terrainDataStore.GridToWorld(path[waypointIndex]);
             moving = true;
         }
         else
@@ -108,22 +110,20 @@ public class UnitMover : MonoBehaviour
         pathLine.positionCount = path.Count;
         for (int i = 0; i < path.Count; i++)
         {
-            Vector3 wp = GridToWorld(path[i]);
-            wp.y = 0.1f;   // slightly above terrain so it's visible
+            Vector3 wp = terrainDataStore.GridToWorld(path[i]);
+            wp.y = 0.1f;
             pathLine.SetPosition(i, wp);
         }
     }
 
     void Update()
     {
-        // Repath when the flag moves to a different cell
-        Vector2Int flagCell = WorldToGrid(flag.position);
+        Vector2Int flagCell = terrainDataStore.WorldToGrid(flag.position);
         if (flagCell != lastFlagCell)
             RequestPath();
 
         if (!moving) return;
 
-        // ── Move toward current waypoint ──────────────────────────────────
         Vector3 toTarget = currentTarget - transform.position;
         toTarget.y = 0f;
         float dist = toTarget.magnitude;
@@ -132,10 +132,8 @@ public class UnitMover : MonoBehaviour
         {
             Vector3 desiredDir = toTarget.normalized;
 
-            // Units instantly face the movement direction
             moveDirection = desiredDir;
 
-            // Squad parent slowly rotates to keep formation
             squadDirection = Vector3.RotateTowards(
                 squadDirection,
                 desiredDir,
@@ -144,10 +142,9 @@ public class UnitMover : MonoBehaviour
             );
             transform.rotation = Quaternion.LookRotation(squadDirection);
 
-            // Scale speed by terrain cost of the current cell:
-            // cost 1 = full speed, cost 10 = 1/10 speed
-            Vector2Int currentCell = voronoiMap.WorldToGrid(transform.position);
-            int terrainCost = voronoiMap.grid[currentCell.x, currentCell.y].movementCost;
+            Vector2Int currentCell = terrainDataStore.WorldToGrid(transform.position);
+            var cell = terrainDataStore.grid[currentCell.x, currentCell.y];
+            int terrainCost = cell?.biome != null ? cell.biome.GetMovementCost(unitType) : 3;
             float effectiveSpeed = moveSpeed / terrainCost;
 
             transform.position += desiredDir * effectiveSpeed * Time.deltaTime;
@@ -160,31 +157,11 @@ public class UnitMover : MonoBehaviour
             if (waypointIndex >= path.Count)
             {
                 moving = false;
-                pathLine.positionCount = 0;   // clear line on arrival
+                pathLine.positionCount = 0;
                 return;
             }
 
-            currentTarget = GridToWorld(path[waypointIndex]);
+            currentTarget = terrainDataStore.GridToWorld(path[waypointIndex]);
         }
-    }
-
-    // ── Grid / World conversion (XZ plane) ───────────────────────────────
-    // 1 cell = 1 unit, map centred on voronoiMap.transform.position
-
-    Vector2Int WorldToGrid(Vector3 world)
-    {
-        Vector3 local = world - voronoiMap.transform.position;
-        int gx = Mathf.FloorToInt(local.x + voronoiMap.width  * 0.5f);
-        int gz = Mathf.FloorToInt(local.z + voronoiMap.height * 0.5f);
-        gx = Mathf.Clamp(gx, 0, voronoiMap.width  - 1);
-        gz = Mathf.Clamp(gz, 0, voronoiMap.height - 1);
-        return new Vector2Int(gx, gz);
-    }
-
-    Vector3 GridToWorld(Vector2Int cell)
-    {
-        float wx = cell.x - voronoiMap.width  * 0.5f + 0.5f;
-        float wz = cell.y - voronoiMap.height * 0.5f + 0.5f;
-        return voronoiMap.transform.position + new Vector3(wx, 0f, wz);
     }
 }

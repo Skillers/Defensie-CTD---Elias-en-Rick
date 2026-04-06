@@ -7,14 +7,14 @@ public class MarchingCubesTerrain : MonoBehaviour
 {
     public PerlinNoisePlane    noisePlane;
     public TerrainConfigHolder configHolder;
-    public BiomeVoronoiMap voronoiMap;
+    public TerrainDataStore terrainDataStore;
     private PlaneConfig config => configHolder?.config;
 
     private const float Step      = 0.5f;
     private const float RoundStep = 0.25f;
 
     private PerlinNoisePlane _subscribedTo;
-    private BiomeVoronoiMap  _subscribedVoronoi;
+    private TerrainDataStore _subscribedDataStore;
 
     void OnEnable()  { Subscribe(); SubscribeBiome(); }
     void OnDisable() { Unsubscribe(); UnsubscribeBiome(); }
@@ -50,17 +50,17 @@ public class MarchingCubesTerrain : MonoBehaviour
 
     private void SubscribeBiome()
     {
-        if (_subscribedVoronoi != voronoiMap)
+        if (_subscribedDataStore != terrainDataStore)
         {
-            if (_subscribedVoronoi != null) _subscribedVoronoi.OnGenerated -= ApplyBiomeColors;
-            _subscribedVoronoi = voronoiMap;
-            if (_subscribedVoronoi != null) _subscribedVoronoi.OnGenerated += ApplyBiomeColors;
+            if (_subscribedDataStore != null) _subscribedDataStore.OnGridReady -= ApplyBiomeColors;
+            _subscribedDataStore = terrainDataStore;
+            if (_subscribedDataStore != null) _subscribedDataStore.OnGridReady += ApplyBiomeColors;
         }
     }
 
     private void UnsubscribeBiome()
     {
-        if (_subscribedVoronoi != null) { _subscribedVoronoi.OnGenerated -= ApplyBiomeColors; _subscribedVoronoi = null; }
+        if (_subscribedDataStore != null) { _subscribedDataStore.OnGridReady -= ApplyBiomeColors; _subscribedDataStore = null; }
     }
 
     [ContextMenu("Regenerate")]
@@ -163,7 +163,7 @@ public class MarchingCubesTerrain : MonoBehaviour
         GetComponent<MeshFilter>().mesh = mesh;
 
         var mr = GetComponent<MeshRenderer>();
-        if (ActiveGrid() != null)
+        if (terrainDataStore != null && terrainDataStore.grid != null)
         {
             var shader = Shader.Find("Universal Render Pipeline/Particles/Lit")
                       ?? Shader.Find("Universal Render Pipeline/Lit")
@@ -180,29 +180,24 @@ public class MarchingCubesTerrain : MonoBehaviour
         }
     }
 
-    private MilitaryTerrainCell[,] ActiveGrid()
-    {
-        if (voronoiMap != null && voronoiMap.grid != null) return voronoiMap.grid;
-        return null;
-    }
-
     private void ApplyBiomeColors()
     {
-        var grid = ActiveGrid();
-        if (grid == null) return;
+        if (terrainDataStore == null || terrainDataStore.grid == null) return;
         var mesh = GetComponent<MeshFilter>().sharedMesh;
         if (mesh == null) return;
 
-        var vertices = mesh.vertices;
-        var colors   = new Color[vertices.Length];
-        int gridW    = grid.GetLength(0);
-        int gridH    = grid.GetLength(1);
+        var biomeGrid = terrainDataStore.grid;
+        var vertices  = mesh.vertices;
+        var colors    = new Color[vertices.Length];
+        int gridW     = biomeGrid.GetLength(0);
+        int gridH     = biomeGrid.GetLength(1);
 
         for (int i = 0; i < vertices.Length; i++)
         {
             int gx = Mathf.Clamp(Mathf.FloorToInt(vertices[i].x + gridW * 0.5f), 0, gridW - 1);
             int gz = Mathf.Clamp(Mathf.FloorToInt(vertices[i].z + gridH * 0.5f), 0, gridH - 1);
-            colors[i] = grid[gx, gz].color;
+            var cell = biomeGrid[gx, gz];
+            colors[i] = cell?.biome != null ? cell.biome.color : Color.white;
         }
 
         mesh.colors = colors;

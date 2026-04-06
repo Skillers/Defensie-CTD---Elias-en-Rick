@@ -2,11 +2,9 @@ using UnityEngine;
 
 /// <summary>
 /// Central data store for per-cell terrain information.
-/// Aggregates terrain type/cost from a biome map, height from PerlinNoisePlane,
+/// Aggregates biome data, height from PerlinNoisePlane,
 /// and slope from SlopeMap into a single queryable place.
-///
-/// Query by world position:  TerrainDataStore.GetData(worldPos)
-/// Query by grid coordinate: TerrainDataStore.GetData(gridX, gridZ)
+/// Also provides grid/world coordinate conversion used by all gameplay systems.
 /// </summary>
 public class TerrainDataStore : MonoBehaviour
 {
@@ -15,67 +13,77 @@ public class TerrainDataStore : MonoBehaviour
     private PlaneConfig config => configHolder?.config;
 
     [Header("Data Sources")]
-    public BiomeVoronoiMap voronoiMap;
     public PerlinNoisePlane noisePlane;
     public SlopeMap         slopeMap;
 
-    // Cached grid dimensions derived from the biome map grid after generation
+    /// <summary>The biome grid. Set externally by whatever system generates biomes.</summary>
+    [HideInInspector] public BiomeCell[,] grid;
+
     public int GridWidth  { get; private set; }
     public int GridHeight { get; private set; }
 
+    public event System.Action OnGridReady;
+
     void Awake()
     {
-        if (noisePlane != null) noisePlane.OnGenerated  += OnTerrainGenerated;
-        if (voronoiMap != null) voronoiMap.OnGenerated  += OnTerrainGenerated;
+        if (noisePlane != null) noisePlane.OnGenerated += OnTerrainGenerated;
     }
 
     void OnDestroy()
     {
-        if (noisePlane != null) noisePlane.OnGenerated  -= OnTerrainGenerated;
-        if (voronoiMap != null) voronoiMap.OnGenerated  -= OnTerrainGenerated;
+        if (noisePlane != null) noisePlane.OnGenerated -= OnTerrainGenerated;
     }
 
     void OnTerrainGenerated()
     {
-        var grid = GetBiomeGrid();
         if (grid != null)
         {
             GridWidth  = grid.GetLength(0);
             GridHeight = grid.GetLength(1);
+            OnGridReady?.Invoke();
         }
     }
 
-    /// <summary>Returns terrain data at the given world position.</summary>
-    public TerrainPoint GetData(Vector3 worldPos)
+    /// <summary>Call after assigning the grid to update dimensions and notify listeners.</summary>
+    public void SetGrid(BiomeCell[,] biomeGrid)
     {
-        if (config == null) return default;
+        grid = biomeGrid;
+        if (grid != null)
+        {
+            GridWidth  = grid.GetLength(0);
+            GridHeight = grid.GetLength(1);
+            OnGridReady?.Invoke();
+        }
+    }
 
-        int gx = Mathf.Clamp(Mathf.FloorToInt(worldPos.x + GridWidth  * 0.5f), 0, GridWidth  - 1);
-        int gz = Mathf.Clamp(Mathf.FloorToInt(worldPos.z + GridHeight * 0.5f), 0, GridHeight - 1);
-        return GetData(gx, gz);
+    // ── Queries ──────────────────────────────────────────────────────────
+
+    /// <summary>Returns terrain data at the given world position.</summary>
+    public TerrainPoint GetData(Vector3 worldPos, UnitTypeSO unitType = null)
+    {
+        Vector2Int g = WorldToGrid(worldPos);
+        return GetData(g.x, g.y, unitType);
     }
 
     /// <summary>Returns terrain data at the given grid coordinate.</summary>
-    public TerrainPoint GetData(int gridX, int gridZ)
+    public TerrainPoint GetData(int gridX, int gridZ, UnitTypeSO unitType = null)
     {
         var point = new TerrainPoint();
 
-        // --- Terrain type and movement cost from biome map ---
-        var grid = GetBiomeGrid();
         if (grid != null)
         {
-            int x = Mathf.Clamp(gridX, 0, grid.GetLength(0) - 1);
-            int z = Mathf.Clamp(gridZ, 0, grid.GetLength(1) - 1);
+            int x = Mathf.Clamp(gridX, 0, GridWidth  - 1);
+            int z = Mathf.Clamp(gridZ, 0, GridHeight - 1);
             var cell = grid[x, z];
-            point.terrainType  = cell.type;
-            point.movementCost = cell.movementCost;
+            if (cell?.biome != null)
+            {
+                point.biome        = cell.biome;
+                point.movementCost = cell.biome.GetMovementCost(unitType);
+            }
         }
 
-        // --- Height from PerlinNoisePlane ---
         if (noisePlane != null && noisePlane.NoiseValues != null && config != null)
         {
-            // Biome cells are 1 unit wide; noise vertices are 0.5 units apart.
-            // Map grid cell center to the nearest noise vertex.
             float worldX = gridX - GridWidth  * 0.5f + 0.5f;
             float worldZ = gridZ - GridHeight * 0.5f + 0.5f;
             int xi = Mathf.Clamp(Mathf.RoundToInt((worldX + config.extentX) / 0.5f), 0, noisePlane.VertsX - 1);
@@ -83,7 +91,6 @@ public class TerrainDataStore : MonoBehaviour
             point.height = noisePlane.GetValue(xi, zi) * config.heightMultiplier;
         }
 
-        // --- Slope from SlopeMap ---
         if (slopeMap != null && slopeMap.SlopeAngles != null && config != null)
         {
             float worldX = gridX - GridWidth  * 0.5f + 0.5f;
@@ -96,17 +103,35 @@ public class TerrainDataStore : MonoBehaviour
         return point;
     }
 
-    MilitaryTerrainCell[,] GetBiomeGrid()
+    // ── Grid / World conversion ──────────────────────────────────────────
+
+    public bool InBounds(int x, int z)
     {
-        if (voronoiMap != null && voronoiMap.grid != null) return voronoiMap.grid;
-        return null;
+        return grid != null && x >= 0 && x < GridWidth && z >= 0 && z < GridHeight;
+    }
+
+    public Vector2Int WorldToGrid(Vector3 world)
+    {
+        Vector3 local = world - transform.position;
+        int gx = Mathf.FloorToInt(local.x + GridWidth  * 0.5f);
+        int gz = Mathf.FloorToInt(local.z + GridHeight * 0.5f);
+        return new Vector2Int(
+            Mathf.Clamp(gx, 0, GridWidth  - 1),
+            Mathf.Clamp(gz, 0, GridHeight - 1));
+    }
+
+    public Vector3 GridToWorld(Vector2Int cell)
+    {
+        float wx = cell.x - GridWidth  * 0.5f + 0.5f;
+        float wz = cell.y - GridHeight * 0.5f + 0.5f;
+        return transform.position + new Vector3(wx, 0f, wz);
     }
 }
 
 /// <summary>All per-cell terrain data in one place.</summary>
 public struct TerrainPoint
 {
-    public MilitaryTerrainType terrainType;
+    public BiomeSO biome;
     public int   movementCost;
     public float height;
     public float slopeDegrees;

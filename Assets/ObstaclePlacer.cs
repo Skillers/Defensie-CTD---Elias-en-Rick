@@ -11,11 +11,15 @@ using UnityEngine.InputSystem;
 public class ObstaclePlacer : MonoBehaviour
 {
     [Header("References")]
-    public VoronoiMap voronoiMap;
+    public TerrainDataStore terrainDataStore;
+
+    [Header("Blocking biome (impassable)")]
+    [Tooltip("Assign a BiomeSO with defaultMovementCost = int.MaxValue.")]
+    public BiomeSO blockBiome;
 
     [Header("Visuals")]
-    public Color blockColor = new Color(1f, 0.1f, 0.1f, 0.4f);   // transparent red
-    public Color slowColor  = new Color(1f, 0.6f, 0.0f, 0.4f);   // transparent orange
+    public Color blockColor = new Color(1f, 0.1f, 0.1f, 0.4f);
+    public Color slowColor  = new Color(1f, 0.6f, 0.0f, 0.4f);
 
     [Header("Cost")]
     public int slowCostIncrease = 5;
@@ -29,50 +33,49 @@ public class ObstaclePlacer : MonoBehaviour
 
     void Place(bool block)
     {
-        // ── Find terrain position under screen centre ─────────────────────
         Ray ray = Camera.main.ScreenPointToRay(
             new Vector3(Screen.width * 0.5f, Screen.height * 0.5f, 0f));
 
-        // Intersect with Y = 0 plane
         if (Mathf.Abs(ray.direction.y) < 0.001f) return;
         float t = -ray.origin.y / ray.direction.y;
         Vector3 worldPos = ray.origin + ray.direction * t;
 
-        Vector2Int center = voronoiMap.WorldToGrid(worldPos);
+        Vector2Int center = terrainDataStore.WorldToGrid(worldPos);
 
-        // ── Update 3x3 grid cells ─────────────────────────────────────────
         for (int dx = -1; dx <= 1; dx++)
         for (int dz = -1; dz <= 1; dz++)
         {
             int cx = center.x + dx;
             int cz = center.y + dz;
-            if (!voronoiMap.InBounds(cx, cz)) continue;
+            if (!terrainDataStore.InBounds(cx, cz)) continue;
 
-            if (block)
-                voronoiMap.grid[cx, cz].movementCost = int.MaxValue;
-            else
-                voronoiMap.grid[cx, cz].movementCost += slowCostIncrease;
+            if (block && blockBiome != null)
+            {
+                terrainDataStore.grid[cx, cz] = new BiomeCell { biome = blockBiome };
+            }
+            else if (!block)
+            {
+                var cell = terrainDataStore.grid[cx, cz];
+                if (cell?.biome != null)
+                    cell.biome.defaultMovementCost += slowCostIncrease;
+            }
         }
 
-        // ── Spawn transparent cube ────────────────────────────────────────
         var cube = GameObject.CreatePrimitive(PrimitiveType.Cube);
-        cube.transform.position   = voronoiMap.GridToWorld(center) + Vector3.up * 0.5f;
+        cube.transform.position   = terrainDataStore.GridToWorld(center) + Vector3.up * 0.5f;
         cube.transform.localScale = new Vector3(3f, 1f, 3f);
 
-        // Remove collider — we don't want it interfering with raycasts
         Destroy(cube.GetComponent<Collider>());
 
         cube.GetComponent<MeshRenderer>().material =
             CreateTransparentMaterial(block ? blockColor : slowColor);
 
-        // ── Trigger repath on all squads ──────────────────────────────────
         foreach (var mover in FindObjectsByType<UnitMover>(FindObjectsSortMode.None))
             mover.RequestPath();
     }
 
     static Material CreateTransparentMaterial(Color color)
     {
-        // URP: Particles/Unlit supports transparency and reads _BaseColor
         Shader shader = Shader.Find("Universal Render Pipeline/Particles/Unlit");
         if (shader != null)
         {
@@ -81,7 +84,6 @@ public class ObstaclePlacer : MonoBehaviour
             return mat;
         }
 
-        // Built-in fallback
         shader = Shader.Find("Legacy Shaders/Transparent/Diffuse");
         if (shader != null)
         {
@@ -90,7 +92,6 @@ public class ObstaclePlacer : MonoBehaviour
             return mat;
         }
 
-        // Last resort — won't be transparent but at least shows something
         var fallback = new Material(Shader.Find("Standard"));
         fallback.color = color;
         return fallback;

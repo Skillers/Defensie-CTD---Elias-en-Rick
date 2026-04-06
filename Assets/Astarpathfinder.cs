@@ -8,7 +8,7 @@ public static class AStarPathfinder
     class Node
     {
         public Vector2Int pos;
-        public float gCost;          // float: diagonal steps cost √2 × terrainCost
+        public float gCost;
         public float hCost;
         public float fCost => gCost + hCost;
         public Node  parent;
@@ -17,12 +17,13 @@ public static class AStarPathfinder
     /// <summary>
     /// Returns a list of grid positions from start to goal (inclusive).
     /// Returns empty list if no path found.
-    /// Supports 8-directional movement; diagonal steps cost √2 × terrain cost.
-    /// unitSize: the squad footprint in cells (e.g. 5 = 5x5). Every candidate cell
-    /// is rejected unless the full footprint fits without hitting an impassable tile.
+    /// Supports 8-directional movement; diagonal steps cost sqrt(2) * terrain cost.
+    /// unitSize: the squad footprint in cells (e.g. 5 = 5x5).
+    /// unitType: optional unit type for resolving per-biome movement costs.
     /// </summary>
-    public static List<Vector2Int> FindPath(TerrainCell[,] grid, int gridWidth, int gridHeight,
-                                            Vector2Int start, Vector2Int goal, int unitSize = 5)
+    public static List<Vector2Int> FindPath(BiomeCell[,] grid, int gridWidth, int gridHeight,
+                                            Vector2Int start, Vector2Int goal,
+                                            int unitSize = 5, UnitTypeSO unitType = null)
     {
         var open   = new List<Node>();
         var closed = new HashSet<Vector2Int>();
@@ -31,7 +32,6 @@ public static class AStarPathfinder
 
         while (open.Count > 0)
         {
-            // Pick lowest fCost
             Node current = open[0];
             for (int i = 1; i < open.Count; i++)
                 if (open[i].fCost < current.fCost) current = open[i];
@@ -45,14 +45,12 @@ public static class AStarPathfinder
             foreach (var (neighbour, isDiagonal) in GetNeighbours(current.pos, gridWidth, gridHeight))
             {
                 if (closed.Contains(neighbour)) continue;
-
-                // Reject if the squad's full footprint doesn't fit at this cell
                 if (!CanFit(grid, gridWidth, gridHeight, neighbour, unitSize)) continue;
 
-                TerrainCell cell = grid[neighbour.x, neighbour.y];
+                var cell = grid[neighbour.x, neighbour.y];
+                int moveCost = cell?.biome != null ? cell.biome.GetMovementCost(unitType) : 3;
 
-                // Diagonal steps travel √2 further, so cost is √2 × terrain cost
-                float stepCost = isDiagonal ? SQRT2 * cell.movementCost : cell.movementCost;
+                float stepCost = isDiagonal ? SQRT2 * moveCost : moveCost;
                 float newG     = current.gCost + stepCost;
 
                 Node existing = open.Find(n => n.pos == neighbour);
@@ -74,12 +72,10 @@ public static class AStarPathfinder
             }
         }
 
-        return new List<Vector2Int>(); // no path
+        return new List<Vector2Int>();
     }
 
-    // Returns true only if every cell in the unitSize×unitSize footprint centred on
-    // pos is in bounds and passable. Movement cost is still read from the centre cell.
-    static bool CanFit(TerrainCell[,] grid, int w, int h, Vector2Int pos, int unitSize)
+    static bool CanFit(BiomeCell[,] grid, int w, int h, Vector2Int pos, int unitSize)
     {
         int half = unitSize / 2;
         for (int dx = -half; dx <= half; dx++)
@@ -88,13 +84,13 @@ public static class AStarPathfinder
             int nx = pos.x + dx;
             int ny = pos.y + dy;
             if (nx < 0 || nx >= w || ny < 0 || ny >= h) return false;
-            if (grid[nx, ny].movementCost == int.MaxValue) return false;
+            var cell = grid[nx, ny];
+            if (cell?.biome == null) return false;
+            if (cell.biome.defaultMovementCost == int.MaxValue) return false;
         }
         return true;
     }
 
-    // Octile distance — correct heuristic for 8-directional grids where
-    // cardinal cost = 1 and diagonal cost = √2.
     static float Heuristic(Vector2Int a, Vector2Int b)
     {
         float dx = Mathf.Abs(a.x - b.x);
@@ -102,7 +98,6 @@ public static class AStarPathfinder
         return (dx + dy) + (SQRT2 - 2f) * Mathf.Min(dx, dy);
     }
 
-    // Returns each neighbour paired with whether the step is diagonal.
     static IEnumerable<(Vector2Int pos, bool isDiagonal)> GetNeighbours(Vector2Int pos, int w, int h)
     {
         for (int dx = -1; dx <= 1; dx++)
