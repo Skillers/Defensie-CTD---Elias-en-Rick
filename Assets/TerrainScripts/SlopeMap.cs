@@ -5,8 +5,7 @@ using UnityEngine.Rendering;
 public class SlopeMap : MonoBehaviour
 {
     public PerlinNoisePlane    noisePlane;
-    public TerrainConfigHolder configHolder;
-    private PlaneConfig config => configHolder?.config;
+    public TerrainDataStore terrainDataStore;
 
     private const float Step      = 0.5f;
     private const float RoundStep = 0.25f;
@@ -52,7 +51,7 @@ public class SlopeMap : MonoBehaviour
     // Raw heights (no rounding) so slope gradients are smooth
     private float[] BuildHeights()
     {
-        float heightMult = config.heightMultiplier;
+        float heightMult = terrainDataStore.heightMultiplier;
         var   heights    = new float[VertsX * VertsZ];
 
         for (int z = 0; z < VertsZ; z++)
@@ -96,7 +95,7 @@ public class SlopeMap : MonoBehaviour
         for (int x = 0; x < VertsX; x++)
         {
             int i = z * VertsX + x;
-            vertices[i] = new Vector3(-config.extentX + x * Step, 0f, -config.extentZ + z * Step);
+            vertices[i] = new Vector3(-terrainDataStore.extentX + x * Step, 0f, -terrainDataStore.extentZ + z * Step);
             uvs[i]      = new Vector2((float)x / stepsX, (float)z / stepsZ);
         }
 

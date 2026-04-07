@@ -2,9 +2,8 @@ using UnityEngine;
 
 public class StartEndPoints : MonoBehaviour
 {
-    public TerrainConfigHolder configHolder;
+    public TerrainDataStore terrainDataStore;
     public PerlinNoisePlane    noisePlane;
-    private PlaneConfig config => configHolder?.config;
 
     private const float EdgeMargin  = 10f;
     private const float SphereSize  = 2f;
@@ -43,13 +42,12 @@ public class StartEndPoints : MonoBehaviour
     [ContextMenu("Replace")]
     public void Place()
     {
-        if (configHolder == null) { Debug.LogError("StartEndPoints: assign a TerrainConfigHolder."); return; }
-        if (config == null) { Debug.LogError("StartEndPoints: TerrainConfigHolder has no PlaneConfig."); return; }
+        if (terrainDataStore == null) { Debug.LogError("StartEndPoints: no TerrainDataStore assigned."); return; }
 
-        float xMax =  config.extentX - EdgeMargin;
-        float xMin = -config.extentX + EdgeMargin;
-        float zMin = -config.extentZ + EdgeMargin;
-        float zMax =  config.extentZ - EdgeMargin;
+        float xMax =  terrainDataStore.extentX - EdgeMargin;
+        float xMin = -terrainDataStore.extentX + EdgeMargin;
+        float zMin = -terrainDataStore.extentZ + EdgeMargin;
+        float zMax =  terrainDataStore.extentZ - EdgeMargin;
 
         if (xMax <= 0 || xMin >= 0)
         {
@@ -57,8 +55,8 @@ public class StartEndPoints : MonoBehaviour
             return;
         }
 
-        // Use config seed so the same seed always produces the same Z positions
-        var rng = new System.Random(config.seed);
+        // Use seed so the same seed always produces the same Z positions
+        var rng = new System.Random(terrainDataStore.seed);
         float startZ = zMin + (float)(rng.NextDouble() * (zMax - zMin));
         float endZ   = zMin + (float)(rng.NextDouble() * (zMax - zMin));
 
@@ -74,11 +72,11 @@ public class StartEndPoints : MonoBehaviour
     {
         if (noisePlane == null || noisePlane.NoiseValues == null) return 0f;
 
-        int xi = Mathf.Clamp(Mathf.RoundToInt((worldX + config.extentX) / Step), 0, noisePlane.VertsX - 1);
-        int zi = Mathf.Clamp(Mathf.RoundToInt((worldZ + config.extentZ) / Step), 0, noisePlane.VertsZ - 1);
+        int xi = Mathf.Clamp(Mathf.RoundToInt((worldX + terrainDataStore.extentX) / Step), 0, noisePlane.VertsX - 1);
+        int zi = Mathf.Clamp(Mathf.RoundToInt((worldZ + terrainDataStore.extentZ) / Step), 0, noisePlane.VertsZ - 1);
 
         float noise   = noisePlane.GetValue(xi, zi);
-        return Mathf.Round(noise * config.heightMultiplier / RoundStep) * RoundStep;
+        return Mathf.Round(noise * terrainDataStore.heightMultiplier / RoundStep) * RoundStep;
     }
 
     private void PlaceSphere(ref GameObject sphere, string label, Vector3 position, Color color)

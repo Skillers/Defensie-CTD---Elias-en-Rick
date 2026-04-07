@@ -14,17 +14,13 @@ using UnityEngine;
 /// </summary>
 public class MapGenerator : MonoBehaviour
 {
-    [Header("Config")]
-    public TerrainConfigHolder configHolder;
-    private PlaneConfig config => configHolder?.config;
-
     [Header("Pipeline Steps")]
     public PerlinNoisePlane    noisePlane;
     public SlopeMap            slopeMap;
     public MarchingCubesTerrain marchingCubes;
     public BiomeAssigner       biomeAssigner;
 
-    [Header("Output")]
+    [Header("Data")]
     public TerrainDataStore terrainDataStore;
 
     private const float RoundStep = 0.25f;
@@ -38,10 +34,10 @@ public class MapGenerator : MonoBehaviour
     [ContextMenu("Regenerate")]
     public void Generate()
     {
-        if (config == null) { Debug.LogError("MapGenerator: no PlaneConfig assigned."); return; }
+        if (terrainDataStore == null) { Debug.LogError("MapGenerator: no TerrainDataStore assigned."); return; }
 
-        int width  = Mathf.RoundToInt(config.extentX * 2f);
-        int height = Mathf.RoundToInt(config.extentZ * 2f);
+        int width  = Mathf.RoundToInt(terrainDataStore.extentX * 2f);
+        int height = Mathf.RoundToInt(terrainDataStore.extentZ * 2f);
 
         // 1. Create empty grid
         var grid = new CellData[width, height];
@@ -145,9 +141,9 @@ public class MapGenerator : MonoBehaviour
 
         float worldX = gridX - width  * 0.5f + 0.5f;
         float worldZ = gridZ - height * 0.5f + 0.5f;
-        int xi = Mathf.Clamp(Mathf.RoundToInt((worldX + config.extentX) / NoiseStep), 0, noisePlane.VertsX - 1);
-        int zi = Mathf.Clamp(Mathf.RoundToInt((worldZ + config.extentZ) / NoiseStep), 0, noisePlane.VertsZ - 1);
-        return noisePlane.GetValue(xi, zi) * config.heightMultiplier;
+        int xi = Mathf.Clamp(Mathf.RoundToInt((worldX + terrainDataStore.extentX) / NoiseStep), 0, noisePlane.VertsX - 1);
+        int zi = Mathf.Clamp(Mathf.RoundToInt((worldZ + terrainDataStore.extentZ) / NoiseStep), 0, noisePlane.VertsZ - 1);
+        return noisePlane.GetValue(xi, zi) * terrainDataStore.heightMultiplier;
     }
 
     void DisableSourceRendering()

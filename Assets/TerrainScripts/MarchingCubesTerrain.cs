@@ -6,9 +6,7 @@ using UnityEngine.Rendering;
 public class MarchingCubesTerrain : MonoBehaviour
 {
     public PerlinNoisePlane    noisePlane;
-    public TerrainConfigHolder configHolder;
     public TerrainDataStore terrainDataStore;
-    private PlaneConfig config => configHolder?.config;
 
     private const float Step      = 0.5f;
     private const float RoundStep = 0.25f;
@@ -19,8 +17,7 @@ public class MarchingCubesTerrain : MonoBehaviour
     public void Generate()
     {
         if (noisePlane == null)   { Debug.LogError("MarchingCubesTerrain: assign a PerlinNoisePlane."); return; }
-        if (configHolder == null) { Debug.LogError("MarchingCubesTerrain: assign a TerrainConfigHolder."); return; }
-        if (config == null)       { Debug.LogError("MarchingCubesTerrain: TerrainConfigHolder has no PlaneConfig."); return; }
+        if (terrainDataStore == null) { Debug.LogError("MarchingCubesTerrain: no TerrainDataStore assigned."); return; }
         if (noisePlane.NoiseValues == null || noisePlane.NoiseValues.Length == 0)
         {
             Debug.LogWarning("MarchingCubesTerrain: waiting for PerlinNoisePlane data.");
@@ -28,9 +25,9 @@ public class MarchingCubesTerrain : MonoBehaviour
         }
         int   vertsX     = noisePlane.VertsX;
         int   vertsZ     = noisePlane.VertsZ;
-        float extX       = config.extentX;
-        float extZ       = config.extentZ;
-        float heightMult = config.heightMultiplier;
+        float extX       = terrainDataStore.extentX;
+        float extZ       = terrainDataStore.extentZ;
+        float heightMult = terrainDataStore.heightMultiplier;
 
         // Y grid: from one step below ground to one step above max rounded height
         float minY  = -Step;

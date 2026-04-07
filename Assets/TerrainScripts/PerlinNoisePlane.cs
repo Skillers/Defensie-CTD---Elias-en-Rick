@@ -4,8 +4,7 @@ using UnityEngine.Rendering;
 [RequireComponent(typeof(MeshFilter), typeof(MeshRenderer))]
 public class PerlinNoisePlane : MonoBehaviour
 {
-    public TerrainConfigHolder configHolder;
-    public PlaneConfig config => configHolder?.config;
+    public TerrainDataStore terrainDataStore;
 
     // 2 vertices per unit = 0.5 step
     private const float Step      = 0.5f;
@@ -34,11 +33,10 @@ public class PerlinNoisePlane : MonoBehaviour
     [ContextMenu("Regenerate")]
     public void Generate()
     {
-        if (configHolder == null) { Debug.LogError("PerlinNoisePlane: no TerrainConfigHolder assigned."); return; }
-        if (config == null) { Debug.LogError("PerlinNoisePlane: TerrainConfigHolder has no PlaneConfig."); return; }
+        if (terrainDataStore == null) { Debug.LogError("PerlinNoisePlane: no TerrainDataStore assigned."); return; }
 
-        int stepsX = Mathf.RoundToInt(config.extentX * 2f / Step);
-        int stepsZ = Mathf.RoundToInt(config.extentZ * 2f / Step);
+        int stepsX = Mathf.RoundToInt(terrainDataStore.extentX * 2f / Step);
+        int stepsZ = Mathf.RoundToInt(terrainDataStore.extentZ * 2f / Step);
         int vertsX = stepsX + 1;
         int vertsZ = stepsZ + 1;
 
@@ -54,8 +52,8 @@ public class PerlinNoisePlane : MonoBehaviour
         for (int x = 0; x < vertsX; x++)
         {
             int i    = z * vertsX + x;
-            float wx = -config.extentX + x * Step;
-            float wz = -config.extentZ + z * Step;
+            float wx = -terrainDataStore.extentX + x * Step;
+            float wz = -terrainDataStore.extentZ + z * Step;
             vertices[i] = new Vector3(wx, 0f, wz);
             uvs[i]      = new Vector2((float)x / stepsX, (float)z / stepsZ);
         }
@@ -94,15 +92,15 @@ public class PerlinNoisePlane : MonoBehaviour
         OnGenerated?.Invoke();
     }
 
-    // Called by PlaneConfig.OnValidate — updates heights and texture without rebuilding triangles
+    // Updates heights and texture without rebuilding triangles
     public void ApplyNoise()
     {
-        if (config == null) return;
+        if (terrainDataStore == null) return;
         var mesh = GetComponent<MeshFilter>().sharedMesh;
         if (mesh == null) { Generate(); return; }
 
-        int vertsX = Mathf.RoundToInt(config.extentX * 2f / Step) + 1;
-        int vertsZ = Mathf.RoundToInt(config.extentZ * 2f / Step) + 1;
+        int vertsX = Mathf.RoundToInt(terrainDataStore.extentX * 2f / Step) + 1;
+        int vertsZ = Mathf.RoundToInt(terrainDataStore.extentZ * 2f / Step) + 1;
 
         if (mesh.vertexCount != vertsX * vertsZ) { Generate(); return; }
 
@@ -128,7 +126,7 @@ public class PerlinNoisePlane : MonoBehaviour
     // Returns a flat array of Perlin values [0..1] for the given grid
     private float[] SampleNoise(int vertsX, int vertsZ)
     {
-        var   rng   = new System.Random(config.seed);
+        var   rng   = new System.Random(terrainDataStore.seed);
         float seedX = (float)(rng.NextDouble() * 10000.0);
         float seedZ = (float)(rng.NextDouble() * 10000.0);
 
@@ -136,11 +134,11 @@ public class PerlinNoisePlane : MonoBehaviour
         for (int z = 0; z < vertsZ; z++)
         for (int x = 0; x < vertsX; x++)
         {
-            float wx = -config.extentX + x * Step;
-            float wz = -config.extentZ + z * Step;
+            float wx = -terrainDataStore.extentX + x * Step;
+            float wz = -terrainDataStore.extentZ + z * Step;
             noise[z * vertsX + x] = Mathf.PerlinNoise(
-                (wx + config.noiseOffset.x) * config.noiseScale + seedX,
-                (wz + config.noiseOffset.y) * config.noiseScale + seedZ);
+                (wx + terrainDataStore.noiseOffset.x) * terrainDataStore.noiseScale + seedX,
+                (wz + terrainDataStore.noiseOffset.y) * terrainDataStore.noiseScale + seedZ);
         }
         return noise;
     }
