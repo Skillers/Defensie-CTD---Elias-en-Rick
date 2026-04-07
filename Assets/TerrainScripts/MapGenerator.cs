@@ -84,9 +84,6 @@ public class MapGenerator : MonoBehaviour
             Debug.Log("MapGenerator: marching cubes generated.");
         }
 
-        // 10. Disable rendering on source maps
-        DisableSourceRendering();
-
         Debug.Log("MapGenerator: pipeline complete.");
     }
 
@@ -146,17 +143,4 @@ public class MapGenerator : MonoBehaviour
         return noisePlane.GetValue(xi, zi) * terrainDataStore.heightMultiplier;
     }
 
-    void DisableSourceRendering()
-    {
-        if (noisePlane != null)
-        {
-            var mr = noisePlane.GetComponent<MeshRenderer>();
-            if (mr != null) mr.enabled = false;
-        }
-        if (slopeMap != null)
-        {
-            var mr = slopeMap.GetComponent<MeshRenderer>();
-            if (mr != null) mr.enabled = false;
-        }
-    }
 }
