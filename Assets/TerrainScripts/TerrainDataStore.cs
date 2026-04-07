@@ -11,6 +11,10 @@ public class TerrainDataStore : MonoBehaviour
     public float extentX = 10f;
     public float extentZ = 10f;
 
+    [Header("Grid Settings")]
+    public float step = 0.5f;
+    public float roundStep = 0.25f;
+
     [Header("Noise Settings")]
     public int seed = 0;
     public float noiseScale = 0.1f;
@@ -62,8 +66,8 @@ public class TerrainDataStore : MonoBehaviour
     public Vector2Int WorldToGrid(Vector3 world)
     {
         Vector3 local = world - transform.position;
-        int gx = Mathf.FloorToInt(local.x + GridWidth  * 0.5f);
-        int gz = Mathf.FloorToInt(local.z + GridHeight * 0.5f);
+        int gx = Mathf.RoundToInt((local.x + extentX) / step);
+        int gz = Mathf.RoundToInt((local.z + extentZ) / step);
         return new Vector2Int(
             Mathf.Clamp(gx, 0, GridWidth  - 1),
             Mathf.Clamp(gz, 0, GridHeight - 1));
@@ -71,8 +75,8 @@ public class TerrainDataStore : MonoBehaviour
 
     public Vector3 GridToWorld(Vector2Int cell)
     {
-        float wx = cell.x - GridWidth  * 0.5f + 0.5f;
-        float wz = cell.y - GridHeight * 0.5f + 0.5f;
+        float wx = -extentX + cell.x * step;
+        float wz = -extentZ + cell.y * step;
         return transform.position + new Vector3(wx, 0f, wz);
     }
 }

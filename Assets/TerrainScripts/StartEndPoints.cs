@@ -3,12 +3,9 @@ using UnityEngine;
 public class StartEndPoints : MonoBehaviour
 {
     public TerrainDataStore terrainDataStore;
-    public PerlinNoisePlane    noisePlane;
 
     private const float EdgeMargin  = 10f;
     private const float SphereSize  = 2f;
-    private const float Step        = 0.5f;
-    private const float RoundStep   = 0.25f;
 
     // Public references for other scripts
     public Vector3 StartPoint { get; private set; }
@@ -19,23 +16,23 @@ public class StartEndPoints : MonoBehaviour
 
     void OnEnable()
     {
-        if (noisePlane != null)
-            noisePlane.OnGenerated += Place;
+        if (terrainDataStore != null)
+            terrainDataStore.OnGridReady += Place;
     }
 
     void OnDisable()
     {
-        if (noisePlane != null)
-            noisePlane.OnGenerated -= Place;
+        if (terrainDataStore != null)
+            terrainDataStore.OnGridReady -= Place;
     }
 
     void Start()
     {
-        if (noisePlane != null)
-            noisePlane.OnGenerated += Place;
+        if (terrainDataStore != null)
+            terrainDataStore.OnGridReady += Place;
 
-        // If noise is already ready, place immediately
-        if (noisePlane != null && noisePlane.NoiseValues != null && noisePlane.NoiseValues.Length > 0)
+        // If grid is already ready, place immediately
+        if (terrainDataStore != null && terrainDataStore.grid != null)
             Place();
     }
 
@@ -70,13 +67,10 @@ public class StartEndPoints : MonoBehaviour
     // Returns the rounded terrain height at a world X,Z position
     private float HeightAt(float worldX, float worldZ)
     {
-        if (noisePlane == null || noisePlane.NoiseValues == null) return 0f;
+        if (terrainDataStore == null || terrainDataStore.grid == null) return 0f;
 
-        int xi = Mathf.Clamp(Mathf.RoundToInt((worldX + terrainDataStore.extentX) / Step), 0, noisePlane.VertsX - 1);
-        int zi = Mathf.Clamp(Mathf.RoundToInt((worldZ + terrainDataStore.extentZ) / Step), 0, noisePlane.VertsZ - 1);
-
-        float noise   = noisePlane.GetValue(xi, zi);
-        return Mathf.Round(noise * terrainDataStore.heightMultiplier / RoundStep) * RoundStep;
+        Vector2Int g = terrainDataStore.WorldToGrid(new Vector3(worldX, 0f, worldZ));
+        return terrainDataStore.grid[g.x, g.y].roundedHeight;
     }
 
     private void PlaceSphere(ref GameObject sphere, string label, Vector3 position, Color color)

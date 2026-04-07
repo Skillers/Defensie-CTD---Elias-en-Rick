@@ -31,9 +31,9 @@ public class PerlinNoisePlane : MonoBehaviour
     // Generation is driven by MapGenerator — no auto-start.
 
     [ContextMenu("Regenerate")]
-    public void Generate()
+    public bool Generate()
     {
-        if (terrainDataStore == null) { Debug.LogError("PerlinNoisePlane: no TerrainDataStore assigned."); return; }
+        if (terrainDataStore == null) { Debug.LogError("PerlinNoisePlane: no TerrainDataStore assigned."); return false; }
 
         int stepsX = Mathf.RoundToInt(terrainDataStore.extentX * 2f / Step);
         int stepsZ = Mathf.RoundToInt(terrainDataStore.extentZ * 2f / Step);
@@ -90,6 +90,8 @@ public class PerlinNoisePlane : MonoBehaviour
 
         ApplyNoiseToTexture(noise, vertsX, vertsZ);
         OnGenerated?.Invoke();
+
+        return true;
     }
 
     // Updates heights and texture without rebuilding triangles

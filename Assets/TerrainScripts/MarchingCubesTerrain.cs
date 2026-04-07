@@ -5,34 +5,28 @@ using UnityEngine.Rendering;
 [RequireComponent(typeof(MeshFilter), typeof(MeshRenderer))]
 public class MarchingCubesTerrain : MonoBehaviour
 {
-    public PerlinNoisePlane    noisePlane;
     public TerrainDataStore terrainDataStore;
-
-    private const float Step      = 0.5f;
-    private const float RoundStep = 0.25f;
 
     // Generation is driven by MapGenerator — no auto-subscribe or auto-start.
 
     [ContextMenu("Regenerate")]
     public void Generate()
     {
-        if (noisePlane == null)   { Debug.LogError("MarchingCubesTerrain: assign a PerlinNoisePlane."); return; }
         if (terrainDataStore == null) { Debug.LogError("MarchingCubesTerrain: no TerrainDataStore assigned."); return; }
-        if (noisePlane.NoiseValues == null || noisePlane.NoiseValues.Length == 0)
-        {
-            Debug.LogWarning("MarchingCubesTerrain: waiting for PerlinNoisePlane data.");
-            return;
-        }
-        int   vertsX     = noisePlane.VertsX;
-        int   vertsZ     = noisePlane.VertsZ;
-        float extX       = terrainDataStore.extentX;
-        float extZ       = terrainDataStore.extentZ;
+        if (terrainDataStore.grid == null) { Debug.LogWarning("MarchingCubesTerrain: waiting for grid data."); return; }
+
+        int   vertsX    = terrainDataStore.GridWidth;
+        int   vertsZ    = terrainDataStore.GridHeight;
+        float extX      = terrainDataStore.extentX;
+        float extZ      = terrainDataStore.extentZ;
+        float stp       = terrainDataStore.step;
+        float rs        = terrainDataStore.roundStep;
         float heightMult = terrainDataStore.heightMultiplier;
 
         // Y grid: from one step below ground to one step above max rounded height
-        float minY  = -Step;
-        float maxY  = Mathf.Round(heightMult / RoundStep) * RoundStep + Step;
-        int   gridY = Mathf.Max(2, Mathf.RoundToInt((maxY - minY) / Step) + 1);
+        float minY  = -stp;
+        float maxY  = Mathf.Round(heightMult / rs) * rs + stp;
+        int   gridY = Mathf.Max(2, Mathf.RoundToInt((maxY - minY) / stp) + 1);
 
         // Build density field: positive = solid, negative = air
         // density(x,y,z) = roundedHeight(x,z) - worldY
@@ -41,9 +35,8 @@ public class MarchingCubesTerrain : MonoBehaviour
         for (int y = 0; y < gridY;  y++)
         for (int x = 0; x < vertsX; x++)
         {
-            float raw     = noisePlane.NoiseValues[z * vertsX + x] * heightMult;
-            float rounded = Mathf.Round(raw / RoundStep) * RoundStep;
-            float worldY  = minY + y * Step;
+            float rounded = terrainDataStore.grid[x, z].roundedHeight;
+            float worldY  = minY + y * stp;
             density[x + vertsX * (y + gridY * z)] = rounded - worldY;
         }
 
@@ -54,21 +47,21 @@ public class MarchingCubesTerrain : MonoBehaviour
         for (int y = 0; y < gridY  - 1; y++)
         for (int x = 0; x < vertsX - 1; x++)
         {
-            float wx = -extX + x * Step;
-            float wy =  minY + y * Step;
-            float wz = -extZ + z * Step;
+            float wx = -extX + x * stp;
+            float wy =  minY + y * stp;
+            float wz = -extZ + z * stp;
 
             // 8 corners of the current cube
             var corners = new Vector3[8]
             {
                 new Vector3(wx,        wy,        wz       ),
-                new Vector3(wx + Step, wy,        wz       ),
-                new Vector3(wx + Step, wy,        wz + Step),
-                new Vector3(wx,        wy,        wz + Step),
-                new Vector3(wx,        wy + Step, wz       ),
-                new Vector3(wx + Step, wy + Step, wz       ),
-                new Vector3(wx + Step, wy + Step, wz + Step),
-                new Vector3(wx,        wy + Step, wz + Step),
+                new Vector3(wx + stp, wy,        wz       ),
+                new Vector3(wx + stp, wy,        wz + stp),
+                new Vector3(wx,        wy,        wz + stp),
+                new Vector3(wx,        wy + stp, wz       ),
+                new Vector3(wx + stp, wy + stp, wz       ),
+                new Vector3(wx + stp, wy + stp, wz + stp),
+                new Vector3(wx,        wy + stp, wz + stp),
             };
 
             var cube = new float[8]

@@ -4,11 +4,7 @@ using UnityEngine.Rendering;
 [RequireComponent(typeof(MeshFilter), typeof(MeshRenderer))]
 public class SlopeMap : MonoBehaviour
 {
-    public PerlinNoisePlane    noisePlane;
     public TerrainDataStore terrainDataStore;
-
-    private const float Step      = 0.5f;
-    private const float RoundStep = 0.25f;
 
     // Per-node slope magnitude in degrees [0..90] — used for visualisation
     public float[] SlopeAngles { get; private set; }
@@ -26,8 +22,8 @@ public class SlopeMap : MonoBehaviour
     {
         float h1       = Heights[z1 * VertsX + x1];
         float h2       = Heights[z2 * VertsX + x2];
-        float dx       = (x2 - x1) * Step;
-        float dz       = (z2 - z1) * Step;
+        float dx       = (x2 - x1) * terrainDataStore.step;
+        float dz       = (z2 - z1) * terrainDataStore.step;
         float distance = Mathf.Sqrt(dx * dx + dz * dz);
         return Mathf.Atan2(h2 - h1, distance) * Mathf.Rad2Deg;
     }
@@ -36,27 +32,58 @@ public class SlopeMap : MonoBehaviour
 
     public void Generate()
     {
-        if (noisePlane == null || noisePlane.NoiseValues == null) return;
+        if (terrainDataStore == null || terrainDataStore.grid == null) return;
 
-        VertsX = noisePlane.VertsX;
-        VertsZ = noisePlane.VertsZ;
+        VertsX = terrainDataStore.GridWidth;
+        VertsZ = terrainDataStore.GridHeight;
 
         Heights     = BuildHeights();
         SlopeAngles = ComputeSlopes(Heights);
+
+        // Bake directional slopes into CellData grid
+        BakeSlopesIntoGrid();
 
         BuildMesh();
         ApplySlopeTexture(SlopeAngles);
     }
 
-    // Raw heights (no rounding) so slope gradients are smooth
+    private void BakeSlopesIntoGrid()
+    {
+        float stp = terrainDataStore.step;
+
+        for (int x = 0; x < VertsX; x++)
+        for (int z = 0; z < VertsZ; z++)
+        {
+            terrainDataStore.grid[x, z].slopeOutgoing = new float[8];
+            float h = terrainDataStore.grid[x, z].rawHeight;
+
+            for (int d = 0; d < 8; d++)
+            {
+                int nx = x + CellData.Directions[d].x;
+                int nz = z + CellData.Directions[d].y;
+
+                if (nx < 0 || nx >= VertsX || nz < 0 || nz >= VertsZ)
+                {
+                    terrainDataStore.grid[x, z].slopeOutgoing[d] = 0f;
+                    continue;
+                }
+
+                float nh = terrainDataStore.grid[nx, nz].rawHeight;
+                bool isDiagonal = CellData.Directions[d].x != 0 && CellData.Directions[d].y != 0;
+                float dist = isDiagonal ? stp * 1.41421356f : stp;
+                terrainDataStore.grid[x, z].slopeOutgoing[d] = Mathf.Atan2(nh - h, dist) * Mathf.Rad2Deg;
+            }
+        }
+    }
+
+    // Raw heights from the CellData grid
     private float[] BuildHeights()
     {
-        float heightMult = terrainDataStore.heightMultiplier;
-        var   heights    = new float[VertsX * VertsZ];
+        var heights = new float[VertsX * VertsZ];
 
         for (int z = 0; z < VertsZ; z++)
         for (int x = 0; x < VertsX; x++)
-            heights[z * VertsX + x] = noisePlane.GetValue(x, z) * heightMult;
+            heights[z * VertsX + x] = terrainDataStore.grid[x, z].rawHeight;
 
         return heights;
     }
@@ -75,8 +102,8 @@ public class SlopeMap : MonoBehaviour
             float down  = z > 0          ? heights[(z - 1) * VertsX +  x      ] : h;
             float up    = z < VertsZ - 1 ? heights[(z + 1) * VertsX +  x      ] : h;
 
-            float dX = (right - left) / (2f * Step);
-            float dZ = (up    - down) / (2f * Step);
+            float dX = (right - left) / (2f * terrainDataStore.step);
+            float dZ = (up    - down) / (2f * terrainDataStore.step);
 
             slopes[z * VertsX + x] = Mathf.Atan(Mathf.Sqrt(dX * dX + dZ * dZ)) * Mathf.Rad2Deg;
         }
@@ -95,7 +122,7 @@ public class SlopeMap : MonoBehaviour
         for (int x = 0; x < VertsX; x++)
         {
             int i = z * VertsX + x;
-            vertices[i] = new Vector3(-terrainDataStore.extentX + x * Step, 0f, -terrainDataStore.extentZ + z * Step);
+            vertices[i] = new Vector3(-terrainDataStore.extentX + x * terrainDataStore.step, 0f, -terrainDataStore.extentZ + z * terrainDataStore.step);
             uvs[i]      = new Vector2((float)x / stepsX, (float)z / stepsZ);
         }
 
