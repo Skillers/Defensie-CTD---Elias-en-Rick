@@ -54,6 +54,7 @@ public class PerlinNoisePlane : MonoBehaviour
         mr.sharedMaterial.mainTexture = tex;
 
         transform.localScale = new Vector3(terrainDataStore.extentX * 2f / 10f, 1f, terrainDataStore.extentZ * 2f / 10f);
+        transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
     }
 
     public void BuildVisual()
@@ -69,8 +70,10 @@ public class PerlinNoisePlane : MonoBehaviour
         var pixels = new Color[NoiseValues.Length];
         for (int i = 0; i < NoiseValues.Length; i++)
         {
-            float steps = terrainDataStore.heightMultiplier * 0.4f;
-            float v = Mathf.Round(NoiseValues[i] * steps) / steps;
+            // Round in height-space (same as marching cubes), then normalize back to 0-1
+            float h = NoiseValues[i] * terrainDataStore.heightMultiplier;
+            float rounded = Mathf.Round(h / terrainDataStore.roundStep) * terrainDataStore.roundStep;
+            float v = rounded / terrainDataStore.heightMultiplier;
             pixels[i] = new Color(v, v, v);
         }
 
@@ -84,8 +87,8 @@ public class PerlinNoisePlane : MonoBehaviour
 
         mr.sharedMaterial.mainTexture = tex;
 
-        // Scale to match terrain extents
-        transform.localScale = new Vector3(terrainDataStore.extentX * 2f/10f, 1f, terrainDataStore.extentZ * 2f/10f);
+        transform.localScale = new Vector3(terrainDataStore.extentX * 2f / 10f, 1f, terrainDataStore.extentZ * 2f / 10f);
+        transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
     }
 
     private float[] SampleNoise(int vertsX, int vertsZ)

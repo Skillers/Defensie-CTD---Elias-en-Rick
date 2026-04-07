@@ -49,7 +49,7 @@ public class MapGenerator : MonoBehaviour
         for (int z = 0; z < height; z++)
         {
             grid[x, z].rawHeight = noisePlane.GetValue(x, z) * terrainDataStore.heightMultiplier;
-        }
+            }
         Debug.Log("MapGenerator: Perlin noise generated and raw heights baked.");
 
         // 3. Compute rounded heights for marching cubes
@@ -64,7 +64,7 @@ public class MapGenerator : MonoBehaviour
         Debug.Log("MapGenerator: grid assigned to TerrainDataStore.");
 
         // 8. Build visual meshes
-        noisePlane.BuildVisualSmooth();
+        noisePlane.BuildVisual();
         Debug.Log("MapGenerator: noise plane mesh built.");
 
         if (slopeMap != null)
