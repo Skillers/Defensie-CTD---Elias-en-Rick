@@ -1,169 +1,110 @@
 using UnityEngine;
-using UnityEngine.Rendering;
 
-[RequireComponent(typeof(MeshFilter), typeof(MeshRenderer))]
+[RequireComponent(typeof(MeshRenderer))]
 public class PerlinNoisePlane : MonoBehaviour
 {
     public TerrainDataStore terrainDataStore;
 
-    // 2 vertices per unit = 0.5 step
-    private const float Step      = 0.5f;
-    private const float RoundStep = 0.25f;
-
-    // Fired after every generation — MarchingCubesTerrain listens to this
-    public event System.Action OnGenerated;
-
-    // Stored noise values [0..1] per vertex, row-major (z * vertsX + x)
+    // Stored noise values [0..1] per vertex, in a flat 2d array (z * vertsX + x)
     public float[] NoiseValues { get; private set; }
     public int VertsX { get; private set; }
     public int VertsZ { get; private set; }
 
-    // Get the noise value at grid coordinates
     public float GetValue(int x, int z) => NoiseValues[z * VertsX + x];
 
-    // Override a single point and immediately refresh the mesh + texture
-    public void SetValue(int x, int z, float value)
-    {
-        NoiseValues[z * VertsX + x] = value;
-        RebuildFromStoredValues();
-    }
-
-    // Generation is driven by MapGenerator — no auto-start.
-
-    [ContextMenu("Regenerate")]
-    public bool Generate()
+    public bool GenerateNoise()
     {
         if (terrainDataStore == null) { Debug.LogError("PerlinNoisePlane: no TerrainDataStore assigned."); return false; }
 
-        int stepsX = Mathf.RoundToInt(terrainDataStore.extentX * 2f / Step);
-        int stepsZ = Mathf.RoundToInt(terrainDataStore.extentZ * 2f / Step);
-        int vertsX = stepsX + 1;
-        int vertsZ = stepsZ + 1;
+        int stepsX = Mathf.RoundToInt(terrainDataStore.extentX * 2f / terrainDataStore.step);
+        int stepsZ = Mathf.RoundToInt(terrainDataStore.extentZ * 2f / terrainDataStore.step);
 
-        VertsX = vertsX;
-        VertsZ = vertsZ;
-        NoiseValues = SampleNoise(vertsX, vertsZ);
-        float[] noise = NoiseValues;
-
-        var vertices = new Vector3[vertsX * vertsZ];
-        var uvs      = new Vector2[vertsX * vertsZ];
-
-        for (int z = 0; z < vertsZ; z++)
-        for (int x = 0; x < vertsX; x++)
-        {
-            int i    = z * vertsX + x;
-            float wx = -terrainDataStore.extentX + x * Step;
-            float wz = -terrainDataStore.extentZ + z * Step;
-            vertices[i] = new Vector3(wx, 0f, wz);
-            uvs[i]      = new Vector2((float)x / stepsX, (float)z / stepsZ);
-        }
-
-        var triangles = new int[stepsX * stepsZ * 6];
-        int t = 0;
-        for (int z = 0; z < stepsZ; z++)
-        for (int x = 0; x < stepsX; x++)
-        {
-            int bl = z * vertsX + x;
-            triangles[t++] = bl;
-            triangles[t++] = bl + vertsX;
-            triangles[t++] = bl + 1;
-            triangles[t++] = bl + 1;
-            triangles[t++] = bl + vertsX;
-            triangles[t++] = bl + vertsX + 1;
-        }
-
-        var mesh = new Mesh { name = "PerlinPlane" };
-        if (vertsX * vertsZ > 65535)
-            mesh.indexFormat = IndexFormat.UInt32;
-
-        mesh.vertices  = vertices;
-        mesh.uv        = uvs;
-        mesh.triangles = triangles;
-        mesh.RecalculateNormals();
-
-        GetComponent<MeshFilter>().mesh = mesh;
-
-        var mr     = GetComponent<MeshRenderer>();
-        var shader = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
-        if (mr.sharedMaterial == null)
-            mr.sharedMaterial = new Material(shader);
-
-        ApplyNoiseToTexture(noise, vertsX, vertsZ);
-        OnGenerated?.Invoke();
+        VertsX = stepsX + 1;
+        VertsZ = stepsZ + 1;
+        NoiseValues = SampleNoise(VertsX, VertsZ);
 
         return true;
     }
 
-    // Updates heights and texture without rebuilding triangles
-    public void ApplyNoise()
+    public void BuildVisualSmooth()
     {
-        if (terrainDataStore == null) return;
-        var mesh = GetComponent<MeshFilter>().sharedMesh;
-        if (mesh == null) { Generate(); return; }
+        if (NoiseValues == null || terrainDataStore == null) return;
 
-        int vertsX = Mathf.RoundToInt(terrainDataStore.extentX * 2f / Step) + 1;
-        int vertsZ = Mathf.RoundToInt(terrainDataStore.extentZ * 2f / Step) + 1;
-
-        if (mesh.vertexCount != vertsX * vertsZ) { Generate(); return; }
-
-        VertsX = vertsX;
-        VertsZ = vertsZ;
-        NoiseValues = SampleNoise(vertsX, vertsZ);
-
-        ApplyNoiseToTexture(NoiseValues, vertsX, vertsZ);
-        OnGenerated?.Invoke();
-    }
-
-    // Kept for backwards compatibility
-    public void ApplyNoiseTexture() => ApplyNoise();
-
-    // Applies whatever is currently in NoiseValues to the mesh and texture
-    public void RebuildFromStoredValues()
-    {
-        if (NoiseValues == null) return;
-        ApplyNoiseToTexture(NoiseValues, VertsX, VertsZ);
-        OnGenerated?.Invoke();
-    }
-
-    // Returns a flat array of Perlin values [0..1] for the given grid
-    private float[] SampleNoise(int vertsX, int vertsZ)
-    {
-        var   rng   = new System.Random(terrainDataStore.seed);
-        float seedX = (float)(rng.NextDouble() * 10000.0);
-        float seedZ = (float)(rng.NextDouble() * 10000.0);
-
-        var noise = new float[vertsX * vertsZ];
-        for (int z = 0; z < vertsZ; z++)
-        for (int x = 0; x < vertsX; x++)
-        {
-            float wx = -terrainDataStore.extentX + x * Step;
-            float wz = -terrainDataStore.extentZ + z * Step;
-            noise[z * vertsX + x] = Mathf.PerlinNoise(
-                (wx + terrainDataStore.noiseOffset.x) * terrainDataStore.noiseScale + seedX,
-                (wz + terrainDataStore.noiseOffset.y) * terrainDataStore.noiseScale + seedZ);
-        }
-        return noise;
-    }
-
-    private void ApplyNoiseToTexture(float[] noise, int vertsX, int vertsZ)
-    {
-        var tex = new Texture2D(vertsX, vertsZ, TextureFormat.RGB24, false)
+        var tex = new Texture2D(VertsX, VertsZ, TextureFormat.RGB24, false)
         {
             filterMode = FilterMode.Bilinear,
             wrapMode   = TextureWrapMode.Clamp
         };
 
-        // Round to the same 0.25 steps MC uses so colors visually match terrain heights
-        var pixels = new Color[noise.Length];
-        for (int i = 0; i < noise.Length; i++)
+        var pixels = new Color[NoiseValues.Length];
+        for (int i = 0; i < NoiseValues.Length; i++)
         {
-            float v = Mathf.Round(noise[i] / RoundStep) * RoundStep;
+            float v = NoiseValues[i];
             pixels[i] = new Color(v, v, v);
         }
 
         tex.SetPixels(pixels);
         tex.Apply();
 
-        GetComponent<MeshRenderer>().sharedMaterial.mainTexture = tex;
+        var mr = GetComponent<MeshRenderer>();
+        var shader = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
+        if (mr.sharedMaterial == null)
+            mr.sharedMaterial = new Material(shader);
+
+        mr.sharedMaterial.mainTexture = tex;
+
+        transform.localScale = new Vector3(terrainDataStore.extentX * 2f / 10f, 1f, terrainDataStore.extentZ * 2f / 10f);
+    }
+
+    public void BuildVisual()
+    {
+        if (NoiseValues == null || terrainDataStore == null) return;
+
+        var tex = new Texture2D(VertsX, VertsZ, TextureFormat.RGB24, false)
+        {
+            filterMode = FilterMode.Bilinear,
+            wrapMode   = TextureWrapMode.Clamp
+        };
+
+        var pixels = new Color[NoiseValues.Length];
+        for (int i = 0; i < NoiseValues.Length; i++)
+        {
+            float steps = terrainDataStore.heightMultiplier * 0.4f;
+            float v = Mathf.Round(NoiseValues[i] * steps) / steps;
+            pixels[i] = new Color(v, v, v);
+        }
+
+        tex.SetPixels(pixels);
+        tex.Apply();
+
+        var mr = GetComponent<MeshRenderer>();
+        var shader = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
+        if (mr.sharedMaterial == null)
+            mr.sharedMaterial = new Material(shader);
+
+        mr.sharedMaterial.mainTexture = tex;
+
+        // Scale to match terrain extents
+        transform.localScale = new Vector3(terrainDataStore.extentX * 2f/10f, 1f, terrainDataStore.extentZ * 2f/10f);
+    }
+
+    private float[] SampleNoise(int vertsX, int vertsZ)
+    {
+        var   rng   = new System.Random(terrainDataStore.seed);
+        float seedX = (float)(rng.NextDouble()*10f);
+        float seedZ = (float)(rng.NextDouble()*10f);
+        Debug.Log(seedX + ", " + seedZ);
+        var noise = new float[vertsX * vertsZ];
+        for (int z = 0; z < vertsZ; z++)
+        for (int x = 0; x < vertsX; x++)
+        {
+            float wx = -terrainDataStore.extentX + x * terrainDataStore.step;
+            float wz = -terrainDataStore.extentZ + z * terrainDataStore.step;
+            noise[z * vertsX + x] = Mathf.PerlinNoise(
+                (wx + terrainDataStore.noiseOffset.x) * terrainDataStore.noiseScale + seedX + 10000.0f,
+                (wz + terrainDataStore.noiseOffset.y) * terrainDataStore.noiseScale + seedZ + 10000.0f);
+        }
+
+        return noise;
     }
 }

@@ -43,7 +43,7 @@ public class MapGenerator : MonoBehaviour
 
         // 2. Generate Perlin noise and bake raw heights into cells
         if (noisePlane == null) { Debug.LogError("MapGenerator: no PerlinNoisePlane assigned."); return; }
-        if (!noisePlane.Generate()) { Debug.LogError("MapGenerator: Perlin noise generation failed."); return; }
+        if (!noisePlane.GenerateNoise()) { Debug.LogError("MapGenerator: Perlin noise generation failed."); return; }
 
         for (int x = 0; x < width; x++)
         for (int z = 0; z < height; z++)
@@ -63,7 +63,10 @@ public class MapGenerator : MonoBehaviour
         terrainDataStore.SetGrid(grid);
         Debug.Log("MapGenerator: grid assigned to TerrainDataStore.");
 
-        // 8. Generate slope visualization (reads from grid)
+        // 8. Build visual meshes
+        noisePlane.BuildVisualSmooth();
+        Debug.Log("MapGenerator: noise plane mesh built.");
+
         if (slopeMap != null)
         {
             slopeMap.Generate();
