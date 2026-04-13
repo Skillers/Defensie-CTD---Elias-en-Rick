@@ -10,6 +10,7 @@ public class EditorUI : MonoBehaviour
     [Header("Tool Buttons")]
     public Button raiseLowerButton;
     public Button flattenButton;
+    public Button biomePaintButton;
 
     [Header("Sliders")]
     public Slider radiusSlider;
@@ -23,6 +24,7 @@ public class EditorUI : MonoBehaviour
     {
         raiseLowerButton.onClick.AddListener(brushController.ToggleRaiseLower);
         flattenButton.onClick.AddListener(brushController.ToggleFlatten);
+        biomePaintButton.onClick.AddListener(brushController.ToggleBiomePaint);
 
         radiusSlider.onValueChanged.AddListener(v =>
         {

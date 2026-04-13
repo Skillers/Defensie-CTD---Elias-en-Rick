@@ -1,6 +1,6 @@
 using UnityEngine;
 
-[RequireComponent(typeof(MeshRenderer))]
+[RequireComponent(typeof(MeshFilter), typeof(MeshRenderer))]
 public class PerlinNoisePlane : MonoBehaviour
 {
     public TerrainDataStore terrainDataStore;
@@ -52,14 +52,16 @@ public class PerlinNoisePlane : MonoBehaviour
             mr.sharedMaterial = new Material(shader);
 
         mr.sharedMaterial.mainTexture = tex;
-
-        transform.localScale = new Vector3(terrainDataStore.extentX * 2f / 10f, 1f, terrainDataStore.extentZ * 2f / 10f);
-        transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
     }
 
     public void BuildVisual()
     {
         if (NoiseValues == null || terrainDataStore == null) return;
+
+        // Ensure we have a quad mesh to render on
+        var mf = GetComponent<MeshFilter>();
+        if (mf.sharedMesh == null)
+            mf.sharedMesh = BuildQuad();
 
         var tex = new Texture2D(VertsX, VertsZ, TextureFormat.RGB24, false)
         {
@@ -86,9 +88,31 @@ public class PerlinNoisePlane : MonoBehaviour
             mr.sharedMaterial = new Material(shader);
 
         mr.sharedMaterial.mainTexture = tex;
+    }
 
-        transform.localScale = new Vector3(terrainDataStore.extentX * 2f / 10f, 1f, terrainDataStore.extentZ * 2f / 10f);
-        transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
+    Mesh BuildQuad()
+    {
+        float extX = terrainDataStore.extentX;
+        float extZ = terrainDataStore.extentZ;
+
+        var mesh = new Mesh { name = "PerlinQuad" };
+        mesh.vertices = new Vector3[]
+        {
+            new Vector3(-extX, 0f, -extZ),
+            new Vector3( extX, 0f, -extZ),
+            new Vector3( extX, 0f,  extZ),
+            new Vector3(-extX, 0f,  extZ),
+        };
+        mesh.uv = new Vector2[]
+        {
+            new Vector2(0f, 0f),
+            new Vector2(1f, 0f),
+            new Vector2(1f, 1f),
+            new Vector2(0f, 1f),
+        };
+        mesh.triangles = new int[] { 0, 2, 1, 0, 3, 2 };
+        mesh.RecalculateNormals();
+        return mesh;
     }
 
     private float[] SampleNoise(int vertsX, int vertsZ)

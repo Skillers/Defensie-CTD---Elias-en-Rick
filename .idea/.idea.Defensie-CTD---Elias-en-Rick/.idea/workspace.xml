@@ -5,8 +5,15 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="2719ef14-fe85-4389-85f2-34cbfe22855b" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/.claude/settings.local.json" beforeDir="false" afterPath="$PROJECT_DIR$/.claude/settings.local.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/.idea.Defensie-CTD---Elias-en-Rick/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.Defensie-CTD---Elias-en-Rick/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/LevelEditor/BrushController.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/LevelEditor/BrushController.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/LevelEditor/EditorUI.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/LevelEditor/EditorUI.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/TerrainScripts/BiomeAssigner.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/TerrainScripts/BiomeAssigner.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/TerrainScripts/MapGenerator.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/TerrainScripts/MapGenerator.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/TerrainScripts/MarchingCubesTerrain.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/TerrainScripts/MarchingCubesTerrain.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/TerrainScripts/PerlinNoisePlane.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/TerrainScripts/PerlinNoisePlane.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/UserSettings/Layouts/CurrentMaximizeLayout.dwlt" beforeDir="false" afterPath="$PROJECT_DIR$/UserSettings/Layouts/CurrentMaximizeLayout.dwlt" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -102,7 +109,7 @@
       <option name="presentableId" value="Default" />
       <updated>1774171244106</updated>
       <workItem from="1774171246180" duration="2740000" />
-      <workItem from="1776061171996" duration="4851000" />
+      <workItem from="1776061171996" duration="6736000" />
     </task>
     <servers />
   </component>

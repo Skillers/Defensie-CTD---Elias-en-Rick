@@ -15,6 +15,11 @@ public class MarchingCubesTerrain : MonoBehaviour
     float   _minY, _extX, _extZ, _stp, _rs;
     Material _sharedMat;
 
+    // Async chunk rebuild queue
+    readonly HashSet<Vector3Int> _rebuildQueue = new HashSet<Vector3Int>();
+    [Tooltip("Max milliseconds spent rebuilding queued chunks per frame.")]
+    public float msPerFrame = 8f;
+
     // Generation is driven by MapGenerator — no auto-subscribe or auto-start.
 
     [ContextMenu("Regenerate")]
@@ -44,16 +49,20 @@ public class MarchingCubesTerrain : MonoBehaviour
 
         BuildDensityField();
 
-        // Resolve material
-        _sharedMat = GetComponent<MeshRenderer>()?.sharedMaterial;
-        if (_sharedMat == null)
+        // Always use the vertex color shader
+        var vcShader = Shader.Find("Custom/VertexColor");
+        if (vcShader != null)
         {
-            var shader = Shader.Find("Universal Render Pipeline/Particles/Lit")
-                      ?? Shader.Find("Universal Render Pipeline/Lit")
-                      ?? Shader.Find("Standard");
-            _sharedMat = new Material(shader);
-            GetComponent<MeshRenderer>().sharedMaterial = _sharedMat;
+            _sharedMat = new Material(vcShader);
+            Debug.Log("MarchingCubesTerrain: using Custom/VertexColor shader.");
         }
+        else
+        {
+            Debug.LogError("MarchingCubesTerrain: Custom/VertexColor shader NOT FOUND — colors won't show!");
+            var fallback = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
+            _sharedMat = new Material(fallback);
+        }
+        GetComponent<MeshRenderer>().sharedMaterial = _sharedMat;
 
         // Build all chunks
         int chunk = MarchingTables.ChunkSize;
@@ -103,6 +112,33 @@ public class MarchingCubesTerrain : MonoBehaviour
         for (int cx = cxMin; cx <= cxMax; cx += chunk)
         for (int cy = 0; cy < _gridY - 1; cy += chunk)
             BuildChunk(new Vector3Int(cx, cy, cz));
+    }
+
+    /// <summary>
+    /// Recolor only the vertex colors of chunks overlapping the region.
+    /// Much cheaper than rebuilding — use for biome painting.
+    /// </summary>
+    public void RecolorRegion(int gxMin, int gzMin, int gxMax, int gzMax)
+    {
+        int chunk = MarchingTables.ChunkSize;
+        int cxMin = (Mathf.Max(0, gxMin) / chunk) * chunk;
+        int czMin = (Mathf.Max(0, gzMin) / chunk) * chunk;
+        int cxMax = (Mathf.Min(_vertsX - 1, gxMax) / chunk) * chunk;
+        int czMax = (Mathf.Min(_vertsZ - 1, gzMax) / chunk) * chunk;
+
+        for (int cz = czMin; cz <= czMax; cz += chunk)
+        for (int cx = cxMin; cx <= cxMax; cx += chunk)
+        for (int cy = 0; cy < _gridY - 1; cy += chunk)
+        {
+            var key = new Vector3Int(cx, cy, cz);
+            if (!_chunks.TryGetValue(key, out var chunkGO)) continue;
+            if (chunkGO == null) continue;
+
+            var mesh = chunkGO.GetComponent<MeshFilter>()?.sharedMesh;
+            if (mesh == null) continue;
+
+            ApplyBiomeColors(mesh, _extX, _extZ);
+        }
     }
 
     void BuildDensityField()
@@ -221,7 +257,11 @@ public class MarchingCubesTerrain : MonoBehaviour
 
     private void ApplyBiomeColors(Mesh mesh, float extX, float extZ)
     {
-        if (terrainDataStore == null || terrainDataStore.grid == null) return;
+        if (terrainDataStore == null || terrainDataStore.grid == null)
+        {
+            Debug.LogWarning("ApplyBiomeColors: no grid data.");
+            return;
+        }
 
         var biomeGrid = terrainDataStore.grid;
         var vertices  = mesh.vertices;
@@ -229,15 +269,20 @@ public class MarchingCubesTerrain : MonoBehaviour
         int gridW     = biomeGrid.GetLength(0);
         int gridH     = biomeGrid.GetLength(1);
 
+        int nullCount = 0;
         for (int i = 0; i < vertices.Length; i++)
         {
             int gx = Mathf.Clamp(Mathf.RoundToInt((vertices[i].x + extX) / terrainDataStore.step), 0, gridW - 1);
             int gz = Mathf.Clamp(Mathf.RoundToInt((vertices[i].z + extZ) / terrainDataStore.step), 0, gridH - 1);
             var cell = biomeGrid[gx, gz];
-            colors[i] = cell.biome != null ? cell.biome.color : Color.white;
+            if (cell.biome == null) nullCount++;
+            colors[i] = cell.biome != null ? cell.biome.color : Color.magenta; // magenta = missing biome
         }
 
         mesh.colors = colors;
+
+        if (nullCount > 0)
+            Debug.LogWarning($"ApplyBiomeColors: {nullCount}/{vertices.Length} verts have no biome (showing magenta).");
     }
 
     // -------------------------------------------------------------------------

@@ -1,7 +1,7 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
 
-public enum BrushTool { None, RaiseLower, Flatten }
+public enum BrushTool { None, RaiseLower, Flatten, BiomePaint }
 
 public class BrushController : MonoBehaviour
 {
@@ -14,6 +14,9 @@ public class BrushController : MonoBehaviour
     public float BrushRadius   = 3f;
     public float BrushStrength = 0.1f;
 
+    [Header("Biome Paint")]
+    public BiomeSO paintBiome;
+
     [Header("Brush Indicator")]
     public Color indicatorColor = Color.yellow;
     public Color centerColor    = Color.red;
@@ -25,6 +28,7 @@ public class BrushController : MonoBehaviour
     bool _rightBlocked;
     float _brushTimer;
     const float BrushInterval = 0.15f;
+    const float PaintInterval = 0.05f;
 
     GameObject _indicator;
     GameObject _centerDot;
@@ -112,6 +116,21 @@ public class BrushController : MonoBehaviour
         {
             _activeTool = BrushTool.Flatten;
             Debug.Log("Flatten ACTIVATED");
+        }
+        ResetState();
+    }
+
+    public void ToggleBiomePaint()
+    {
+        if (_activeTool == BrushTool.BiomePaint)
+        {
+            _activeTool = BrushTool.None;
+            Debug.Log("BiomePaint DEACTIVATED");
+        }
+        else
+        {
+            _activeTool = BrushTool.BiomePaint;
+            Debug.Log($"BiomePaint ACTIVATED — painting: {(paintBiome != null ? paintBiome.biomeName : "NONE")}");
         }
         ResetState();
     }
@@ -212,12 +231,16 @@ public class BrushController : MonoBehaviour
             Debug.Log($"Right UP at {hit.point}");
         }
 
-        // --- Apply tool on interval ---
+        // --- Apply tool on interval (fires immediately on first press) ---
         if (_leftDown || _rightDown)
         {
+            float interval = _activeTool == BrushTool.BiomePaint ? PaintInterval : BrushInterval;
             _brushTimer += Time.deltaTime;
-            if (_brushTimer >= BrushInterval)
+
+            if (_brushTimer >= interval)
             {
+                _brushTimer = 0f;
+
                 switch (_activeTool)
                 {
                     case BrushTool.RaiseLower:
@@ -227,13 +250,16 @@ public class BrushController : MonoBehaviour
                     case BrushTool.Flatten:
                         ApplyFlatten(hit.point, _rightDown);
                         break;
+                    case BrushTool.BiomePaint:
+                        if (_leftDown) ApplyBiomePaint(hit.point);
+                        break;
                 }
-                _brushTimer = 0f;
             }
         }
         else
         {
-            _brushTimer = 0f;
+            // Start at interval so next press fires immediately
+            _brushTimer = 999f;
         }
     }
 
@@ -352,6 +378,39 @@ public class BrushController : MonoBehaviour
 
         if (gxMin <= gxMax)
             marchingCubes.RebuildRegion(gxMin, gzMin, gxMax, gzMax);
+    }
+
+    // --- Biome Paint ---
+    void ApplyBiomePaint(Vector3 worldPos)
+    {
+        if (paintBiome == null) { Debug.LogWarning("No paintBiome assigned."); return; }
+
+        Vector2Int center = terrainDataStore.WorldToGrid(worldPos);
+        int radiusCells = Mathf.CeilToInt(BrushRadius / terrainDataStore.step);
+
+        int gxMin = int.MaxValue, gzMin = int.MaxValue;
+        int gxMax = int.MinValue, gzMax = int.MinValue;
+
+        for (int dx = -radiusCells; dx <= radiusCells; dx++)
+        for (int dz = -radiusCells; dz <= radiusCells; dz++)
+        {
+            int gx = center.x + dx;
+            int gz = center.y + dz;
+            if (!terrainDataStore.InBounds(gx, gz)) continue;
+
+            float dist = new Vector2(dx, dz).magnitude * terrainDataStore.step;
+            if (dist > BrushRadius) continue;
+
+            terrainDataStore.grid[gx, gz].biome = paintBiome;
+
+            if (gx < gxMin) gxMin = gx;
+            if (gx > gxMax) gxMax = gx;
+            if (gz < gzMin) gzMin = gz;
+            if (gz > gzMax) gzMax = gz;
+        }
+
+        if (gxMin <= gxMax)
+            marchingCubes.RecolorRegion(gxMin, gzMin, gxMax, gzMax);
     }
 
     void OnDestroy()
