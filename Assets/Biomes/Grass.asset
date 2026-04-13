@@ -16,5 +16,5 @@ MonoBehaviour:
   color: {r: 0.21924882, g: 1, b: 0.023584902, a: 1}
   defaultMovementCost: 2
   unitWeights:
-  - unitType: {fileID: 0}
-    movementCost: 0
+  - unitType: {fileID: 11400000, guid: a95043a850146a34a9eb4bba141aa8be, type: 2}
+    movementCost: 2
