@@ -1,11 +1,19 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
+using System.Linq;
 
 [RequireComponent(typeof(MeshFilter), typeof(MeshRenderer))]
 public class MarchingCubesTerrain : MonoBehaviour
 {
     public TerrainDataStore terrainDataStore;
+
+    // Cached generation state
+    Dictionary<Vector3Int, GameObject> _chunks = new Dictionary<Vector3Int, GameObject>();
+    float[] _density;
+    int     _vertsX, _gridY, _vertsZ;
+    float   _minY, _extX, _extZ, _stp, _rs;
+    Material _sharedMat;
 
     // Generation is driven by MapGenerator — no auto-subscribe or auto-start.
 
@@ -17,121 +25,192 @@ public class MarchingCubesTerrain : MonoBehaviour
 
         DestroyChunks();
 
-        int   vertsX    = terrainDataStore.GridWidth;
-        int   vertsZ    = terrainDataStore.GridHeight;
-        float extX      = terrainDataStore.extentX;
-        float extZ      = terrainDataStore.extentZ;
-        float stp       = terrainDataStore.step;
-        float rs        = terrainDataStore.roundStep;
+        _vertsX = terrainDataStore.GridWidth;
+        _vertsZ = terrainDataStore.GridHeight;
+        _extX   = terrainDataStore.extentX;
+        _extZ   = terrainDataStore.extentZ;
+        _stp    = terrainDataStore.step;
+        _rs     = terrainDataStore.roundStep;
         float heightMult = terrainDataStore.heightMultiplier;
 
-        // Bake rounded heights from raw heights (snap for marching cubes)
-        for (int x = 0; x < vertsX; x++)
-        for (int z = 0; z < vertsZ; z++)
-            terrainDataStore.grid[x, z].roundedHeight = Mathf.Round(terrainDataStore.grid[x, z].rawHeight / rs) * rs;
+        // Bake rounded heights
+        for (int x = 0; x < _vertsX; x++)
+        for (int z = 0; z < _vertsZ; z++)
+            terrainDataStore.grid[x, z].roundedHeight = Mathf.Round(terrainDataStore.grid[x, z].rawHeight / _rs) * _rs;
 
-        // Y grid: from one step below ground to one step above max rounded height
-        float minY  = -stp;
-        float maxY  = Mathf.Round(heightMult / rs) * rs + stp;
-        int   gridY = Mathf.Max(2, Mathf.RoundToInt((maxY - minY) / stp) + 1);
+        _minY  = -_stp;
+        float maxY = Mathf.Round(heightMult / _rs) * _rs + _stp;
+        _gridY = Mathf.Max(2, Mathf.RoundToInt((maxY - _minY) / _stp) + 1);
 
-        // Build density field: positive = solid, negative = air
-        float[] density = new float[vertsX * gridY * vertsZ];
-        for (int z = 0; z < vertsZ; z++)
-        for (int y = 0; y < gridY;  y++)
-        for (int x = 0; x < vertsX; x++)
-        {
-            float rounded = terrainDataStore.grid[x, z].roundedHeight;
-            float worldY  = minY + y * stp;
-            density[x + vertsX * (y + gridY * z)] = rounded - worldY;
-        }
+        BuildDensityField();
 
-        // Resolve material once
-        Material sharedMat = GetComponent<MeshRenderer>()?.sharedMaterial;
-        if (sharedMat == null)
+        // Resolve material
+        _sharedMat = GetComponent<MeshRenderer>()?.sharedMaterial;
+        if (_sharedMat == null)
         {
             var shader = Shader.Find("Universal Render Pipeline/Particles/Lit")
                       ?? Shader.Find("Universal Render Pipeline/Lit")
                       ?? Shader.Find("Standard");
-            sharedMat = new Material(shader);
-            GetComponent<MeshRenderer>().sharedMaterial = sharedMat;
+            _sharedMat = new Material(shader);
+            GetComponent<MeshRenderer>().sharedMaterial = _sharedMat;
+        }
+
+        // Build all chunks
+        int chunk = MarchingTables.ChunkSize;
+        for (int cz = 0; cz < _vertsZ - 1; cz += chunk)
+        for (int cy = 0; cy < _gridY  - 1; cy += chunk)
+        for (int cx = 0; cx < _vertsX - 1; cx += chunk)
+            BuildChunk(new Vector3Int(cx, cy, cz));
+    }
+
+    /// <summary>
+    /// Rebuild only the chunks that overlap the given grid region.
+    /// Call after modifying rawHeight in the grid.
+    /// </summary>
+    public void RebuildRegion(int gxMin, int gzMin, int gxMax, int gzMax)
+    {
+        if (_density == null) return;
+
+        // Re-bake rounded heights for affected cells (with 1-cell border)
+        int xStart = Mathf.Max(0, gxMin - 1);
+        int zStart = Mathf.Max(0, gzMin - 1);
+        int xEnd   = Mathf.Min(_vertsX - 1, gxMax + 1);
+        int zEnd   = Mathf.Min(_vertsZ - 1, gzMax + 1);
+
+        for (int x = xStart; x <= xEnd; x++)
+        for (int z = zStart; z <= zEnd; z++)
+        {
+            terrainDataStore.grid[x, z].roundedHeight =
+                Mathf.Round(terrainDataStore.grid[x, z].rawHeight / _rs) * _rs;
+
+            // Update density column
+            for (int y = 0; y < _gridY; y++)
+            {
+                float worldY = _minY + y * _stp;
+                _density[x + _vertsX * (y + _gridY * z)] =
+                    terrainDataStore.grid[x, z].roundedHeight - worldY;
+            }
+        }
+
+        // Find which chunks overlap the region
+        int chunk = MarchingTables.ChunkSize;
+        int cxMin = (xStart / chunk) * chunk;
+        int czMin = (zStart / chunk) * chunk;
+        int cxMax = (xEnd   / chunk) * chunk;
+        int czMax = (zEnd   / chunk) * chunk;
+
+        for (int cz = czMin; cz <= czMax; cz += chunk)
+        for (int cx = cxMin; cx <= cxMax; cx += chunk)
+        for (int cy = 0; cy < _gridY - 1; cy += chunk)
+            BuildChunk(new Vector3Int(cx, cy, cz));
+    }
+
+    void BuildDensityField()
+    {
+        _density = new float[_vertsX * _gridY * _vertsZ];
+        for (int z = 0; z < _vertsZ; z++)
+        for (int y = 0; y < _gridY;  y++)
+        for (int x = 0; x < _vertsX; x++)
+        {
+            float rounded = terrainDataStore.grid[x, z].roundedHeight;
+            float worldY  = _minY + y * _stp;
+            _density[x + _vertsX * (y + _gridY * z)] = rounded - worldY;
+        }
+    }
+
+    void BuildChunk(Vector3Int key)
+    {
+        // Destroy existing chunk at this key
+        if (_chunks.TryGetValue(key, out var old))
+        {
+            if (Application.isPlaying) Destroy(old);
+            else DestroyImmediate(old);
+            _chunks.Remove(key);
         }
 
         int chunk = MarchingTables.ChunkSize;
+        int cx = key.x, cy = key.y, cz = key.z;
 
-        // Generate chunked meshes with colliders
-        for (int cz = 0; cz < vertsZ - 1; cz += chunk)
-        for (int cy = 0; cy < gridY  - 1; cy += chunk)
-        for (int cx = 0; cx < vertsX - 1; cx += chunk)
+        var verts = new List<Vector3>();
+        var tris  = new List<int>();
+
+        int xEnd = Mathf.Min(cx + chunk, _vertsX - 1);
+        int yEnd = Mathf.Min(cy + chunk, _gridY  - 1);
+        int zEnd = Mathf.Min(cz + chunk, _vertsZ - 1);
+
+        for (int z = cz; z < zEnd; z++)
+        for (int y = cy; y < yEnd; y++)
+        for (int x = cx; x < xEnd; x++)
         {
-            var verts = new List<Vector3>();
-            var tris  = new List<int>();
+            float wx = -_extX + x * _stp;
+            float wy =  _minY + y * _stp;
+            float wz = -_extZ + z * _stp;
 
-            int xEnd = Mathf.Min(cx + chunk, vertsX - 1);
-            int yEnd = Mathf.Min(cy + chunk, gridY  - 1);
-            int zEnd = Mathf.Min(cz + chunk, vertsZ - 1);
-
-            for (int z = cz; z < zEnd; z++)
-            for (int y = cy; y < yEnd; y++)
-            for (int x = cx; x < xEnd; x++)
+            var corners = new Vector3[8]
             {
-                float wx = -extX + x * stp;
-                float wy =  minY + y * stp;
-                float wz = -extZ + z * stp;
+                new Vector3(wx,        wy,        wz       ),
+                new Vector3(wx + _stp, wy,        wz       ),
+                new Vector3(wx + _stp, wy,        wz + _stp),
+                new Vector3(wx,        wy,        wz + _stp),
+                new Vector3(wx,        wy + _stp, wz       ),
+                new Vector3(wx + _stp, wy + _stp, wz       ),
+                new Vector3(wx + _stp, wy + _stp, wz + _stp),
+                new Vector3(wx,        wy + _stp, wz + _stp),
+            };
 
-                var corners = new Vector3[8]
-                {
-                    new Vector3(wx,       wy,       wz      ),
-                    new Vector3(wx + stp, wy,       wz      ),
-                    new Vector3(wx + stp, wy,       wz + stp),
-                    new Vector3(wx,       wy,       wz + stp),
-                    new Vector3(wx,       wy + stp, wz      ),
-                    new Vector3(wx + stp, wy + stp, wz      ),
-                    new Vector3(wx + stp, wy + stp, wz + stp),
-                    new Vector3(wx,       wy + stp, wz + stp),
-                };
+            var cube = new float[8]
+            {
+                _density[ x    + _vertsX * ( y    + _gridY *  z   )],
+                _density[(x+1) + _vertsX * ( y    + _gridY *  z   )],
+                _density[(x+1) + _vertsX * ( y    + _gridY * (z+1))],
+                _density[ x    + _vertsX * ( y    + _gridY * (z+1))],
+                _density[ x    + _vertsX * ((y+1) + _gridY *  z   )],
+                _density[(x+1) + _vertsX * ((y+1) + _gridY *  z   )],
+                _density[(x+1) + _vertsX * ((y+1) + _gridY * (z+1))],
+                _density[ x    + _vertsX * ((y+1) + _gridY * (z+1))],
+            };
 
-                var cube = new float[8]
-                {
-                    density[ x    + vertsX * ( y    + gridY *  z   )],
-                    density[(x+1) + vertsX * ( y    + gridY *  z   )],
-                    density[(x+1) + vertsX * ( y    + gridY * (z+1))],
-                    density[ x    + vertsX * ( y    + gridY * (z+1))],
-                    density[ x    + vertsX * ((y+1) + gridY *  z   )],
-                    density[(x+1) + vertsX * ((y+1) + gridY *  z   )],
-                    density[(x+1) + vertsX * ((y+1) + gridY * (z+1))],
-                    density[ x    + vertsX * ((y+1) + gridY * (z+1))],
-                };
-
-                MarchCube(cube, corners, verts, tris);
-            }
-
-            if (verts.Count == 0) continue;
-
-            var mesh = new Mesh { name = $"MCChunk_{cx}_{cy}_{cz}" };
-            if (verts.Count > 65535) mesh.indexFormat = IndexFormat.UInt32;
-            mesh.SetVertices(verts);
-            mesh.SetTriangles(tris, 0);
-            mesh.RecalculateNormals();
-
-            // Apply biome vertex colors
-            ApplyBiomeColors(mesh, extX, extZ);
-
-            var chunkGO = new GameObject(mesh.name);
-            chunkGO.transform.SetParent(transform, false);
-            chunkGO.AddComponent<MeshFilter>().sharedMesh = mesh;
-            chunkGO.AddComponent<MeshRenderer>().sharedMaterial = sharedMat;
-
-            var mc = chunkGO.AddComponent<MeshCollider>();
-            mc.cookingOptions = MeshColliderCookingOptions.CookForFasterSimulation
-                              | MeshColliderCookingOptions.WeldColocatedVertices
-                              | MeshColliderCookingOptions.UseFastMidphase;
-            mc.sharedMesh = mesh;
+            MarchCube(cube, corners, verts, tris);
         }
+
+        if (verts.Count == 0) return;
+
+        var mesh = new Mesh { name = $"MCChunk_{cx}_{cy}_{cz}" };
+        mesh.MarkDynamic();
+        if (verts.Count > 65535) mesh.indexFormat = IndexFormat.UInt32;
+        mesh.SetVertices(verts);
+        mesh.SetTriangles(tris, 0);
+        mesh.RecalculateNormals();
+
+        ApplyBiomeColors(mesh, _extX, _extZ);
+
+        var chunkGO = new GameObject(mesh.name);
+        chunkGO.transform.SetParent(transform, false);
+        chunkGO.AddComponent<MeshFilter>().sharedMesh = mesh;
+        chunkGO.AddComponent<MeshRenderer>().sharedMaterial = _sharedMat;
+
+        var mc = chunkGO.AddComponent<MeshCollider>();
+        mc.cookingOptions = MeshColliderCookingOptions.CookForFasterSimulation
+                          | MeshColliderCookingOptions.WeldColocatedVertices
+                          | MeshColliderCookingOptions.UseFastMidphase;
+        mc.sharedMesh = mesh;
+
+        _chunks[key] = chunkGO;
     }
 
     void DestroyChunks()
     {
+        foreach (var kvp in _chunks)
+        {
+            if (kvp.Value != null)
+            {
+                if (Application.isPlaying) Destroy(kvp.Value);
+                else DestroyImmediate(kvp.Value);
+            }
+        }
+        _chunks.Clear();
+
+        // Also clean any orphan children
         for (int i = transform.childCount - 1; i >= 0; i--)
         {
             var child = transform.GetChild(i).gameObject;

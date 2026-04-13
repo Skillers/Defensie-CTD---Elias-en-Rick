@@ -18,8 +18,10 @@ public class BrushController : MonoBehaviour
     bool _brushActive;
     bool _leftDown;
     bool _rightDown;
-    bool _leftBlocked;   // ignore left until physically released
-    bool _rightBlocked;  // ignore right until physically released
+    bool _leftBlocked;
+    bool _rightBlocked;
+    float _brushTimer;
+    const float BrushInterval = 0.15f;
     GameObject _indicator;
 
     const int RingSegments = 64;
@@ -173,6 +175,53 @@ public class BrushController : MonoBehaviour
             _rightDown = false;
             Debug.Log($"Right UP at {hit.point}");
         }
+
+        // Apply brush on interval: left = lower, right = raise
+        if (_leftDown || _rightDown)
+        {
+            _brushTimer += Time.deltaTime;
+            if (_brushTimer >= BrushInterval)
+            {
+                float sign = _rightDown ? 1f : -1f;
+                ApplyBrush(hit.point, sign);
+                _brushTimer = 0f;
+            }
+        }
+        else
+        {
+            _brushTimer = 0f;
+        }
+    }
+
+    void ApplyBrush(Vector3 worldPos, float sign)
+    {
+        Vector2Int center = terrainDataStore.WorldToGrid(worldPos);
+        int radiusCells = Mathf.CeilToInt(BrushRadius / terrainDataStore.step);
+
+        int gxMin = int.MaxValue, gzMin = int.MaxValue;
+        int gxMax = int.MinValue, gzMax = int.MinValue;
+
+        for (int dx = -radiusCells; dx <= radiusCells; dx++)
+        for (int dz = -radiusCells; dz <= radiusCells; dz++)
+        {
+            int gx = center.x + dx;
+            int gz = center.y + dz;
+            if (!terrainDataStore.InBounds(gx, gz)) continue;
+
+            float dist = new Vector2(dx, dz).magnitude * terrainDataStore.step;
+            if (dist > BrushRadius) continue;
+            float falloff = 1f - dist / BrushRadius;
+
+            terrainDataStore.grid[gx, gz].rawHeight += sign * BrushStrength * falloff * BrushInterval;
+
+            if (gx < gxMin) gxMin = gx;
+            if (gx > gxMax) gxMax = gx;
+            if (gz < gzMin) gzMin = gz;
+            if (gz > gzMax) gzMax = gz;
+        }
+
+        if (gxMin <= gxMax)
+            marchingCubes.RebuildRegion(gxMin, gzMin, gxMax, gzMax);
     }
 
     void OnDestroy()
