@@ -4,7 +4,10 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="2719ef14-fe85-4389-85f2-34cbfe22855b" name="Changes" comment="" />
+    <list default="true" id="2719ef14-fe85-4389-85f2-34cbfe22855b" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/Assets/LevelEditor/BrushController.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/LevelEditor/BrushController.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/LevelEditor/EditorUI.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/LevelEditor/EditorUI.cs" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -99,7 +102,7 @@
       <option name="presentableId" value="Default" />
       <updated>1774171244106</updated>
       <workItem from="1774171246180" duration="2740000" />
-      <workItem from="1776061171996" duration="4258000" />
+      <workItem from="1776061171996" duration="4851000" />
     </task>
     <servers />
   </component>

@@ -7,8 +7,9 @@ public class EditorUI : MonoBehaviour
     [Header("References")]
     public BrushController brushController;
 
-    [Header("Buttons")]
-    public Button brushToggleButton;
+    [Header("Tool Buttons")]
+    public Button raiseLowerButton;
+    public Button flattenButton;
 
     [Header("Sliders")]
     public Slider radiusSlider;
@@ -20,7 +21,8 @@ public class EditorUI : MonoBehaviour
 
     void Start()
     {
-        brushToggleButton.onClick.AddListener(brushController.ToggleBrush);
+        raiseLowerButton.onClick.AddListener(brushController.ToggleRaiseLower);
+        flattenButton.onClick.AddListener(brushController.ToggleFlatten);
 
         radiusSlider.onValueChanged.AddListener(v =>
         {
@@ -34,7 +36,6 @@ public class EditorUI : MonoBehaviour
             UpdateLabels();
         });
 
-        // Show initial values
         UpdateLabels();
     }
 

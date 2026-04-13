@@ -1,6 +1,8 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
 
+public enum BrushTool { None, RaiseLower, Flatten }
+
 public class BrushController : MonoBehaviour
 {
     [Header("References")]
@@ -14,18 +16,21 @@ public class BrushController : MonoBehaviour
 
     [Header("Brush Indicator")]
     public Color indicatorColor = Color.yellow;
+    public Color centerColor    = Color.red;
 
-    bool _brushActive;
+    BrushTool _activeTool = BrushTool.None;
     bool _leftDown;
     bool _rightDown;
     bool _leftBlocked;
     bool _rightBlocked;
     float _brushTimer;
     const float BrushInterval = 0.15f;
+
     GameObject _indicator;
+    GameObject _centerDot;
 
     const int RingSegments = 64;
-    const float RingThickness = 0.15f; // fraction of radius
+    const float RingThickness = 0.15f;
 
     Mesh _ringMesh;
     Vector3[] _baseInner;
@@ -33,7 +38,7 @@ public class BrushController : MonoBehaviour
 
     void Start()
     {
-        // Pre-compute unit circle directions
+        // Ring indicator
         _baseInner = new Vector3[RingSegments];
         _baseOuter = new Vector3[RingSegments];
         float inner = 1f - RingThickness;
@@ -47,7 +52,6 @@ public class BrushController : MonoBehaviour
             _baseOuter[i] = new Vector3(cos, 0f, sin);
         }
 
-        // Build initial mesh with triangles (verts updated each frame)
         var tris = new int[RingSegments * 6];
         for (int i = 0; i < RingSegments; i++)
         {
@@ -72,43 +76,64 @@ public class BrushController : MonoBehaviour
         var shader = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
         mr.sharedMaterial = new Material(shader) { color = indicatorColor };
         _indicator.SetActive(false);
+
+        // Center dot for flatten tool
+        _centerDot = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        _centerDot.name = "BrushCenterDot";
+        _centerDot.transform.localScale = Vector3.one * 0.5f;
+        Destroy(_centerDot.GetComponent<Collider>());
+        _centerDot.GetComponent<MeshRenderer>().sharedMaterial = new Material(shader) { color = centerColor };
+        _centerDot.SetActive(false);
     }
 
-    void UpdateRingToTerrain(Vector3 center)
+    public void ToggleRaiseLower()
     {
-        var verts = new Vector3[RingSegments * 2];
-        float offset = 0.15f; // hover above surface
-
-        for (int i = 0; i < RingSegments; i++)
+        if (_activeTool == BrushTool.RaiseLower)
         {
-            Vector3 innerWorld = center + _baseInner[i] * BrushRadius;
-            Vector3 outerWorld = center + _baseOuter[i] * BrushRadius;
-
-            innerWorld.y = terrainDataStore.GetHeight(innerWorld) + offset;
-            outerWorld.y = terrainDataStore.GetHeight(outerWorld) + offset;
-
-            // Store in local space (indicator at origin)
-            verts[i * 2]     = innerWorld;
-            verts[i * 2 + 1] = outerWorld;
+            _activeTool = BrushTool.None;
+            Debug.Log("RaiseLower DEACTIVATED");
         }
-
-        _ringMesh.vertices = verts;
-        _ringMesh.RecalculateNormals();
-        _ringMesh.RecalculateBounds();
+        else
+        {
+            _activeTool = BrushTool.RaiseLower;
+            Debug.Log("RaiseLower ACTIVATED");
+        }
+        ResetState();
     }
 
-    public void ToggleBrush()
+    public void ToggleFlatten()
     {
-        _brushActive = !_brushActive;
-        Debug.Log($"Brush {(_brushActive ? "ACTIVATED" : "DEACTIVATED")}");
-        if (!_brushActive) _indicator.SetActive(false);
+        if (_activeTool == BrushTool.Flatten)
+        {
+            _activeTool = BrushTool.None;
+            Debug.Log("Flatten DEACTIVATED");
+        }
+        else
+        {
+            _activeTool = BrushTool.Flatten;
+            Debug.Log("Flatten ACTIVATED");
+        }
+        ResetState();
+    }
+
+    void ResetState()
+    {
+        _leftDown = _rightDown = false;
+        _leftBlocked = _rightBlocked = false;
+        _brushTimer = 0f;
+        if (_activeTool == BrushTool.None)
+        {
+            _indicator.SetActive(false);
+            _centerDot.SetActive(false);
+        }
     }
 
     void Update()
     {
-        if (!_brushActive)
+        if (_activeTool == BrushTool.None)
         {
             _indicator.SetActive(false);
+            _centerDot.SetActive(false);
             return;
         }
 
@@ -122,37 +147,49 @@ public class BrushController : MonoBehaviour
             _indicator.transform.position = Vector3.zero;
             _indicator.transform.localScale = Vector3.one;
             UpdateRingToTerrain(hit.point);
+
+            // Show center dot only for flatten tool
+            if (_activeTool == BrushTool.Flatten)
+            {
+                _centerDot.SetActive(true);
+                _centerDot.transform.position = new Vector3(
+                    hit.point.x,
+                    terrainDataStore.GetHeight(hit.point) + 0.3f,
+                    hit.point.z);
+            }
+            else
+            {
+                _centerDot.SetActive(false);
+            }
         }
         else
         {
             _indicator.SetActive(false);
+            _centerDot.SetActive(false);
             return;
         }
 
+        // --- Input tracking (shared) ---
         bool leftPressed  = mouse.leftButton.isPressed;
         bool rightPressed = mouse.rightButton.isPressed;
 
-        // Unblock once physically released
         if (!leftPressed)  _leftBlocked  = false;
         if (!rightPressed) _rightBlocked = false;
 
-        // Right pressed while left is held — switch
         if (_leftDown && rightPressed && !_rightBlocked)
         {
             _leftDown = false;
-            _leftBlocked = true;  // ignore left until released
+            _leftBlocked = true;
             Debug.Log("Left RELEASED (switched to right)");
         }
 
-        // Left pressed while right is held — switch
         if (_rightDown && leftPressed && !_leftBlocked)
         {
             _rightDown = false;
-            _rightBlocked = true;  // ignore right until released
+            _rightBlocked = true;
             Debug.Log("Right RELEASED (switched to left)");
         }
 
-        // Track left
         if (leftPressed && !_leftDown && !_rightDown && !_leftBlocked)
         {
             _leftDown = true;
@@ -164,7 +201,6 @@ public class BrushController : MonoBehaviour
             Debug.Log($"Left UP at {hit.point}");
         }
 
-        // Track right
         if (rightPressed && !_rightDown && !_leftDown && !_rightBlocked)
         {
             _rightDown = true;
@@ -176,14 +212,22 @@ public class BrushController : MonoBehaviour
             Debug.Log($"Right UP at {hit.point}");
         }
 
-        // Apply brush on interval: left = lower, right = raise
+        // --- Apply tool on interval ---
         if (_leftDown || _rightDown)
         {
             _brushTimer += Time.deltaTime;
             if (_brushTimer >= BrushInterval)
             {
-                float sign = _rightDown ? 1f : -1f;
-                ApplyBrush(hit.point, sign);
+                switch (_activeTool)
+                {
+                    case BrushTool.RaiseLower:
+                        float sign = _rightDown ? 1f : -1f;
+                        ApplyRaiseLower(hit.point, sign);
+                        break;
+                    case BrushTool.Flatten:
+                        ApplyFlatten(hit.point, _rightDown);
+                        break;
+                }
                 _brushTimer = 0f;
             }
         }
@@ -193,7 +237,30 @@ public class BrushController : MonoBehaviour
         }
     }
 
-    void ApplyBrush(Vector3 worldPos, float sign)
+    void UpdateRingToTerrain(Vector3 center)
+    {
+        var verts = new Vector3[RingSegments * 2];
+        float offset = 0.15f;
+
+        for (int i = 0; i < RingSegments; i++)
+        {
+            Vector3 innerWorld = center + _baseInner[i] * BrushRadius;
+            Vector3 outerWorld = center + _baseOuter[i] * BrushRadius;
+
+            innerWorld.y = terrainDataStore.GetHeight(innerWorld) + offset;
+            outerWorld.y = terrainDataStore.GetHeight(outerWorld) + offset;
+
+            verts[i * 2]     = innerWorld;
+            verts[i * 2 + 1] = outerWorld;
+        }
+
+        _ringMesh.vertices = verts;
+        _ringMesh.RecalculateNormals();
+        _ringMesh.RecalculateBounds();
+    }
+
+    // --- Raise / Lower ---
+    void ApplyRaiseLower(Vector3 worldPos, float sign)
     {
         Vector2Int center = terrainDataStore.WorldToGrid(worldPos);
         int radiusCells = Mathf.CeilToInt(BrushRadius / terrainDataStore.step);
@@ -224,8 +291,72 @@ public class BrushController : MonoBehaviour
             marchingCubes.RebuildRegion(gxMin, gzMin, gxMax, gzMax);
     }
 
+    // --- Flatten ---
+    void ApplyFlatten(Vector3 worldPos, bool snapToCenter)
+    {
+        Vector2Int center = terrainDataStore.WorldToGrid(worldPos);
+        int radiusCells = Mathf.CeilToInt(BrushRadius / terrainDataStore.step);
+
+        // Determine target height
+        float targetHeight;
+        if (snapToCenter)
+        {
+            // Right click: snap to center point height
+            targetHeight = terrainDataStore.grid[
+                Mathf.Clamp(center.x, 0, terrainDataStore.GridWidth - 1),
+                Mathf.Clamp(center.y, 0, terrainDataStore.GridHeight - 1)
+            ].rawHeight;
+        }
+        else
+        {
+            // Left click: average height of area
+            float sum = 0f;
+            int count = 0;
+            for (int dx = -radiusCells; dx <= radiusCells; dx++)
+            for (int dz = -radiusCells; dz <= radiusCells; dz++)
+            {
+                int gx = center.x + dx;
+                int gz = center.y + dz;
+                if (!terrainDataStore.InBounds(gx, gz)) continue;
+                float dist = new Vector2(dx, dz).magnitude * terrainDataStore.step;
+                if (dist > BrushRadius) continue;
+                sum += terrainDataStore.grid[gx, gz].rawHeight;
+                count++;
+            }
+            targetHeight = count > 0 ? sum / count : 0f;
+        }
+
+        int gxMin = int.MaxValue, gzMin = int.MaxValue;
+        int gxMax = int.MinValue, gzMax = int.MinValue;
+
+        for (int dx = -radiusCells; dx <= radiusCells; dx++)
+        for (int dz = -radiusCells; dz <= radiusCells; dz++)
+        {
+            int gx = center.x + dx;
+            int gz = center.y + dz;
+            if (!terrainDataStore.InBounds(gx, gz)) continue;
+
+            float dist = new Vector2(dx, dz).magnitude * terrainDataStore.step;
+            if (dist > BrushRadius) continue;
+            float falloff = 1f - dist / BrushRadius;
+
+            float current = terrainDataStore.grid[gx, gz].rawHeight;
+            float diff = targetHeight - current;
+            terrainDataStore.grid[gx, gz].rawHeight += diff * BrushStrength * falloff * BrushInterval;
+
+            if (gx < gxMin) gxMin = gx;
+            if (gx > gxMax) gxMax = gx;
+            if (gz < gzMin) gzMin = gz;
+            if (gz > gzMax) gzMax = gz;
+        }
+
+        if (gxMin <= gxMax)
+            marchingCubes.RebuildRegion(gxMin, gzMin, gxMax, gzMax);
+    }
+
     void OnDestroy()
     {
         if (_indicator != null) Destroy(_indicator);
+        if (_centerDot != null) Destroy(_centerDot);
     }
 }
