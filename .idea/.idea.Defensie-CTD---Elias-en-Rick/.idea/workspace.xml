@@ -4,7 +4,23 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="2719ef14-fe85-4389-85f2-34cbfe22855b" name="Changes" comment="" />
+    <list default="true" id="2719ef14-fe85-4389-85f2-34cbfe22855b" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/.claude/settings.local.json" beforeDir="false" afterPath="$PROJECT_DIR$/.claude/settings.local.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/.idea.Defensie-CTD---Elias-en-Rick/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.Defensie-CTD---Elias-en-Rick/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/LevelEditor/BrushController.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/LevelEditor/BrushController.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/LevelEditor/EditorUI.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/LevelEditor/EditorUI.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/LevelEditor/LevelEditorManager.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/LevelEditor/LevelEditorManager.cs.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/LevelEditor/LevelEditorTerrain.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/LevelEditor/LevelEditorTerrain.cs.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/LevelEditor/PlacementController.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/LevelEditor/PlacementController.cs.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/TerrainScripts/MapGenerator.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/TerrainScripts/MapGenerator.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/TerrainScripts/MarchingCubesTerrain.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/TerrainScripts/MarchingCubesTerrain.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/TerrainScripts/SlopeMap.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/TerrainScripts/SlopeMap.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/TerrainScripts/TerrainDataStore.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/TerrainScripts/TerrainDataStore.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/UserSettings/Layouts/default-6000.dwlt" beforeDir="false" afterPath="$PROJECT_DIR$/UserSettings/Layouts/default-6000.dwlt" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -18,9 +34,9 @@
     <setting file="file://$PROJECT_DIR$/Assets/Maprenderer.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Assets/UnitMover.cs" root0="FORCE_HIGHLIGHTING" />
   </component>
-  <component name="ProjectColorInfo"><![CDATA[{
-  "associatedIndex": 2
-}]]></component>
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 2
+}</component>
   <component name="ProjectId" id="3BIKf1uKFuCQp4vgFzmQXx0iJH7" />
   <component name="ProjectViewState">
     <option name="hideEmptyMiddlePackages" value="true" />
@@ -33,7 +49,7 @@
     "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
     "RunOnceActivity.git.unshallow": "true",
     "RunOnceActivity.typescript.service.memoryLimit.init": "true",
-    "git-widget-placeholder": "main",
+    "git-widget-placeholder": "LevelEditor",
     "node.js.detected.package.eslint": "true",
     "node.js.detected.package.tslint": "true",
     "node.js.selected.package.eslint": "(autodetect)",
@@ -43,6 +59,16 @@
   }
 }]]></component>
   <component name="RunManager" selected="Attach to Unity Editor.Attach to Unity Editor">
+    <configuration name="Standalone Player" type="RunUnityExe" factoryName="Unity Executable">
+      <option name="EXE_PATH" value="$USER_HOME$/Desktop/CTD\Defensie-CTD---Elias-en-Rick-.exe" />
+      <option name="PROGRAM_PARAMETERS" value="" />
+      <option name="WORKING_DIRECTORY" value="C:\Users\Skillers\Desktop\CTD" />
+      <option name="PASS_PARENT_ENVS" value="1" />
+      <option name="ENV_FILE_PATHS" value="" />
+      <option name="REDIRECT_INPUT_PATH" value="" />
+      <option name="MIXED_MODE_DEBUG" value="0" />
+      <method v="2" />
+    </configuration>
     <configuration name="Start Unity" type="RunUnityExe" factoryName="Unity Executable">
       <option name="EXE_PATH" value="C:\Program Files\Unity\Hub\Editor\6000.3.11f1\Editor\Unity.exe" />
       <option name="PROGRAM_PARAMETERS" value="-projectPath D:\UnityProjects\Defensie-CTD---Elias-en-Rick -debugCodeOptimization" />
@@ -89,6 +115,7 @@
       <option name="presentableId" value="Default" />
       <updated>1774171244106</updated>
       <workItem from="1774171246180" duration="2740000" />
+      <workItem from="1776061171996" duration="3666000" />
     </task>
     <servers />
   </component>

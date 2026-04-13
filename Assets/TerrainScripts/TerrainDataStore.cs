@@ -79,4 +79,54 @@ public class TerrainDataStore : MonoBehaviour
         float wz = -extentZ + cell.y * step;
         return transform.position + new Vector3(wx, 0f, wz);
     }
+
+    /// <summary>Returns the rounded height at the given grid coordinate.</summary>
+    public float GetHeight(int gx, int gz)
+    {
+        if (grid == null) return 0f;
+        int x = Mathf.Clamp(gx, 0, GridWidth  - 1);
+        int z = Mathf.Clamp(gz, 0, GridHeight - 1);
+        return grid[x, z].roundedHeight;
+    }
+
+    /// <summary>Returns the rounded height at a world position.</summary>
+    public float GetHeight(Vector3 worldPos)
+    {
+        Vector2Int g = WorldToGrid(worldPos);
+        return GetHeight(g.x, g.y);
+    }
+
+    /// <summary>
+    /// Raycast against the terrain heightmap. Steps the ray across the XZ grid
+    /// and finds where the ray drops below the terrain surface.
+    /// Returns true if hit, with hitPoint on the terrain surface.
+    /// </summary>
+    public bool RaycastTerrain(Ray ray, out Vector3 hitPoint, float maxDistance = 500f)
+    {
+        hitPoint = Vector3.zero;
+        if (grid == null) return false;
+
+        float stepDist = step * 0.5f;
+        Vector3 pos = ray.origin;
+
+        for (float d = 0f; d < maxDistance; d += stepDist)
+        {
+            pos = ray.GetPoint(d);
+
+            // Check if within terrain bounds
+            float lx = pos.x - transform.position.x;
+            float lz = pos.z - transform.position.z;
+            if (lx < -extentX || lx > extentX || lz < -extentZ || lz > extentZ)
+                continue;
+
+            float terrainY = GetHeight(pos);
+            if (pos.y <= terrainY)
+            {
+                hitPoint = new Vector3(pos.x, terrainY, pos.z);
+                return true;
+            }
+        }
+
+        return false;
+    }
 }

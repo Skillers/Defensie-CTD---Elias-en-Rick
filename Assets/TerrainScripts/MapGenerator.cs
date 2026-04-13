@@ -5,12 +5,11 @@ using UnityEngine;
 /// generation pipeline step-by-step:
 ///   1. Create empty grid
 ///   2. Generate Perlin noise → bake raw heights
-///   3. Compute outgoing slopes (from raw data — nicer than rounded)
-///   4. Compute rounded heights (0.25 snap for marching cubes)
-///   5. Assign biomes (via BiomeAssigner)
-///   6. Hand grid to TerrainDataStore
-///   7. Generate marching cubes mesh
-///   8. Disable rendering on source maps
+///   3. Compute outgoing slopes (from raw heights — smoother than rounded)
+///   4. Assign biomes (via BiomeAssigner)
+///   5. Hand grid to TerrainDataStore
+///   6. Build visual meshes (noise plane, slope map)
+///   7. Generate marching cubes mesh (also bakes rounded heights)
 /// </summary>
 public class MapGenerator : MonoBehaviour
 {
@@ -49,31 +48,38 @@ public class MapGenerator : MonoBehaviour
         for (int z = 0; z < height; z++)
         {
             grid[x, z].rawHeight = noisePlane.GetValue(x, z) * terrainDataStore.heightMultiplier;
-            }
+        }
         Debug.Log("MapGenerator: Perlin noise generated and raw heights baked.");
 
-        // 3. Compute rounded heights for marching cubes
-        BakeRoundedHeights(grid, width, height);
-        Debug.Log("MapGenerator: rounded heights baked.");
+        // 3. Compute outgoing slopes from raw heights (smoother than rounded)
+        if (slopeMap != null)
+        {
+            slopeMap.ComputeAndBake(grid, width, height);
+            Debug.Log("MapGenerator: slopes computed and baked.");
+        }
 
+        // 4. Assign biomes
+        if (biomeAssigner != null)
+        {
+            biomeAssigner.Assign(grid, width, height);
+            Debug.Log("MapGenerator: biomes assigned.");
+        }
 
-
- 
-        // 7. Hand grid to TerrainDataStore
+        // 5. Hand grid to TerrainDataStore
         terrainDataStore.SetGrid(grid);
         Debug.Log("MapGenerator: grid assigned to TerrainDataStore.");
 
-        // 8. Build visual meshes
+        // 6. Build visual meshes
         noisePlane.BuildVisual();
         Debug.Log("MapGenerator: noise plane mesh built.");
 
         if (slopeMap != null)
         {
             slopeMap.Generate();
-            Debug.Log("MapGenerator: slope map generated.");
+            Debug.Log("MapGenerator: slope map visual built.");
         }
 
-        // 9. Generate marching cubes mesh
+        // 7. Generate marching cubes mesh (also bakes rounded heights)
         if (marchingCubes != null)
         {
             marchingCubes.Generate();
@@ -81,15 +87,6 @@ public class MapGenerator : MonoBehaviour
         }
 
         Debug.Log("MapGenerator: pipeline complete.");
-    }
-
-    void BakeRoundedHeights(CellData[,] grid, int width, int height)
-    {
-        for (int x = 0; x < width; x++)
-        for (int z = 0; z < height; z++)
-        {
-            grid[x, z].roundedHeight = Mathf.Round(grid[x, z].rawHeight / terrainDataStore.roundStep) * terrainDataStore.roundStep;
-        }
     }
 
 }

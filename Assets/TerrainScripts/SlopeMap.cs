@@ -30,6 +30,24 @@ public class SlopeMap : MonoBehaviour
 
     // Generation is driven by MapGenerator — no auto-subscribe or auto-start.
 
+    /// <summary>
+    /// Compute slopes from the given grid and bake directional slopes into each cell.
+    /// Call this before handing the grid to TerrainDataStore.
+    /// </summary>
+    public void ComputeAndBake(CellData[,] grid, int width, int height)
+    {
+        if (terrainDataStore == null) return;
+
+        VertsX = width;
+        VertsZ = height;
+
+        Heights     = BuildHeightsFromGrid(grid);
+        SlopeAngles = ComputeSlopes(Heights);
+
+        BakeSlopesIntoGrid(grid);
+    }
+
+    /// <summary>Build the visual mesh (call after TerrainDataStore has the grid).</summary>
     public void Generate()
     {
         if (terrainDataStore == null || terrainDataStore.grid == null) return;
@@ -37,25 +55,22 @@ public class SlopeMap : MonoBehaviour
         VertsX = terrainDataStore.GridWidth;
         VertsZ = terrainDataStore.GridHeight;
 
-        Heights     = BuildHeights();
-        SlopeAngles = ComputeSlopes(Heights);
-
-        // Bake directional slopes into CellData grid
-        BakeSlopesIntoGrid();
+        if (Heights == null) Heights = BuildHeightsFromGrid(terrainDataStore.grid);
+        if (SlopeAngles == null) SlopeAngles = ComputeSlopes(Heights);
 
         BuildMesh();
         ApplySlopeTexture(SlopeAngles);
     }
 
-    private void BakeSlopesIntoGrid()
+    private void BakeSlopesIntoGrid(CellData[,] grid)
     {
         float stp = terrainDataStore.step;
 
         for (int x = 0; x < VertsX; x++)
         for (int z = 0; z < VertsZ; z++)
         {
-            terrainDataStore.grid[x, z].slopeOutgoing = new float[8];
-            float h = terrainDataStore.grid[x, z].rawHeight;
+            grid[x, z].slopeOutgoing = new float[8];
+            float h = grid[x, z].rawHeight;
 
             for (int d = 0; d < 8; d++)
             {
@@ -64,26 +79,25 @@ public class SlopeMap : MonoBehaviour
 
                 if (nx < 0 || nx >= VertsX || nz < 0 || nz >= VertsZ)
                 {
-                    terrainDataStore.grid[x, z].slopeOutgoing[d] = 0f;
+                    grid[x, z].slopeOutgoing[d] = 0f;
                     continue;
                 }
 
-                float nh = terrainDataStore.grid[nx, nz].rawHeight;
+                float nh = grid[nx, nz].rawHeight;
                 bool isDiagonal = CellData.Directions[d].x != 0 && CellData.Directions[d].y != 0;
                 float dist = isDiagonal ? stp * 1.41421356f : stp;
-                terrainDataStore.grid[x, z].slopeOutgoing[d] = Mathf.Atan2(nh - h, dist) * Mathf.Rad2Deg;
+                grid[x, z].slopeOutgoing[d] = Mathf.Atan2(nh - h, dist) * Mathf.Rad2Deg;
             }
         }
     }
 
-    // Raw heights from the CellData grid
-    private float[] BuildHeights()
+    private float[] BuildHeightsFromGrid(CellData[,] grid)
     {
         var heights = new float[VertsX * VertsZ];
 
         for (int z = 0; z < VertsZ; z++)
         for (int x = 0; x < VertsX; x++)
-            heights[z * VertsX + x] = terrainDataStore.grid[x, z].rawHeight;
+            heights[z * VertsX + x] = grid[x, z].rawHeight;
 
         return heights;
     }
