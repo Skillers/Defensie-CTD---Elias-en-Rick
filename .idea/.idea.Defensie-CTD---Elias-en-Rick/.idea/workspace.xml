@@ -4,23 +4,7 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="2719ef14-fe85-4389-85f2-34cbfe22855b" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.claude/settings.local.json" beforeDir="false" afterPath="$PROJECT_DIR$/.claude/settings.local.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/.idea.Defensie-CTD---Elias-en-Rick/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.Defensie-CTD---Elias-en-Rick/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/LevelEditor/BrushController.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/LevelEditor/BrushController.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/LevelEditor/EditorUI.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/LevelEditor/EditorUI.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/LevelEditor/LevelEditorManager.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/LevelEditor/LevelEditorManager.cs.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/LevelEditor/LevelEditorTerrain.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/LevelEditor/LevelEditorTerrain.cs.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/LevelEditor/PlacementController.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/LevelEditor/PlacementController.cs.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/TerrainScripts/MapGenerator.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/TerrainScripts/MapGenerator.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/TerrainScripts/MarchingCubesTerrain.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/TerrainScripts/MarchingCubesTerrain.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/TerrainScripts/SlopeMap.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/TerrainScripts/SlopeMap.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/TerrainScripts/TerrainDataStore.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/TerrainScripts/TerrainDataStore.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/UserSettings/Layouts/default-6000.dwlt" beforeDir="false" afterPath="$PROJECT_DIR$/UserSettings/Layouts/default-6000.dwlt" afterDir="false" />
-    </list>
+    <list default="true" id="2719ef14-fe85-4389-85f2-34cbfe22855b" name="Changes" comment="" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -115,7 +99,7 @@
       <option name="presentableId" value="Default" />
       <updated>1774171244106</updated>
       <workItem from="1774171246180" duration="2740000" />
-      <workItem from="1776061171996" duration="3666000" />
+      <workItem from="1776061171996" duration="4258000" />
     </task>
     <servers />
   </component>
