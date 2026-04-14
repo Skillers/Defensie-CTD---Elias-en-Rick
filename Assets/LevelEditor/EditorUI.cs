@@ -38,6 +38,10 @@ public class EditorUI : MonoBehaviour
             UpdateLabels();
         });
 
+        // Sync sliders to BrushController defaults
+        radiusSlider.value   = brushController.BrushRadius;
+        strengthSlider.value = brushController.BrushStrength;
+
         UpdateLabels();
     }
 

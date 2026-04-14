@@ -111,7 +111,7 @@ public class MarchingCubesTerrain : MonoBehaviour
         for (int cz = czMin; cz <= czMax; cz += chunk)
         for (int cx = cxMin; cx <= cxMax; cx += chunk)
         for (int cy = 0; cy < _gridY - 1; cy += chunk)
-            BuildChunk(new Vector3Int(cx, cy, cz));
+            _rebuildQueue.Add(new Vector3Int(cx, cy, cz));
     }
 
     /// <summary>
@@ -138,6 +138,23 @@ public class MarchingCubesTerrain : MonoBehaviour
             if (mesh == null) continue;
 
             ApplyBiomeColors(mesh, _extX, _extZ);
+        }
+    }
+
+    void LateUpdate()
+    {
+        if (_rebuildQueue.Count == 0) return;
+
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        var iter = new List<Vector3Int>(_rebuildQueue);
+
+        foreach (var key in iter)
+        {
+            BuildChunk(key);
+            _rebuildQueue.Remove(key);
+
+            if (sw.Elapsed.TotalMilliseconds >= msPerFrame)
+                break;
         }
     }
 
