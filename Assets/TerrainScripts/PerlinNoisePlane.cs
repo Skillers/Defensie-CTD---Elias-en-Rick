@@ -30,6 +30,9 @@ public class PerlinNoisePlane : MonoBehaviour
     {
         if (NoiseValues == null || terrainDataStore == null) return;
 
+        var mf = GetComponent<MeshFilter>();
+        mf.sharedMesh = BuildQuad();
+
         var tex = new Texture2D(VertsX, VertsZ, TextureFormat.RGB24, false)
         {
             filterMode = FilterMode.Bilinear,
@@ -58,10 +61,8 @@ public class PerlinNoisePlane : MonoBehaviour
     {
         if (NoiseValues == null || terrainDataStore == null) return;
 
-        // Ensure we have a quad mesh to render on
         var mf = GetComponent<MeshFilter>();
-        if (mf.sharedMesh == null)
-            mf.sharedMesh = BuildQuad();
+        mf.sharedMesh = BuildQuad();
 
         var tex = new Texture2D(VertsX, VertsZ, TextureFormat.RGB24, false)
         {

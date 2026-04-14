@@ -1557,7 +1557,7 @@ MonoBehaviour:
   extentZ: 100
   step: 0.5
   roundStep: 0.25
-  seed: 66
+  seed: 22
   noiseScale: 0.02
   noiseOffset: {x: 0, y: 0}
   heightMultiplier: 40
@@ -2184,7 +2184,7 @@ MeshFilter:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1313885674}
-  m_Mesh: {fileID: 10210, guid: 0000000000000000e000000000000000, type: 0}
+  m_Mesh: {fileID: 0}
 --- !u!4 &1313885678
 Transform:
   m_ObjectHideFlags: 0
