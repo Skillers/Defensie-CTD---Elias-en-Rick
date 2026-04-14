@@ -266,7 +266,7 @@ public class BrushController : MonoBehaviour
     void UpdateRingToTerrain(Vector3 center)
     {
         var verts = new Vector3[RingSegments * 2];
-        float offset = 0.15f;
+        float offset = 0.25f;
 
         for (int i = 0; i < RingSegments; i++)
         {

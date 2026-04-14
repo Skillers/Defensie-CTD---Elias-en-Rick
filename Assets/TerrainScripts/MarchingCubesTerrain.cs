@@ -15,8 +15,9 @@ public class MarchingCubesTerrain : MonoBehaviour
     float   _minY, _extX, _extZ, _stp, _rs;
     Material _sharedMat;
 
-    // Async chunk rebuild queue
-    readonly HashSet<Vector3Int> _rebuildQueue = new HashSet<Vector3Int>();
+    // Async chunk rebuild queue (FIFO + dedup)
+    readonly Queue<Vector3Int>   _rebuildQueue   = new Queue<Vector3Int>();
+    readonly HashSet<Vector3Int> _rebuildQueued   = new HashSet<Vector3Int>();
     [Tooltip("Max milliseconds spent rebuilding queued chunks per frame.")]
     public float msPerFrame = 8f;
 
@@ -111,7 +112,11 @@ public class MarchingCubesTerrain : MonoBehaviour
         for (int cz = czMin; cz <= czMax; cz += chunk)
         for (int cx = cxMin; cx <= cxMax; cx += chunk)
         for (int cy = 0; cy < _gridY - 1; cy += chunk)
-            _rebuildQueue.Add(new Vector3Int(cx, cy, cz));
+        {
+            var key = new Vector3Int(cx, cy, cz);
+            if (_rebuildQueued.Add(key))
+                _rebuildQueue.Enqueue(key);
+        }
     }
 
     /// <summary>
@@ -146,12 +151,12 @@ public class MarchingCubesTerrain : MonoBehaviour
         if (_rebuildQueue.Count == 0) return;
 
         var sw = System.Diagnostics.Stopwatch.StartNew();
-        var iter = new List<Vector3Int>(_rebuildQueue);
 
-        foreach (var key in iter)
+        while (_rebuildQueue.Count > 0)
         {
+            var key = _rebuildQueue.Dequeue();
+            _rebuildQueued.Remove(key);
             BuildChunk(key);
-            _rebuildQueue.Remove(key);
 
             if (sw.Elapsed.TotalMilliseconds >= msPerFrame)
                 break;
