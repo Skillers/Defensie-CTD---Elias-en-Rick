@@ -57,12 +57,20 @@ public class PerlinNoisePlane : MonoBehaviour
         mr.sharedMaterial.mainTexture = tex;
     }
 
+    [Header("Visual Settings")]
+    [Range(0.05f, 1f)]
+    public float heightStepFraction = 0.4f;
+
     public void BuildVisual()
     {
         if (NoiseValues == null || terrainDataStore == null) return;
 
         var mf = GetComponent<MeshFilter>();
         mf.sharedMesh = BuildQuad();
+
+        // Number of distinct height bands for the strategic map look
+        int layers = Mathf.Max(1, Mathf.RoundToInt(terrainDataStore.heightMultiplier * heightStepFraction));
+        float mapStep = terrainDataStore.heightMultiplier / layers;
 
         var tex = new Texture2D(VertsX, VertsZ, TextureFormat.RGB24, false)
         {
@@ -73,9 +81,8 @@ public class PerlinNoisePlane : MonoBehaviour
         var pixels = new Color[NoiseValues.Length];
         for (int i = 0; i < NoiseValues.Length; i++)
         {
-            // Round in height-space (same as marching cubes), then normalize back to 0-1
             float h = NoiseValues[i] * terrainDataStore.heightMultiplier;
-            float rounded = Mathf.Round(h / terrainDataStore.roundStep) * terrainDataStore.roundStep;
+            float rounded = Mathf.Round(h / mapStep) * mapStep;
             float v = rounded / terrainDataStore.heightMultiplier;
             pixels[i] = new Color(v, v, v);
         }
