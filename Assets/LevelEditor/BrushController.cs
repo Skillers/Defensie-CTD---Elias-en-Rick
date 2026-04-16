@@ -1,5 +1,7 @@
+using System;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.Serialization;
 
 public enum BrushTool { None, RaiseLower, Flatten, BiomePaint }
 
@@ -15,13 +17,29 @@ public class BrushController : MonoBehaviour
     public float BrushStrength = 0.1f;
 
     [Header("Biome Paint")]
-    public BiomeSO paintBiome;
+    [FormerlySerializedAs("paintBiome")]
+    [SerializeField] BiomeSO _paintBiome;
+
+    public BiomeSO paintBiome
+    {
+        get => _paintBiome;
+        set
+        {
+            if (_paintBiome == value) return;
+            _paintBiome = value;
+            OnBiomeChanged?.Invoke(_paintBiome);
+        }
+    }
 
     [Header("Brush Indicator")]
     public Color indicatorColor = Color.yellow;
     public Color centerColor    = Color.red;
 
     BrushTool _activeTool = BrushTool.None;
+    public BrushTool ActiveTool => _activeTool;
+
+    public event Action<BrushTool> OnToolChanged;
+    public event Action<BiomeSO>   OnBiomeChanged;
     bool _leftDown;
     bool _rightDown;
     bool _leftBlocked;
@@ -90,49 +108,27 @@ public class BrushController : MonoBehaviour
         _centerDot.SetActive(false);
     }
 
-    public void ToggleRaiseLower()
-    {
-        if (_activeTool == BrushTool.RaiseLower)
-        {
-            _activeTool = BrushTool.None;
-            Debug.Log("RaiseLower DEACTIVATED");
-        }
-        else
-        {
-            _activeTool = BrushTool.RaiseLower;
-            Debug.Log("RaiseLower ACTIVATED");
-        }
-        ResetState();
-    }
+    public void ToggleRaiseLower() => SetActiveTool(BrushTool.RaiseLower);
+    public void ToggleFlatten()    => SetActiveTool(BrushTool.Flatten);
+    public void ToggleBiomePaint() => SetActiveTool(BrushTool.BiomePaint);
+    public void CancelTool()       => SetActiveTool(BrushTool.None);
 
-    public void ToggleFlatten()
+    void SetActiveTool(BrushTool tool)
     {
-        if (_activeTool == BrushTool.Flatten)
-        {
-            _activeTool = BrushTool.None;
-            Debug.Log("Flatten DEACTIVATED");
-        }
-        else
-        {
-            _activeTool = BrushTool.Flatten;
-            Debug.Log("Flatten ACTIVATED");
-        }
-        ResetState();
-    }
+        // Toggle semantics: clicking the active tool cancels it.
+        if (tool != BrushTool.None && _activeTool == tool) tool = BrushTool.None;
+        if (_activeTool == tool) return;
 
-    public void ToggleBiomePaint()
-    {
+        var prev = _activeTool;
+        _activeTool = tool;
+        ResetState();
+
         if (_activeTool == BrushTool.BiomePaint)
-        {
-            _activeTool = BrushTool.None;
-            Debug.Log("BiomePaint DEACTIVATED");
-        }
+            Debug.Log($"Tool: {prev} -> {_activeTool} (painting: {(paintBiome != null ? paintBiome.biomeName : "NONE")})");
         else
-        {
-            _activeTool = BrushTool.BiomePaint;
-            Debug.Log($"BiomePaint ACTIVATED — painting: {(paintBiome != null ? paintBiome.biomeName : "NONE")}");
-        }
-        ResetState();
+            Debug.Log($"Tool: {prev} -> {_activeTool}");
+
+        OnToolChanged?.Invoke(_activeTool);
     }
 
     void ResetState()
