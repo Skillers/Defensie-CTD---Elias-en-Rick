@@ -28,6 +28,18 @@ public class TerrainDataStore : MonoBehaviour
 
     public event System.Action OnGridReady;
 
+    // ── Start / End markers (set by level editor tools) ──────────────────
+    Vector2Int? _startCell;
+    Vector2Int? _endCell;
+
+    /// <summary>Grid cell of the start flag, or null if not placed.</summary>
+    public Vector2Int? StartCell => _startCell;
+    /// <summary>Grid cell of the end flag, or null if not placed.</summary>
+    public Vector2Int? EndCell   => _endCell;
+
+    public event System.Action OnStartChanged;
+    public event System.Action OnEndChanged;
+
     /// <summary>Assign a fully baked grid and notify listeners.</summary>
     public void SetGrid(CellData[,] cellGrid)
     {
@@ -94,6 +106,32 @@ public class TerrainDataStore : MonoBehaviour
     {
         Vector2Int g = WorldToGrid(worldPos);
         return GetHeight(g.x, g.y);
+    }
+
+    // ── Start / End setters ──────────────────────────────────────────────
+
+    public void SetStartCell(Vector2Int cell)
+    {
+        _startCell = cell;
+        OnStartChanged?.Invoke();
+    }
+
+    public void SetEndCell(Vector2Int cell)
+    {
+        _endCell = cell;
+        OnEndChanged?.Invoke();
+    }
+
+    public void ClearStartCell()
+    {
+        _startCell = null;
+        OnStartChanged?.Invoke();
+    }
+
+    public void ClearEndCell()
+    {
+        _endCell = null;
+        OnEndChanged?.Invoke();
     }
 
     /// <summary>

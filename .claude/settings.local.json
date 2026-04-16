@@ -10,7 +10,8 @@
       "Bash(python -c ':*)",
       "WebSearch",
       "WebFetch(domain:github.com)",
-      "mcp__c1fc4002-5f49-5f9d-a4e5-93c4ef5d6a75__google_drive_search"
+      "mcp__c1fc4002-5f49-5f9d-a4e5-93c4ef5d6a75__google_drive_search",
+      "Bash(xargs grep:*)"
     ]
   }
 }
