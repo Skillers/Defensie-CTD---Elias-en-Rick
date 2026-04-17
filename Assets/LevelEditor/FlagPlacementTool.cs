@@ -1,5 +1,8 @@
+using System;
 using UnityEngine;
 using UnityEngine.InputSystem;
+
+public enum FlagPhase { Start, End }
 
 /// <summary>
 /// Level editor tool for placing start/end flag markers on the terrain.
@@ -24,7 +27,7 @@ public class FlagPlacementTool : MonoBehaviour
     public float heightOffset = 0f;
 
     bool _active;
-    bool _placingEnd;   // false = next click places start, true = next click places end
+    FlagPhase _phase = FlagPhase.Start;
     bool _leftDown;
 
     GameObject _startFlagInstance;
@@ -33,16 +36,37 @@ public class FlagPlacementTool : MonoBehaviour
     /// <summary>True when this tool is the active editor tool.</summary>
     public bool IsActive => _active;
 
-    /// <summary>Wired to a UI button by EditorUI. Toggles the tool on/off.</summary>
+    /// <summary>Which flag the next click will place.</summary>
+    public FlagPhase CurrentPhase => _phase;
+
+    /// <summary>Fires whenever IsActive or CurrentPhase changes.</summary>
+    public event Action OnStateChanged;
+
+    /// <summary>Wired to a UI button. Turns the tool on (idempotent).</summary>
+    public void Activate()
+    {
+        if (_active) return;
+        _active = true;
+        _leftDown = false;
+        Debug.Log($"FlagPlacement ACTIVATED — next click places {_phase}");
+        OnStateChanged?.Invoke();
+    }
+
+    /// <summary>Wired to a UI button. Turns the tool off (idempotent).</summary>
+    public void Cancel()
+    {
+        if (!_active) return;
+        _active = false;
+        _leftDown = false;
+        Debug.Log("FlagPlacement DEACTIVATED");
+        OnStateChanged?.Invoke();
+    }
+
+    /// <summary>Convenience toggle for a single button that flips active state.</summary>
     public void Toggle()
     {
-        _active = !_active;
-        _leftDown = false;
-
-        if (_active)
-            Debug.Log($"FlagPlacement ACTIVATED — next click places {(_placingEnd ? "END" : "START")}");
-        else
-            Debug.Log("FlagPlacement DEACTIVATED");
+        if (_active) Cancel();
+        else Activate();
     }
 
     void Update()
@@ -76,25 +100,27 @@ public class FlagPlacementTool : MonoBehaviour
         Vector2Int cell = terrainDataStore.WorldToGrid(hit.point);
         Vector3 worldPos = WorldPosForCell(cell);
 
-        if (!_placingEnd)
+        if (_phase == FlagPhase.Start)
         {
             terrainDataStore.SetStartCell(cell);
             SpawnOrMove(ref _startFlagInstance, startFlagPrefab, worldPos, "StartFlag");
-            _placingEnd = true;
+            _phase = FlagPhase.End;
             Debug.Log($"Start placed at grid {cell} (world {worldPos})");
+            OnStateChanged?.Invoke();
         }
         else
         {
             var prefab = endFlagPrefab != null ? endFlagPrefab : startFlagPrefab;
             terrainDataStore.SetEndCell(cell);
             SpawnOrMove(ref _endFlagInstance, prefab, worldPos, "EndFlag");
-            _placingEnd = false;
+            _phase = FlagPhase.Start;
             Debug.Log($"End placed at grid {cell} (world {worldPos})");
 
             // Auto-deactivate after a full start→end placement cycle.
             _active = false;
             _leftDown = false;
             Debug.Log("FlagPlacement DEACTIVATED (cycle complete)");
+            OnStateChanged?.Invoke();
         }
     }
 

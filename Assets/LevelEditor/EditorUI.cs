@@ -6,11 +6,13 @@ public class EditorUI : MonoBehaviour
 {
     [Header("References")]
     public BrushController brushController;
+    public FlagPlacementTool flagPlacementTool;
 
     [Header("Tool Buttons")]
     public Button raiseLowerButton;
     public Button flattenButton;
     public Button biomePaintButton;
+    public Button flagButton;
     public Button cancelButton;
 
     [Header("Sliders")]
@@ -35,14 +37,17 @@ public class EditorUI : MonoBehaviour
     Color _raiseLowerNormal;
     Color _flattenNormal;
     Color _biomePaintNormal;
+    Color _flagNormal;
 
     void Start()
     {
-        raiseLowerButton.onClick.AddListener(brushController.ToggleRaiseLower);
-        flattenButton.onClick.AddListener(brushController.ToggleFlatten);
-        biomePaintButton.onClick.AddListener(brushController.ToggleBiomePaint);
+        raiseLowerButton.onClick.AddListener(OnRaiseLowerClicked);
+        flattenButton.onClick.AddListener(OnFlattenClicked);
+        biomePaintButton.onClick.AddListener(OnBiomePaintClicked);
+        if (flagButton != null)
+            flagButton.onClick.AddListener(OnFlagClicked);
         if (cancelButton != null)
-            cancelButton.onClick.AddListener(brushController.CancelTool);
+            cancelButton.onClick.AddListener(OnCancelClicked);
 
         radiusSlider.onValueChanged.AddListener(v =>
         {
@@ -64,23 +69,64 @@ public class EditorUI : MonoBehaviour
         _raiseLowerNormal = raiseLowerButton != null ? raiseLowerButton.colors.normalColor : Color.white;
         _flattenNormal    = flattenButton    != null ? flattenButton.colors.normalColor    : Color.white;
         _biomePaintNormal = biomePaintButton != null ? biomePaintButton.colors.normalColor : Color.white;
+        _flagNormal       = flagButton       != null ? flagButton.colors.normalColor       : Color.white;
 
-        brushController.OnToolChanged  += HandleToolChanged;
+        brushController.OnToolChanged  += HandleBrushToolChanged;
         brushController.OnBiomeChanged += HandleBiomeChanged;
+        if (flagPlacementTool != null)
+            flagPlacementTool.OnStateChanged += RefreshUI;
 
         UpdateLabels();
-        HandleToolChanged(brushController.ActiveTool);
-        HandleBiomeChanged(brushController.paintBiome);
+        RefreshUI();
     }
 
     void OnDestroy()
     {
         if (brushController != null)
         {
-            brushController.OnToolChanged  -= HandleToolChanged;
+            brushController.OnToolChanged  -= HandleBrushToolChanged;
             brushController.OnBiomeChanged -= HandleBiomeChanged;
         }
+        if (flagPlacementTool != null)
+            flagPlacementTool.OnStateChanged -= RefreshUI;
     }
+
+    // ── Button handlers (own the mutex between brush and flag tools) ──
+
+    void OnRaiseLowerClicked()
+    {
+        if (flagPlacementTool != null) flagPlacementTool.Cancel();
+        brushController.ToggleRaiseLower();
+    }
+
+    void OnFlattenClicked()
+    {
+        if (flagPlacementTool != null) flagPlacementTool.Cancel();
+        brushController.ToggleFlatten();
+    }
+
+    void OnBiomePaintClicked()
+    {
+        if (flagPlacementTool != null) flagPlacementTool.Cancel();
+        brushController.ToggleBiomePaint();
+    }
+
+    void OnFlagClicked()
+    {
+        brushController.CancelTool();
+        if (flagPlacementTool != null) flagPlacementTool.Toggle();
+    }
+
+    void OnCancelClicked()
+    {
+        brushController.CancelTool();
+        if (flagPlacementTool != null) flagPlacementTool.Cancel();
+    }
+
+    // ── State change handlers ──
+
+    void HandleBrushToolChanged(BrushTool tool) => RefreshUI();
+    void HandleBiomeChanged(BiomeSO biome)      => RefreshUI();
 
     void UpdateLabels()
     {
@@ -88,45 +134,52 @@ public class EditorUI : MonoBehaviour
         if (strengthText != null) strengthText.text  = $"Strength: {brushController.BrushStrength:F2}";
     }
 
-    void HandleToolChanged(BrushTool tool)
+    void RefreshUI()
     {
-        RefreshStatusLabels();
+        BrushTool tool   = brushController.ActiveTool;
+        bool flagActive  = flagPlacementTool != null && flagPlacementTool.IsActive;
+        bool anyActive   = flagActive || tool != BrushTool.None;
 
-        // Cancel button only visible when something is active
+        // Cancel button visible whenever any tool is active
         if (cancelButton != null)
-            cancelButton.gameObject.SetActive(tool != BrushTool.None);
+            cancelButton.gameObject.SetActive(anyActive);
 
-        // Sliders: hide both when no tool, hide strength for biome paint
-        bool toolActive = tool != BrushTool.None;
-        bool showStrength = toolActive && tool != BrushTool.BiomePaint;
-        SetGroupActive(radiusGroup,   radiusSlider,   radiusText,   toolActive);
+        // Sliders: only meaningful for brushes; hidden when flag tool or nothing is active
+        bool showRadius   = !flagActive && tool != BrushTool.None;
+        bool showStrength = showRadius && tool != BrushTool.BiomePaint;
+        SetGroupActive(radiusGroup,   radiusSlider,   radiusText,   showRadius);
         SetGroupActive(strengthGroup, strengthSlider, strengthText, showStrength);
 
-        // Highlight the active tool button
+        // Highlight the active tool button (at most one is highlighted)
         SetButtonNormalColor(raiseLowerButton, tool == BrushTool.RaiseLower ? activeButtonColor : _raiseLowerNormal);
         SetButtonNormalColor(flattenButton,    tool == BrushTool.Flatten    ? activeButtonColor : _flattenNormal);
         SetButtonNormalColor(biomePaintButton, tool == BrushTool.BiomePaint ? activeButtonColor : _biomePaintNormal);
+        SetButtonNormalColor(flagButton,       flagActive                   ? activeButtonColor : _flagNormal);
+
+        RefreshStatusLabels(tool, flagActive);
     }
 
-    void HandleBiomeChanged(BiomeSO biome) => RefreshStatusLabels();
-
-    void RefreshStatusLabels()
+    void RefreshStatusLabels(BrushTool tool, bool flagActive)
     {
-        var tool = brushController.ActiveTool;
-
         if (mainText != null)
         {
-            mainText.text = tool switch
+            if (flagActive)
             {
-                BrushTool.RaiseLower => "Brush: Raise / Lower",
-                BrushTool.Flatten    => "Brush: Flatten",
-                BrushTool.BiomePaint => "Brush: Terrain",
-                _                    => "No brush selected",
-            };
+                mainText.text = "Tool: Place Flags";
+            }
+            else
+            {
+                mainText.text = tool switch
+                {
+                    BrushTool.RaiseLower => "Brush: Raise / Lower",
+                    BrushTool.Flatten    => "Brush: Flatten",
+                    BrushTool.BiomePaint => "Brush: Terrain",
+                    _                    => "No brush selected",
+                };
+            }
         }
 
-        // Sub text = optional extra info; hidden when null
-        string sub = GetSubLabel(tool);
+        string sub = GetSubLabel(tool, flagActive);
         if (subText != null)
         {
             subText.gameObject.SetActive(sub != null);
@@ -134,14 +187,20 @@ public class EditorUI : MonoBehaviour
         }
     }
 
-    string GetSubLabel(BrushTool tool)
+    string GetSubLabel(BrushTool tool, bool flagActive)
     {
+        if (flagActive)
+        {
+            return flagPlacementTool.CurrentPhase == FlagPhase.Start
+                ? "Click to place START flag"
+                : "Click to place END flag";
+        }
+
         switch (tool)
         {
             case BrushTool.BiomePaint:
                 var b = brushController.paintBiome;
                 return b != null ? $"Terrain: {b.biomeName}" : "Terrain: (none)";
-            // Add other brushes here that want a sub-label
             default:
                 return null; // null = hide the sub group
         }
