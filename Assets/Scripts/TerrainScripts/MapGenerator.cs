@@ -22,10 +22,7 @@ public class MapGenerator : MonoBehaviour
     [Header("Data")]
     public TerrainDataStore terrainDataStore;
 
-    [Header("Optional (disabled for now)")]
-    public StartEndPoints startEndPoints;
-
-    void Start()
+void Start()
     {
         Generate();
     }
@@ -90,9 +87,6 @@ public class MapGenerator : MonoBehaviour
             marchingCubes.Generate();
             Debug.Log("MapGenerator: step 7 — marching cubes generated.");
         }
-
-        // StartEndPoints disabled for now
-        // if (startEndPoints != null) startEndPoints.Place();
 
         Debug.Log("MapGenerator: pipeline complete.");
     }
