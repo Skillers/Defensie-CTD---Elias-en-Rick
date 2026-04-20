@@ -178,8 +178,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: Obstacle placement mode
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
-  m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 0da6f3a2109e30841b084e5a5060a64a, type: 2}
+  m_sharedMaterial: {fileID: 2130222893574730568, guid: 0da6f3a2109e30841b084e5a5060a64a, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -203,12 +203,12 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 32.7
+  m_fontSize: 44.05
   m_fontSizeBase: 36
   m_fontWeight: 400
   m_enableAutoSizing: 1
   m_fontSizeMin: 20
-  m_fontSizeMax: 60
+  m_fontSizeMax: 66.5
   m_fontStyle: 17
   m_HorizontalAlignment: 2
   m_VerticalAlignment: 512
@@ -669,7 +669,7 @@ RectTransform:
   m_AnchorMin: {x: 0.5, y: 1}
   m_AnchorMax: {x: 0.5, y: 1}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 658, y: 95.62}
+  m_SizeDelta: {x: 801.6, y: 95.62}
   m_Pivot: {x: 0.5, y: 1}
 --- !u!114 &476036638
 MonoBehaviour:
@@ -2187,7 +2187,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &1969247181
 RectTransform:
   m_ObjectHideFlags: 0
