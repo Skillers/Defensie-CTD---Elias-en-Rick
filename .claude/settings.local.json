@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node -e \"try { require\\(''docx''\\); console.log\\(''docx available''\\); } catch\\(e\\) { console.log\\(''docx not found''\\); }\")",
+      "Bash(npm install:*)",
+      "Bash(node -e \"try { require\\(''docx''\\); console.log\\(''docx available''\\); } catch\\(e\\) { console.log\\(''docx not found: '' + e.message\\); }\")",
+      "Bash(npm root:*)",
+      "Bash(python \"C:\\\\Users\\\\debbi\\\\AppData\\\\Roaming\\\\Claude\\\\local-agent-mode-sessions\\\\skills-plugin\\\\36b13fe2-6816-4efb-a9d5-219db5c2f07c\\\\fa550a9b-93a9-4f68-9b1c-599091d8abab\\\\skills\\\\docx\\\\scripts\\\\office\\\\validate.py\" \"C:\\\\Repos\\\\Defensie-CTD---Elias-en-Rick\\\\Documents\\\\TerrainSystem_Analysis.docx\")",
+      "Bash(python3 -c ':*)",
+      "Bash(python -c ':*)",
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "mcp__c1fc4002-5f49-5f9d-a4e5-93c4ef5d6a75__google_drive_search",
+
+      "Bash(xargs grep:*)",
+      "Bash(grep -v \"^$\")"
+    ]
+  }
+}
