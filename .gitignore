@@ -73,3 +73,5 @@ crashlytics-build.properties
 **/.idea/**/dataSources.local.xml
 **/.idea/**/sqlDataSources.xml
 **/.idea/**/dynamic.xml
+
+UserSettings/Layouts/default-6000.dwlt
