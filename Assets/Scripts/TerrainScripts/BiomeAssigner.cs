@@ -9,6 +9,9 @@ public class BiomeAssigner : MonoBehaviour
     [Tooltip("Default biome applied to the entire grid (e.g. Grass).")]
     public BiomeSO defaultBiome;
 
+    [Tooltip("Optional. If set, registers the default biome as used.")]
+    public TerrainDataStore terrainDataStore;
+
     public void Assign(CellData[,] grid, int width, int height)
     {
         if (defaultBiome == null)
@@ -24,6 +27,10 @@ public class BiomeAssigner : MonoBehaviour
             grid[x, z].biome = defaultBiome;
             count++;
         }
+
+        if (terrainDataStore != null)
+            terrainDataStore.RegisterBiome(defaultBiome);
+
         Debug.Log($"BiomeAssigner: assigned '{defaultBiome.biomeName}' (color: {defaultBiome.color}) to {count} cells.");
     }
 }

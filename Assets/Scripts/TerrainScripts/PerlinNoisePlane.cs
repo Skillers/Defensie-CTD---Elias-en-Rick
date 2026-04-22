@@ -63,7 +63,15 @@ public class PerlinNoisePlane : MonoBehaviour
 
     public void BuildVisual()
     {
-        if (NoiseValues == null || terrainDataStore == null) return;
+        if (terrainDataStore == null) return;
+        if (terrainDataStore.grid == null)
+        {
+            Debug.LogWarning("PerlinNoisePlane.BuildVisual: grid is null — call after TerrainDataStore.SetGrid().");
+            return;
+        }
+
+        int w = terrainDataStore.GridWidth;
+        int h = terrainDataStore.GridHeight;
 
         var mf = GetComponent<MeshFilter>();
         mf.sharedMesh = BuildQuad();
@@ -71,20 +79,22 @@ public class PerlinNoisePlane : MonoBehaviour
         // Number of distinct height bands for the strategic map look
         int layers = Mathf.Max(1, Mathf.RoundToInt(terrainDataStore.heightMultiplier * heightStepFraction));
         float mapStep = terrainDataStore.heightMultiplier / layers;
+        float heightMult = Mathf.Max(0.0001f, terrainDataStore.heightMultiplier);
 
-        var tex = new Texture2D(VertsX, VertsZ, TextureFormat.RGB24, false)
+        var tex = new Texture2D(w, h, TextureFormat.RGB24, false)
         {
             filterMode = FilterMode.Bilinear,
             wrapMode   = TextureWrapMode.Clamp
         };
 
-        var pixels = new Color[NoiseValues.Length];
-        for (int i = 0; i < NoiseValues.Length; i++)
+        var pixels = new Color[w * h];
+        for (int z = 0; z < h; z++)
+        for (int x = 0; x < w; x++)
         {
-            float h = NoiseValues[i] * terrainDataStore.heightMultiplier;
-            float rounded = Mathf.Round(h / mapStep) * mapStep;
-            float v = rounded / terrainDataStore.heightMultiplier;
-            pixels[i] = new Color(v, v, v);
+            float raw = terrainDataStore.grid[x, z].rawHeight;
+            float rounded = Mathf.Round(raw / mapStep) * mapStep;
+            float v = Mathf.Clamp01(rounded / heightMult);
+            pixels[z * w + x] = new Color(v, v, v);
         }
 
         tex.SetPixels(pixels);

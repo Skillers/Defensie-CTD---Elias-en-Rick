@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using System.IO;
 using UnityEngine;
 
 /// <summary>
@@ -21,26 +23,61 @@ public class TerrainDataStore : MonoBehaviour
     public Vector2 noiseOffset = Vector2.zero;
     public float heightMultiplier = 0f;
 
+    [Header("Save / Load")]
+    [SerializeField] string saveFileName = "level.json";
+    [Tooltip("If true, the store checks its save file automatically on Start. Subscribers should register in Awake so they see the fired event.")]
+    [SerializeField] bool autoLoadOnStart = true;
+    [Tooltip("Base biome always registered as used by this terrain.")]
+    [SerializeField] BiomeSO baseBiome;
+
     [HideInInspector] public CellData[,] grid;
+
+    // Runtime list of biomes actually used in this terrain. Base is always present.
+    readonly List<BiomeSO> _usedBiomes = new List<BiomeSO>();
+    public IReadOnlyList<BiomeSO> UsedBiomes => _usedBiomes;
 
     public int GridWidth  { get; private set; }
     public int GridHeight { get; private set; }
 
     public event System.Action OnGridReady;
 
-    // ── Start / End markers (set by level editor tools) ──────────────────
+    // ── Save / Load events ───────────────────────────────────────────────
+    public event System.Action OnSaveLoaded;
+    public event System.Action OnSaveCreated;
+    public event System.Action<string> OnSaveFailed;
+
+    public string SaveFilePath => Path.Combine(Application.persistentDataPath, saveFileName);
+    public bool SaveFileExists => File.Exists(SaveFilePath);
+
+
     Vector2Int? _startCell;
-    Vector2Int? _endCell;
-
-    /// <summary>Grid cell of the start flag, or null if not placed.</summary>
     public Vector2Int? StartCell => _startCell;
-    /// <summary>Grid cell of the end flag, or null if not placed.</summary>
-    public Vector2Int? EndCell   => _endCell;
 
-    public event System.Action OnStartChanged;
-    public event System.Action OnEndChanged;
+    Vector2Int? _endCell;
+    public Vector2Int? EndCell => _endCell;
 
-    /// <summary>Assign a fully baked grid and notify listeners.</summary>
+
+    void Awake()
+    {
+        RegisterBiome(baseBiome);
+    }
+
+    void Start()
+    {
+        if (autoLoadOnStart) CheckSaveFile();
+    }
+
+    /// <summary>
+    /// Adds a biome to the used-biome list if not already present. Called when a
+    /// biome is applied to a cell (by BiomeAssigner or the paint brush).
+    /// </summary>
+    public void RegisterBiome(BiomeSO biome)
+    {
+        if (biome == null) return;
+        if (!_usedBiomes.Contains(biome))
+            _usedBiomes.Add(biome);
+    }
+
     public void SetGrid(CellData[,] cellGrid)
     {
         grid = cellGrid;
@@ -52,7 +89,6 @@ public class TerrainDataStore : MonoBehaviour
         }
     }
 
-    // ── Queries ──────────────────────────────────────────────────────────
 
     public CellData GetData(Vector3 worldPos)
     {
@@ -68,7 +104,6 @@ public class TerrainDataStore : MonoBehaviour
         return grid[x, z];
     }
 
-    // ── Grid / World conversion ──────────────────────────────────────────
 
     public bool InBounds(int x, int z)
     {
@@ -92,8 +127,7 @@ public class TerrainDataStore : MonoBehaviour
         return transform.position + new Vector3(wx, 0f, wz);
     }
 
-    /// <summary>Returns the rounded height at the given grid coordinate.</summary>
-    public float GetHeight(int gx, int gz)
+    public float GetRoundedHeight(int gx, int gz)
     {
         if (grid == null) return 0f;
         int x = Mathf.Clamp(gx, 0, GridWidth  - 1);
@@ -101,44 +135,30 @@ public class TerrainDataStore : MonoBehaviour
         return grid[x, z].roundedHeight;
     }
 
-    /// <summary>Returns the rounded height at a world position.</summary>
-    public float GetHeight(Vector3 worldPos)
+    public float GetRoundedHeight(Vector3 worldPos)
     {
         Vector2Int g = WorldToGrid(worldPos);
-        return GetHeight(g.x, g.y);
+        return GetRoundedHeight(g.x, g.y);
     }
 
-    // ── Start / End setters ──────────────────────────────────────────────
-
-    public void SetStartCell(Vector2Int cell)
+    public float GetRawHeight(int gx, int gz)
     {
-        _startCell = cell;
-        OnStartChanged?.Invoke();
+        if (grid == null) return 0f;
+        int x = Mathf.Clamp(gx, 0, GridWidth  - 1);
+        int z = Mathf.Clamp(gz, 0, GridHeight - 1);
+        return grid[x, z].rawHeight;
     }
 
-    public void SetEndCell(Vector2Int cell)
+    public float GetRawHeight(Vector3 worldPos)
     {
-        _endCell = cell;
-        OnEndChanged?.Invoke();
+        Vector2Int g = WorldToGrid(worldPos);
+        return GetRawHeight(g.x, g.y);
     }
 
-    public void ClearStartCell()
-    {
-        _startCell = null;
-        OnStartChanged?.Invoke();
-    }
 
-    public void ClearEndCell()
-    {
-        _endCell = null;
-        OnEndChanged?.Invoke();
-    }
+    public void SetStartCell(Vector2Int cell) => _startCell = cell;
+    public void SetEndCell(Vector2Int cell)   => _endCell   = cell;
 
-    /// <summary>
-    /// Raycast against the terrain heightmap. Steps the ray across the XZ grid
-    /// and finds where the ray drops below the terrain surface.
-    /// Returns true if hit, with hitPoint on the terrain surface.
-    /// </summary>
     public bool RaycastTerrain(Ray ray, out Vector3 hitPoint, float maxDistance = 500f)
     {
         hitPoint = Vector3.zero;
@@ -157,7 +177,7 @@ public class TerrainDataStore : MonoBehaviour
             if (lx < -extentX || lx > extentX || lz < -extentZ || lz > extentZ)
                 continue;
 
-            float terrainY = GetHeight(pos);
+            float terrainY = GetRoundedHeight(pos);
             if (pos.y <= terrainY)
             {
                 hitPoint = new Vector3(pos.x, terrainY, pos.z);
@@ -166,5 +186,173 @@ public class TerrainDataStore : MonoBehaviour
         }
 
         return false;
+    }
+
+    // ── Save / Load ──────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Checks for a save file on disk. If present, loads it and fires OnSaveLoaded.
+    /// If absent, fires OnSaveCreated so a subscriber can run generation and then call WriteSave().
+    /// On IO / parse errors, fires OnSaveFailed with a reason string.
+    /// </summary>
+    public void CheckSaveFile()
+    {
+        Debug.Log($"TerrainDataStore: checking for save at {SaveFilePath} (exists={SaveFileExists}).");
+
+        if (!SaveFileExists)
+        {
+            OnSaveCreated?.Invoke();
+            return;
+        }
+
+        try
+        {
+            string json = File.ReadAllText(SaveFilePath);
+            SaveData data = JsonUtility.FromJson<SaveData>(json);
+            if (data == null)
+            {
+                OnSaveFailed?.Invoke("Save file parsed to null.");
+                return;
+            }
+            Debug.Log($"TerrainDataStore: parsed save ({json.Length} chars, grid {data.gridWidth}x{data.gridHeight}, cells={(data.cells != null ? data.cells.Length : 0)}).");
+            ApplySaveData(data);
+            OnSaveLoaded?.Invoke();
+        }
+        catch (System.Exception e)
+        {
+            OnSaveFailed?.Invoke(e.Message);
+        }
+    }
+
+    /// <summary>
+    /// Serializes the current grid, settings, and flag positions to disk.
+    /// </summary>
+    public void WriteSave()
+    {
+        if (grid == null)
+        {
+            Debug.LogWarning("TerrainDataStore.WriteSave: grid is null — nothing to save.");
+            return;
+        }
+
+        try
+        {
+            SaveData data = BuildSaveData();
+            string json = JsonUtility.ToJson(data);
+            File.WriteAllText(SaveFilePath, json);
+            Debug.Log($"TerrainDataStore: wrote save ({json.Length} chars, {data.gridWidth}x{data.gridHeight} cells) to {SaveFilePath}.");
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogError($"TerrainDataStore.WriteSave failed: {e}");
+            OnSaveFailed?.Invoke(e.Message);
+        }
+    }
+
+    SaveData BuildSaveData()
+    {
+        SaveData data = new SaveData
+        {
+            extentX = extentX,
+            extentZ = extentZ,
+            step = step,
+            roundStep = roundStep,
+            seed = seed,
+            noiseScale = noiseScale,
+            noiseOffset = noiseOffset,
+            heightMultiplier = heightMultiplier,
+            gridWidth = GridWidth,
+            gridHeight = GridHeight,
+            hasStart = _startCell.HasValue,
+            startX = _startCell?.x ?? 0,
+            startZ = _startCell?.y ?? 0,
+            hasEnd = _endCell.HasValue,
+            endX = _endCell?.x ?? 0,
+            endZ = _endCell?.y ?? 0,
+        };
+
+        if (grid != null)
+        {
+            data.cells = new CellDataDto[GridWidth * GridHeight];
+            for (int x = 0; x < GridWidth; x++)
+            {
+                for (int z = 0; z < GridHeight; z++)
+                {
+                    CellData c = grid[x, z];
+                    data.cells[x * GridHeight + z] = new CellDataDto
+                    {
+                        rawHeight = c.rawHeight,
+                        roundedHeight = c.roundedHeight,
+                        slopeOutgoing = c.slopeOutgoing,
+                        biomeName = c.biome != null ? c.biome.biomeName : null,
+                    };
+                }
+            }
+        }
+
+        return data;
+    }
+
+    void ApplySaveData(SaveData data)
+    {
+        // Restore settings
+        extentX = data.extentX;
+        extentZ = data.extentZ;
+        step = data.step;
+        roundStep = data.roundStep;
+        seed = data.seed;
+        noiseScale = data.noiseScale;
+        noiseOffset = data.noiseOffset;
+        heightMultiplier = data.heightMultiplier;
+
+        // Restore flags
+        _startCell = data.hasStart ? new Vector2Int(data.startX, data.startZ) : (Vector2Int?)null;
+        _endCell   = data.hasEnd   ? new Vector2Int(data.endX,   data.endZ)   : (Vector2Int?)null;
+
+        // Restore grid
+        if (data.cells != null && data.gridWidth > 0 && data.gridHeight > 0)
+        {
+            Dictionary<string, BiomeSO> lookup = BuildBiomeLookup();
+            CellData[,] restored = new CellData[data.gridWidth, data.gridHeight];
+
+            for (int x = 0; x < data.gridWidth; x++)
+            {
+                for (int z = 0; z < data.gridHeight; z++)
+                {
+                    CellDataDto dto = data.cells[x * data.gridHeight + z];
+                    BiomeSO biome = null;
+                    if (dto != null && !string.IsNullOrEmpty(dto.biomeName))
+                        lookup.TryGetValue(dto.biomeName, out biome);
+
+                    restored[x, z] = new CellData
+                    {
+                        rawHeight = dto?.rawHeight ?? 0f,
+                        roundedHeight = dto?.roundedHeight ?? 0f,
+                        slopeOutgoing = dto?.slopeOutgoing,
+                        biome = biome,
+                    };
+
+                    RegisterBiome(biome);
+                }
+            }
+
+            SetGrid(restored);
+        }
+    }
+
+    /// <summary>
+    /// Builds a name -> BiomeSO map from every BiomeSO asset under Resources/Biomes.
+    /// Move your BiomeSO assets into Assets/Resources/Biomes/ so they can be loaded
+    /// in builds.
+    /// </summary>
+    Dictionary<string, BiomeSO> BuildBiomeLookup()
+    {
+        Dictionary<string, BiomeSO> map = new Dictionary<string, BiomeSO>();
+        foreach (BiomeSO b in Resources.LoadAll<BiomeSO>("Biomes"))
+        {
+            if (b != null && !string.IsNullOrEmpty(b.biomeName))
+                map[b.biomeName] = b;
+        }
+        return map;
     }
 }

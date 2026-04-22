@@ -158,7 +158,7 @@ public class FlagPlacementTool : MonoBehaviour
     Vector3 WorldPosForCell(Vector2Int cell)
     {
         Vector3 pos = terrainDataStore.GridToWorld(cell);
-        pos.y = terrainDataStore.GetHeight(cell.x, cell.y) + heightOffset;
+        pos.y = terrainDataStore.GetRoundedHeight(cell.x, cell.y) + heightOffset;
         return pos;
     }
 

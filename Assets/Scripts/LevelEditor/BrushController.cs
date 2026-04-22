@@ -169,7 +169,7 @@ public class BrushController : MonoBehaviour
                 _centerDot.SetActive(true);
                 _centerDot.transform.position = new Vector3(
                     hit.point.x,
-                    terrainDataStore.GetHeight(hit.point) + 0.3f,
+                    terrainDataStore.GetRoundedHeight(hit.point) + 0.3f,
                     hit.point.z);
             }
             else
@@ -269,8 +269,8 @@ public class BrushController : MonoBehaviour
             Vector3 innerWorld = center + _baseInner[i] * BrushRadius;
             Vector3 outerWorld = center + _baseOuter[i] * BrushRadius;
 
-            innerWorld.y = terrainDataStore.GetHeight(innerWorld) + offset;
-            outerWorld.y = terrainDataStore.GetHeight(outerWorld) + offset;
+            innerWorld.y = terrainDataStore.GetRoundedHeight(innerWorld) + offset;
+            outerWorld.y = terrainDataStore.GetRoundedHeight(outerWorld) + offset;
 
             verts[i * 2]     = innerWorld;
             verts[i * 2 + 1] = outerWorld;
@@ -386,6 +386,7 @@ public class BrushController : MonoBehaviour
 
         int gxMin = int.MaxValue, gzMin = int.MaxValue;
         int gxMax = int.MinValue, gzMax = int.MinValue;
+        bool painted = false;
 
         for (int dx = -radiusCells; dx <= radiusCells; dx++)
         for (int dz = -radiusCells; dz <= radiusCells; dz++)
@@ -398,12 +399,16 @@ public class BrushController : MonoBehaviour
             if (dist > BrushRadius) continue;
 
             terrainDataStore.grid[gx, gz].biome = paintBiome;
+            painted = true;
 
             if (gx < gxMin) gxMin = gx;
             if (gx > gxMax) gxMax = gx;
             if (gz < gzMin) gzMin = gz;
             if (gz > gzMax) gzMax = gz;
         }
+
+        if (painted)
+            terrainDataStore.RegisterBiome(paintBiome);
 
         if (gxMin <= gxMax)
             marchingCubes.RecolorRegion(gxMin, gzMin, gxMax, gzMax);
