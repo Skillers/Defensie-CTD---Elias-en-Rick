@@ -1,3 +1,5 @@
+using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -71,6 +73,80 @@ public class MarchingCubesTerrain : MonoBehaviour
         for (int cy = 0; cy < _gridY  - 1; cy += chunk)
         for (int cx = 0; cx < _vertsX - 1; cx += chunk)
             BuildChunk(new Vector3Int(cx, cy, cz));
+    }
+
+    /// <summary>
+    /// Async version of Generate. Yields per chunk row so the main thread stays
+    /// responsive and a loading UI can update. <paramref name="progress"/> is
+    /// invoked with a 0..1 value after each row. msPerFrame controls the
+    /// time budget per frame (reuses the existing field).
+    /// </summary>
+    public IEnumerator GenerateAsync(Action<float> progress = null)
+    {
+        if (terrainDataStore == null) { Debug.LogError("MarchingCubesTerrain: no TerrainDataStore assigned."); yield break; }
+        if (terrainDataStore.grid == null) { Debug.LogWarning("MarchingCubesTerrain: waiting for grid data."); yield break; }
+
+        DestroyChunks();
+
+        _vertsX = terrainDataStore.GridWidth;
+        _vertsZ = terrainDataStore.GridHeight;
+        _extX   = terrainDataStore.extentX;
+        _extZ   = terrainDataStore.extentZ;
+        _stp    = terrainDataStore.step;
+        _rs     = terrainDataStore.roundStep;
+        float heightMult = terrainDataStore.heightMultiplier;
+
+        // Bake rounded heights
+        for (int x = 0; x < _vertsX; x++)
+        for (int z = 0; z < _vertsZ; z++)
+            terrainDataStore.grid[x, z].roundedHeight = Mathf.Round(terrainDataStore.grid[x, z].rawHeight / _rs) * _rs;
+
+        _minY  = -_stp;
+        float maxY = Mathf.Round(heightMult / _rs) * _rs + _stp;
+        _gridY = Mathf.Max(2, Mathf.RoundToInt((maxY - _minY) / _stp) + 1);
+
+        BuildDensityField();
+
+        var vcShader = Shader.Find("Custom/VertexColor");
+        if (vcShader != null)
+        {
+            _sharedMat = new Material(vcShader);
+        }
+        else
+        {
+            Debug.LogError("MarchingCubesTerrain: Custom/VertexColor shader NOT FOUND — colors won't show!");
+            var fallback = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
+            _sharedMat = new Material(fallback);
+        }
+        GetComponent<MeshRenderer>().sharedMaterial = _sharedMat;
+
+        int chunk = MarchingTables.ChunkSize;
+        // Count total chunks for progress
+        int rowsZ = Mathf.CeilToInt((_vertsZ - 1f) / chunk);
+        int rowsY = Mathf.CeilToInt((_gridY  - 1f) / chunk);
+        int rowsX = Mathf.CeilToInt((_vertsX - 1f) / chunk);
+        int totalChunks = rowsZ * rowsY * rowsX;
+        int builtChunks = 0;
+
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        for (int cz = 0; cz < _vertsZ - 1; cz += chunk)
+        {
+            for (int cy = 0; cy < _gridY - 1; cy += chunk)
+            for (int cx = 0; cx < _vertsX - 1; cx += chunk)
+            {
+                BuildChunk(new Vector3Int(cx, cy, cz));
+                builtChunks++;
+
+                if (sw.Elapsed.TotalMilliseconds >= msPerFrame)
+                {
+                    progress?.Invoke(totalChunks > 0 ? (float)builtChunks / totalChunks : 1f);
+                    sw.Restart();
+                    yield return null;
+                }
+            }
+        }
+
+        progress?.Invoke(1f);
     }
 
     /// <summary>

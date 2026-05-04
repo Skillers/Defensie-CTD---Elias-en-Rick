@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 using TMPro;
 
@@ -7,6 +8,7 @@ public class EditorUI : MonoBehaviour
     [Header("References")]
     public BrushController brushController;
     public FlagPlacementTool flagPlacementTool;
+    public TerrainDataStore terrainDataStore;
 
     [Header("Tool Buttons")]
     public Button raiseLowerButton;
@@ -14,6 +16,20 @@ public class EditorUI : MonoBehaviour
     public Button biomePaintButton;
     public Button flagButton;
     public Button cancelButton;
+    public Button exitToMenuButton;
+
+    [Header("Main Menu Scene")]
+#if UNITY_EDITOR
+    [SerializeField] private UnityEditor.SceneAsset mainMenuScene;
+#endif
+    [SerializeField, HideInInspector] private string mainMenuSceneName = "UiScene";
+
+#if UNITY_EDITOR
+    private void OnValidate()
+    {
+        if (mainMenuScene != null) mainMenuSceneName = mainMenuScene.name;
+    }
+#endif
 
     [Header("Sliders")]
     public Slider radiusSlider;
@@ -48,6 +64,8 @@ public class EditorUI : MonoBehaviour
             flagButton.onClick.AddListener(OnFlagClicked);
         if (cancelButton != null)
             cancelButton.onClick.AddListener(OnCancelClicked);
+        if (exitToMenuButton != null)
+            exitToMenuButton.onClick.AddListener(OnExitToMenuClicked);
 
         radiusSlider.onValueChanged.AddListener(v =>
         {
@@ -121,6 +139,16 @@ public class EditorUI : MonoBehaviour
     {
         brushController.CancelTool();
         if (flagPlacementTool != null) flagPlacementTool.Cancel();
+    }
+
+    void OnExitToMenuClicked()
+    {
+        if (terrainDataStore != null)
+        {
+            terrainDataStore.WriteSave();
+            Debug.Log($"EditorUI: saved level to {terrainDataStore.SaveFilePath} before exit.");
+        }
+        SceneManager.LoadScene(mainMenuSceneName);
     }
 
     // ── State change handlers ──

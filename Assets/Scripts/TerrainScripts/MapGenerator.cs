@@ -22,9 +22,56 @@ public class MapGenerator : MonoBehaviour
     [Header("Data")]
     public TerrainDataStore terrainDataStore;
 
-void Start()
+    void Awake()
     {
+        if (terrainDataStore == null) { Debug.LogError("MapGenerator: no TerrainDataStore assigned."); return; }
+
+        // Subscribe in Awake so we're registered before TerrainDataStore's Start
+        // auto-load fires its event.
+        terrainDataStore.OnSaveLoaded  += HandleSaveLoaded;
+        terrainDataStore.OnSaveCreated += HandleSaveCreated;
+        terrainDataStore.OnSaveFailed  += HandleSaveFailed;
+    }
+
+    void OnDestroy()
+    {
+        if (terrainDataStore == null) return;
+        terrainDataStore.OnSaveLoaded  -= HandleSaveLoaded;
+        terrainDataStore.OnSaveCreated -= HandleSaveCreated;
+        terrainDataStore.OnSaveFailed  -= HandleSaveFailed;
+    }
+
+    void HandleSaveLoaded()
+    {
+        Debug.Log($"MapGenerator: save loaded from {terrainDataStore.SaveFilePath} — rebuilding visuals only.");
+        BuildVisualsFromGrid();
+    }
+
+    void HandleSaveCreated()
+    {
+        Debug.Log($"MapGenerator: no save at {terrainDataStore.SaveFilePath} — generating fresh terrain.");
         Generate();
+        terrainDataStore.WriteSave();
+        Debug.Log($"MapGenerator: save written to {terrainDataStore.SaveFilePath}.");
+    }
+
+    void HandleSaveFailed(string reason)
+    {
+        Debug.LogError($"MapGenerator: save load failed ({reason}) — regenerating.");
+        Generate();
+        terrainDataStore.WriteSave();
+    }
+
+    /// <summary>
+    /// Rebuilds the visual meshes from the already-loaded grid. Called after a
+    /// save is loaded. The noise plane reads heights directly from the grid, so
+    /// no re-sampling of Perlin is needed.
+    /// </summary>
+    void BuildVisualsFromGrid()
+    {
+        if (noisePlane != null) noisePlane.BuildVisual();
+        if (slopeMap != null) slopeMap.Generate();
+        if (marchingCubes != null) marchingCubes.Generate();
     }
 
     [ContextMenu("Regenerate")]
