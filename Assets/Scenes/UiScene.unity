@@ -225,8 +225,8 @@ MonoBehaviour:
   noisePlane: {fileID: 1605038433}
   slopeMap: {fileID: 1736460551}
   marchingCubes: {fileID: 2035679259}
-  mainMenuScene: {fileID: 0}
-  mainMenuSceneName: UiScene
+  mainMenuScene: {fileID: 102900000, guid: e0253d13eeb0ca54b87cd92ee9ec1aba, type: 3}
+  mainMenuSceneName: MainSceneRD
 --- !u!4 &94873266
 Transform:
   m_ObjectHideFlags: 0
