@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 public class ObstaclePlacementManager : MonoBehaviour
 {
@@ -27,10 +28,11 @@ public class ObstaclePlacementManager : MonoBehaviour
     private void Update()
     {
         if (_selected == null) return;
-        if (!Input.GetMouseButtonDown(0)) return;
+        if (!Mouse.current.leftButton.wasPressedThisFrame) return;
 
-        Ray ray = placementCamera.ScreenPointToRay(Input.mousePosition);
-        if (Physics.Raycast(ray, out RaycastHit hit, Mathf.Infinity, terrainLayer))
+        Ray ray = placementCamera.ScreenPointToRay(Mouse.current.position.ReadValue());
+        bool didHit = Physics.Raycast(ray, out RaycastHit hit, Mathf.Infinity, terrainLayer);
+        if (didHit)
         {
             PlaceObstacle(hit.point);
         }

@@ -2497,6 +2497,34 @@ PrefabInstance:
       propertyPath: itemLabel
       value: Landmine
       objectReference: {fileID: 0}
+    - target: {fileID: 8882381918175297311, guid: ba49849a848fe874ebf1fb804e1fdbd3, type: 3}
+      propertyPath: m_OnClick.m_PersistentCalls.m_Calls.Array.size
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 8882381918175297311, guid: ba49849a848fe874ebf1fb804e1fdbd3, type: 3}
+      propertyPath: m_OnClick.m_PersistentCalls.m_Calls.Array.data[0].m_Mode
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 8882381918175297311, guid: ba49849a848fe874ebf1fb804e1fdbd3, type: 3}
+      propertyPath: m_OnClick.m_PersistentCalls.m_Calls.Array.data[0].m_Target
+      value: 
+      objectReference: {fileID: 1902258544}
+    - target: {fileID: 8882381918175297311, guid: ba49849a848fe874ebf1fb804e1fdbd3, type: 3}
+      propertyPath: m_OnClick.m_PersistentCalls.m_Calls.Array.data[0].m_CallState
+      value: 2
+      objectReference: {fileID: 0}
+    - target: {fileID: 8882381918175297311, guid: ba49849a848fe874ebf1fb804e1fdbd3, type: 3}
+      propertyPath: m_OnClick.m_PersistentCalls.m_Calls.Array.data[0].m_MethodName
+      value: OnClicked
+      objectReference: {fileID: 0}
+    - target: {fileID: 8882381918175297311, guid: ba49849a848fe874ebf1fb804e1fdbd3, type: 3}
+      propertyPath: m_OnClick.m_PersistentCalls.m_Calls.Array.data[0].m_TargetAssemblyTypeName
+      value: PlacableObstacleButton, Assembly-CSharp
+      objectReference: {fileID: 0}
+    - target: {fileID: 8882381918175297311, guid: ba49849a848fe874ebf1fb804e1fdbd3, type: 3}
+      propertyPath: m_OnClick.m_PersistentCalls.m_Calls.Array.data[0].m_Arguments.m_ObjectArgumentAssemblyTypeName
+      value: UnityEngine.Object, UnityEngine
+      objectReference: {fileID: 0}
     - target: {fileID: 8904795763261490248, guid: ba49849a848fe874ebf1fb804e1fdbd3, type: 3}
       propertyPath: m_text
       value: Landmine
@@ -2625,7 +2653,7 @@ GameObject:
   - component: {fileID: 1750375903}
   - component: {fileID: 1750375904}
   m_Layer: 0
-  m_Name: GameObject (4)
+  m_Name: ObstaclePlacementManager
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -2667,6 +2695,17 @@ RectTransform:
   m_CorrespondingSourceObject: {fileID: 700263074541515258, guid: ba49849a848fe874ebf1fb804e1fdbd3, type: 3}
   m_PrefabInstance: {fileID: 1695147007}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &1902258544 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 7822491032535858337, guid: ba49849a848fe874ebf1fb804e1fdbd3, type: 3}
+  m_PrefabInstance: {fileID: 1695147007}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 37f530c4d6e908043b818bb4a9084b8d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlacableObstacleButton
 --- !u!224 &1906637790 stripped
 RectTransform:
   m_CorrespondingSourceObject: {fileID: 700263074541515258, guid: ba49849a848fe874ebf1fb804e1fdbd3, type: 3}
