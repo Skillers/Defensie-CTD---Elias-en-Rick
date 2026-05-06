@@ -426,6 +426,7 @@ GameObject:
   - component: {fileID: 277478088}
   - component: {fileID: 277478090}
   - component: {fileID: 277478089}
+  - component: {fileID: 277478091}
   m_Layer: 5
   m_Name: ObstaclePanel
   m_TagString: Untagged
@@ -492,6 +493,21 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 277478087}
   m_CullTransparentMesh: 1
+--- !u!114 &277478091
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 277478087}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ee4866bf02f8dd943b354c82642bbff1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ObstacleInventoryUI
+  inventory: {fileID: 11400000, guid: 12db05a7284acde449dcb52089707fe6, type: 2}
+  buttonPrefab: {fileID: 4571154277439690098, guid: ba49849a848fe874ebf1fb804e1fdbd3, type: 3}
+  buttonContainer: {fileID: 803668088}
 --- !u!1 &315833435
 GameObject:
   m_ObjectHideFlags: 0
@@ -668,7 +684,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 700263074541515258, guid: ba49849a848fe874ebf1fb804e1fdbd3, type: 3}
       propertyPath: m_AnchorMax.y
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 700263074541515258, guid: ba49849a848fe874ebf1fb804e1fdbd3, type: 3}
       propertyPath: m_AnchorMin.x
@@ -676,11 +692,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 700263074541515258, guid: ba49849a848fe874ebf1fb804e1fdbd3, type: 3}
       propertyPath: m_AnchorMin.y
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 700263074541515258, guid: ba49849a848fe874ebf1fb804e1fdbd3, type: 3}
       propertyPath: m_SizeDelta.x
-      value: 0
+      value: 240
       objectReference: {fileID: 0}
     - target: {fileID: 700263074541515258, guid: ba49849a848fe874ebf1fb804e1fdbd3, type: 3}
       propertyPath: m_SizeDelta.y
@@ -716,11 +732,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 700263074541515258, guid: ba49849a848fe874ebf1fb804e1fdbd3, type: 3}
       propertyPath: m_AnchoredPosition.x
-      value: 0
+      value: 130
       objectReference: {fileID: 0}
     - target: {fileID: 700263074541515258, guid: ba49849a848fe874ebf1fb804e1fdbd3, type: 3}
       propertyPath: m_AnchoredPosition.y
-      value: 0
+      value: -77.5
       objectReference: {fileID: 0}
     - target: {fileID: 700263074541515258, guid: ba49849a848fe874ebf1fb804e1fdbd3, type: 3}
       propertyPath: m_LocalEulerAnglesHint.x
@@ -737,6 +753,10 @@ PrefabInstance:
     - target: {fileID: 4571154277439690098, guid: ba49849a848fe874ebf1fb804e1fdbd3, type: 3}
       propertyPath: m_Name
       value: Placable obstacle button (4)
+      objectReference: {fileID: 0}
+    - target: {fileID: 4571154277439690098, guid: ba49849a848fe874ebf1fb804e1fdbd3, type: 3}
+      propertyPath: m_IsActive
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 7822491032535858337, guid: ba49849a848fe874ebf1fb804e1fdbd3, type: 3}
       propertyPath: itemLabel
@@ -991,7 +1011,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 700263074541515258, guid: ba49849a848fe874ebf1fb804e1fdbd3, type: 3}
       propertyPath: m_AnchorMax.y
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 700263074541515258, guid: ba49849a848fe874ebf1fb804e1fdbd3, type: 3}
       propertyPath: m_AnchorMin.x
@@ -999,11 +1019,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 700263074541515258, guid: ba49849a848fe874ebf1fb804e1fdbd3, type: 3}
       propertyPath: m_AnchorMin.y
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 700263074541515258, guid: ba49849a848fe874ebf1fb804e1fdbd3, type: 3}
       propertyPath: m_SizeDelta.x
-      value: 0
+      value: 240
       objectReference: {fileID: 0}
     - target: {fileID: 700263074541515258, guid: ba49849a848fe874ebf1fb804e1fdbd3, type: 3}
       propertyPath: m_SizeDelta.y
@@ -1039,11 +1059,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 700263074541515258, guid: ba49849a848fe874ebf1fb804e1fdbd3, type: 3}
       propertyPath: m_AnchoredPosition.x
-      value: 0
+      value: 130
       objectReference: {fileID: 0}
     - target: {fileID: 700263074541515258, guid: ba49849a848fe874ebf1fb804e1fdbd3, type: 3}
       propertyPath: m_AnchoredPosition.y
-      value: 0
+      value: -77.5
       objectReference: {fileID: 0}
     - target: {fileID: 700263074541515258, guid: ba49849a848fe874ebf1fb804e1fdbd3, type: 3}
       propertyPath: m_LocalEulerAnglesHint.x
@@ -1060,6 +1080,10 @@ PrefabInstance:
     - target: {fileID: 4571154277439690098, guid: ba49849a848fe874ebf1fb804e1fdbd3, type: 3}
       propertyPath: m_Name
       value: Placable obstacle button (2)
+      objectReference: {fileID: 0}
+    - target: {fileID: 4571154277439690098, guid: ba49849a848fe874ebf1fb804e1fdbd3, type: 3}
+      propertyPath: m_IsActive
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 7822491032535858337, guid: ba49849a848fe874ebf1fb804e1fdbd3, type: 3}
       propertyPath: itemLabel
@@ -1934,8 +1958,8 @@ MonoBehaviour:
   m_TargetGraphic: {fileID: 315833437}
   m_HandleRect: {fileID: 315833436}
   m_Direction: 2
-  m_Value: 1
-  m_Size: 0.7653549
+  m_Value: 0
+  m_Size: 1
   m_NumberOfSteps: 0
   m_OnValueChanged:
     m_PersistentCalls:
@@ -2000,7 +2024,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 700263074541515258, guid: ba49849a848fe874ebf1fb804e1fdbd3, type: 3}
       propertyPath: m_AnchorMax.y
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 700263074541515258, guid: ba49849a848fe874ebf1fb804e1fdbd3, type: 3}
       propertyPath: m_AnchorMin.x
@@ -2008,11 +2032,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 700263074541515258, guid: ba49849a848fe874ebf1fb804e1fdbd3, type: 3}
       propertyPath: m_AnchorMin.y
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 700263074541515258, guid: ba49849a848fe874ebf1fb804e1fdbd3, type: 3}
       propertyPath: m_SizeDelta.x
-      value: 0
+      value: 240
       objectReference: {fileID: 0}
     - target: {fileID: 700263074541515258, guid: ba49849a848fe874ebf1fb804e1fdbd3, type: 3}
       propertyPath: m_SizeDelta.y
@@ -2048,11 +2072,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 700263074541515258, guid: ba49849a848fe874ebf1fb804e1fdbd3, type: 3}
       propertyPath: m_AnchoredPosition.x
-      value: 0
+      value: 130
       objectReference: {fileID: 0}
     - target: {fileID: 700263074541515258, guid: ba49849a848fe874ebf1fb804e1fdbd3, type: 3}
       propertyPath: m_AnchoredPosition.y
-      value: 0
+      value: -77.5
       objectReference: {fileID: 0}
     - target: {fileID: 700263074541515258, guid: ba49849a848fe874ebf1fb804e1fdbd3, type: 3}
       propertyPath: m_LocalEulerAnglesHint.x
@@ -2069,6 +2093,10 @@ PrefabInstance:
     - target: {fileID: 4571154277439690098, guid: ba49849a848fe874ebf1fb804e1fdbd3, type: 3}
       propertyPath: m_Name
       value: Placable obstacle button
+      objectReference: {fileID: 0}
+    - target: {fileID: 4571154277439690098, guid: ba49849a848fe874ebf1fb804e1fdbd3, type: 3}
+      propertyPath: m_IsActive
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 7822491032535858337, guid: ba49849a848fe874ebf1fb804e1fdbd3, type: 3}
       propertyPath: itemImage
@@ -2544,7 +2572,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 700263074541515258, guid: ba49849a848fe874ebf1fb804e1fdbd3, type: 3}
       propertyPath: m_AnchorMax.y
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 700263074541515258, guid: ba49849a848fe874ebf1fb804e1fdbd3, type: 3}
       propertyPath: m_AnchorMin.x
@@ -2552,11 +2580,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 700263074541515258, guid: ba49849a848fe874ebf1fb804e1fdbd3, type: 3}
       propertyPath: m_AnchorMin.y
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 700263074541515258, guid: ba49849a848fe874ebf1fb804e1fdbd3, type: 3}
       propertyPath: m_SizeDelta.x
-      value: 0
+      value: 240
       objectReference: {fileID: 0}
     - target: {fileID: 700263074541515258, guid: ba49849a848fe874ebf1fb804e1fdbd3, type: 3}
       propertyPath: m_SizeDelta.y
@@ -2592,11 +2620,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 700263074541515258, guid: ba49849a848fe874ebf1fb804e1fdbd3, type: 3}
       propertyPath: m_AnchoredPosition.x
-      value: 0
+      value: 130
       objectReference: {fileID: 0}
     - target: {fileID: 700263074541515258, guid: ba49849a848fe874ebf1fb804e1fdbd3, type: 3}
       propertyPath: m_AnchoredPosition.y
-      value: 0
+      value: -77.5
       objectReference: {fileID: 0}
     - target: {fileID: 700263074541515258, guid: ba49849a848fe874ebf1fb804e1fdbd3, type: 3}
       propertyPath: m_LocalEulerAnglesHint.x
@@ -2613,6 +2641,10 @@ PrefabInstance:
     - target: {fileID: 4571154277439690098, guid: ba49849a848fe874ebf1fb804e1fdbd3, type: 3}
       propertyPath: m_Name
       value: Placable obstacle button (1)
+      objectReference: {fileID: 0}
+    - target: {fileID: 4571154277439690098, guid: ba49849a848fe874ebf1fb804e1fdbd3, type: 3}
+      propertyPath: m_IsActive
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 7822491032535858337, guid: ba49849a848fe874ebf1fb804e1fdbd3, type: 3}
       propertyPath: itemImage
@@ -2807,7 +2839,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 700263074541515258, guid: ba49849a848fe874ebf1fb804e1fdbd3, type: 3}
       propertyPath: m_AnchorMax.y
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 700263074541515258, guid: ba49849a848fe874ebf1fb804e1fdbd3, type: 3}
       propertyPath: m_AnchorMin.x
@@ -2815,11 +2847,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 700263074541515258, guid: ba49849a848fe874ebf1fb804e1fdbd3, type: 3}
       propertyPath: m_AnchorMin.y
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 700263074541515258, guid: ba49849a848fe874ebf1fb804e1fdbd3, type: 3}
       propertyPath: m_SizeDelta.x
-      value: 0
+      value: 240
       objectReference: {fileID: 0}
     - target: {fileID: 700263074541515258, guid: ba49849a848fe874ebf1fb804e1fdbd3, type: 3}
       propertyPath: m_SizeDelta.y
@@ -2855,11 +2887,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 700263074541515258, guid: ba49849a848fe874ebf1fb804e1fdbd3, type: 3}
       propertyPath: m_AnchoredPosition.x
-      value: 0
+      value: 130
       objectReference: {fileID: 0}
     - target: {fileID: 700263074541515258, guid: ba49849a848fe874ebf1fb804e1fdbd3, type: 3}
       propertyPath: m_AnchoredPosition.y
-      value: 0
+      value: -77.5
       objectReference: {fileID: 0}
     - target: {fileID: 700263074541515258, guid: ba49849a848fe874ebf1fb804e1fdbd3, type: 3}
       propertyPath: m_LocalEulerAnglesHint.x
@@ -2876,6 +2908,10 @@ PrefabInstance:
     - target: {fileID: 4571154277439690098, guid: ba49849a848fe874ebf1fb804e1fdbd3, type: 3}
       propertyPath: m_Name
       value: Placable obstacle button (3)
+      objectReference: {fileID: 0}
+    - target: {fileID: 4571154277439690098, guid: ba49849a848fe874ebf1fb804e1fdbd3, type: 3}
+      propertyPath: m_IsActive
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 7822491032535858337, guid: ba49849a848fe874ebf1fb804e1fdbd3, type: 3}
       propertyPath: itemLabel

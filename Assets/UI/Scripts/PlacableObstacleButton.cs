@@ -58,6 +58,11 @@ public class PlacableObstacleButton : MonoBehaviour
             itemLabelObject.text = label;
     }
 
+    public void SetObstacle(ObstacleSO obstacleData)
+    {
+        obstacle = obstacleData;
+    }
+
     public void OnClicked()
     {
         ObstaclePlacementManager.Instance.SelectObstacle(obstacle);
