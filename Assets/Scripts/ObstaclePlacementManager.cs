@@ -25,6 +25,11 @@ public class ObstaclePlacementManager : MonoBehaviour
         _selected = obstacle;
     }
 
+    public void Deselect()
+    {
+        _selected = null;
+    }
+
     private void Update()
     {
         if (_selected == null) return;

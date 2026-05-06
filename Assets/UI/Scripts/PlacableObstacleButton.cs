@@ -1,5 +1,6 @@
 using TMPro;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 /// <summary>
@@ -7,7 +8,7 @@ using UnityEngine.UI;
 /// Exposes image and label so variants can be configured in the Inspector
 /// or set at runtime via SetItem().
 /// </summary>
-public class PlacableObstacleButton : MonoBehaviour
+public class PlacableObstacleButton : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
 {
     [Header("Content")]
     [SerializeField] private ObstacleSO obstacle;
@@ -23,11 +24,25 @@ public class PlacableObstacleButton : MonoBehaviour
     [SerializeField] private Sprite defaultSprite;
     [SerializeField] private string defaultLabel = "Item";
 
+    private Button _button;
+
+    private bool _currentlySelected;
+
     private void Awake()
     {
+        _button = GetComponent<Button>();
+        _button.transition = Selectable.Transition.None;
         // Apply defaults so the prefab looks correct on spawn
         // without requiring an explicit SetItem() call
         // SetItem(defaultSprite, defaultLabel);
+    }
+
+    public void SetSelected(bool selected)
+    {
+        _currentlySelected = selected;
+        _button.targetGraphic.color = selected
+            ? _button.colors.selectedColor
+            : _button.colors.normalColor;
     }
 
     private void OnValidate()
@@ -66,5 +81,17 @@ public class PlacableObstacleButton : MonoBehaviour
     public void OnClicked()
     {
         ObstaclePlacementManager.Instance.SelectObstacle(obstacle);
+    }
+
+    public void OnPointerEnter(PointerEventData eventData)
+    {
+        if (_currentlySelected) return; // don't override selected color
+        _button.targetGraphic.color = _button.colors.highlightedColor;
+    }
+
+    public void OnPointerExit(PointerEventData eventData)
+    {
+        if (_currentlySelected) return;
+        _button.targetGraphic.color = _button.colors.normalColor;
     }
 }
