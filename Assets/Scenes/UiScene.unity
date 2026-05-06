@@ -2317,6 +2317,7 @@ MonoBehaviour:
   terrainLayer:
     serializedVersion: 2
     m_Bits: 8
+  previewMaterial: {fileID: 2100000, guid: f2a3b4c5d6e7f2a3b4c5d6e7f2a3b4c5, type: 2}
 --- !u!224 &1902258539 stripped
 RectTransform:
   m_CorrespondingSourceObject: {fileID: 700263074541515258, guid: ba49849a848fe874ebf1fb804e1fdbd3, type: 3}

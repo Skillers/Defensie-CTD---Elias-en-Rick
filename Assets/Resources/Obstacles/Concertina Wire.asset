@@ -15,3 +15,4 @@ MonoBehaviour:
   obstacleName: Concertina Wire
   icon: {fileID: 21300000, guid: 4fae79a1c03fcb3458ab05d5b30e1437, type: 3}
   prefab: {fileID: 1000000001, guid: b8c9d0e1f2a3b8c9d0e1f2a3b8c9d0e1, type: 3}
+  placementType: 1
