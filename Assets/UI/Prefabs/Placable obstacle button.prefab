@@ -191,6 +191,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 37f530c4d6e908043b818bb4a9084b8d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlacableObstacleButton
+  obstacle: {fileID: 11400000, guid: d0e1f2a3b4c5d0e1f2a3b4c5d0e1f2a3, type: 2}
   itemImage: {fileID: 0}
   itemLabel: 
   itemImageObject: {fileID: 9173685423513206015}

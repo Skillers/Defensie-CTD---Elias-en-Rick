@@ -10,6 +10,7 @@ using UnityEngine.UI;
 public class PlacableObstacleButton : MonoBehaviour
 {
     [Header("Content")]
+    [SerializeField] private ObstacleSO obstacle;
     [SerializeField] private Sprite itemImage;
     [SerializeField] private string itemLabel;
     
@@ -55,5 +56,10 @@ public class PlacableObstacleButton : MonoBehaviour
 
         if (itemLabelObject != null)
             itemLabelObject.text = label;
+    }
+
+    public void OnClicked()
+    {
+        ObstaclePlacementManager.Instance.SelectObstacle(obstacle);
     }
 }
