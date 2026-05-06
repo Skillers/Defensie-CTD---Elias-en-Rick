@@ -39,6 +39,7 @@ public class ObstacleInventoryUI : MonoBehaviour
                 _currentSelected?.SetSelected(false);
                 _currentSelected = obstacleButton;
                 _currentSelected.SetSelected(true);
+                ObstaclePlacementManager.Instance.ClearWorldSelection();
                 obstacleButton.OnClicked();
             });
         }
