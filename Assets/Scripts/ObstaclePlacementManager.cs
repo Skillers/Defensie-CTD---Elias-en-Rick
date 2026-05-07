@@ -78,6 +78,13 @@ public class ObstaclePlacementManager : MonoBehaviour
 
     private void Update()
     {
+        if (_selected == null && Mouse.current.leftButton.wasReleasedThisFrame)
+        {
+            if (_isDragging)
+                SelectObstaclesInRect(_dragStart, Mouse.current.position.ReadValue());
+            _isDragging = false;
+        }
+
         if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
             return;
 
@@ -184,16 +191,6 @@ public class ObstaclePlacementManager : MonoBehaviour
         {
             if (!_isDragging && Vector2.Distance(mousePos, _dragStart) > 10f)
                 _isDragging = true;
-        }
-
-        if (mouse.leftButton.wasReleasedThisFrame)
-        {
-            if (_isDragging)
-                SelectObstaclesInRect(_dragStart, mousePos);
-            else if (!_clickedObstacle)
-                ClearWorldSelection(); // Single click on terrain clears selection
-            _isDragging = false;
-            _clickedObstacle = false;
         }
 
         if (Keyboard.current.deleteKey.wasPressedThisFrame)

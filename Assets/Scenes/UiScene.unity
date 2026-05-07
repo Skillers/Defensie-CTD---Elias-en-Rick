@@ -1004,8 +1004,12 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::SimulationCameraController
   panSpeed: 25
   zoomSpeed: 900
-  minZoom: 5
   maxZoom: 250
+  placementCamera: {fileID: 501374142}
+  minHeightAboveTerrain: 10
+  terrainLayerMask:
+    serializedVersion: 2
+    m_Bits: 8
 --- !u!1001 &653818736
 PrefabInstance:
   m_ObjectHideFlags: 0
