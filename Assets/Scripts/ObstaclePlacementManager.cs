@@ -170,7 +170,7 @@ public class ObstaclePlacementManager : MonoBehaviour
 
     private void PlaceObstacle(Vector3 position)
     {
-        var go = Instantiate(_selected.prefab, position, Quaternion.identity);
+        var go = Instantiate(_selected.prefab, position, _selected.prefab.transform.rotation);
         var placed = go.AddComponent<PlacedObstacle>();
         placed.obstacleSO = _selected;
         _placedObstacles.Add(placed);
@@ -180,7 +180,7 @@ public class ObstaclePlacementManager : MonoBehaviour
     {
         float distance = Vector3.Distance(start, end);
         var go = Instantiate(_selected.prefab, (start + end) * 0.5f,
-            Quaternion.FromToRotation(Vector3.up, (end - start).normalized));
+            _selected.prefab.transform.rotation);
         go.transform.localScale = new Vector3(0.3f, distance / 2f, 0.3f);
         var placed = go.AddComponent<PlacedObstacle>();
         placed.obstacleSO = _selected;
