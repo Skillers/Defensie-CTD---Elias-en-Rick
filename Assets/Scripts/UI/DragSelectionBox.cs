@@ -44,5 +44,6 @@ public class DragSelectionBox : MonoBehaviour
         var c = _image.color;
         c.a = alpha;
         _image.color = c;
+        _image.raycastTarget = alpha > 0;
     }
 }
