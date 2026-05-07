@@ -152,6 +152,17 @@ public class AvenuesOfApproachHandler : MonoBehaviour
     /// <summary>Fires whenever the avenue list, current index, title, or waypoints change.</summary>
     public event Action OnAvenueChanged;
 
+    void Awake()
+    {
+        // Subscribe in Awake so we're hooked up before TerrainDataStore.Start
+        // fires its auto-load and we'd miss OnApplyingSaveData.
+        if (terrainDataStore != null)
+        {
+            terrainDataStore.OnBuildingSaveData += HandleBuildingSaveData;
+            terrainDataStore.OnApplyingSaveData += HandleApplyingSaveData;
+        }
+    }
+
     void Start()
     {
         if (toggleButton != null)        toggleButton.onClick.AddListener(Toggle);
@@ -178,6 +189,12 @@ public class AvenuesOfApproachHandler : MonoBehaviour
         if (newAvenueButton != null)     newAvenueButton.onClick.RemoveListener(CreateNewAvenue);
         if (removeAvenueButton != null)  removeAvenueButton.onClick.RemoveListener(RemoveCurrentAvenue);
         if (titleInput != null)          titleInput.onValueChanged.RemoveListener(OnTitleChanged);
+
+        if (terrainDataStore != null)
+        {
+            terrainDataStore.OnBuildingSaveData -= HandleBuildingSaveData;
+            terrainDataStore.OnApplyingSaveData -= HandleApplyingSaveData;
+        }
     }
 
 #if UNITY_EDITOR
@@ -286,6 +303,71 @@ public class AvenuesOfApproachHandler : MonoBehaviour
     {
         if (CurrentAvenue == null) return;
         CurrentAvenue.title = newTitle;
+        OnAvenueChanged?.Invoke();
+    }
+
+    void HandleBuildingSaveData(SaveData data)
+    {
+        var dtos = new AvenueDto[_avenues.Count];
+        for (int i = 0; i < _avenues.Count; i++)
+        {
+            var avenue = _avenues[i];
+            int waypointCount = avenue.waypoints.Count;
+            var dto = new AvenueDto
+            {
+                index = i,
+                title = avenue.title,
+                waypointXs = new int[waypointCount],
+                waypointZs = new int[waypointCount],
+            };
+            for (int w = 0; w < waypointCount; w++)
+            {
+                dto.waypointXs[w] = avenue.waypoints[w].x;
+                dto.waypointZs[w] = avenue.waypoints[w].y;
+            }
+            dtos[i] = dto;
+        }
+        data.avenues = dtos;
+    }
+
+    void HandleApplyingSaveData(SaveData data)
+    {
+        // Tear down anything that's already in the scene before replacing it.
+        for (int i = 0; i < _avenues.Count; i++)
+        {
+            var existing = _avenues[i];
+            DestroyAvenueSpheres(existing);
+            if (existing.line != null) Destroy(existing.line.gameObject);
+        }
+        _avenues.Clear();
+        _currentIndex = -1;
+
+        if (data.avenues != null)
+        {
+            for (int i = 0; i < data.avenues.Length; i++)
+            {
+                var dto = data.avenues[i];
+                if (dto == null) continue;
+
+                var avenue = new AvenueOfApproach { title = dto.title ?? string.Empty };
+                avenue.line = SpawnLine();
+
+                int xLen = dto.waypointXs?.Length ?? 0;
+                int zLen = dto.waypointZs?.Length ?? 0;
+                int n = Mathf.Min(xLen, zLen);
+                for (int w = 0; w < n; w++)
+                {
+                    var cell = new Vector2Int(dto.waypointXs[w], dto.waypointZs[w]);
+                    avenue.waypoints.Add(cell);
+                    avenue.waypointSpheres.Add(SpawnSphere(cell));
+                }
+
+                _avenues.Add(avenue);
+            }
+            _currentIndex = _avenues.Count > 0 ? 0 : -1;
+        }
+
+        RefreshAvenueUI();
         OnAvenueChanged?.Invoke();
     }
 

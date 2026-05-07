@@ -35,6 +35,9 @@ public class SaveData
     public bool hasEnd;
     public int endX;
     public int endZ;
+
+    // Avenues of Approach. Array position is the avenue's number (0..count-1).
+    public AvenueDto[] avenues;
 }
 
 /// <summary>
@@ -48,4 +51,19 @@ public class CellDataDto
     public float roundedHeight;
     public float[] slopeOutgoing;
     public string biomeName;
+}
+
+/// <summary>
+/// Serializable mirror of an AvenueOfApproach. The explicit <see cref="index"/>
+/// makes the 0..count-1 numbering self-evident in the JSON for later random
+/// selection. Waypoints are stored as parallel int arrays since JsonUtility
+/// handles plain ints more reliably than Vector2Int collections.
+/// </summary>
+[System.Serializable]
+public class AvenueDto
+{
+    public int index;
+    public string title;
+    public int[] waypointXs;
+    public int[] waypointZs;
 }
