@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 
 public class ObstaclePlacementManager : MonoBehaviour
@@ -17,9 +18,10 @@ public class ObstaclePlacementManager : MonoBehaviour
     private bool _isDragging;
     private bool _clickedObstacle;
     private GameObject _previewObject;
-    private GameObject _linePreviewObject;
     private Vector3 _lineDragStartWorld;
     private bool _isDraggingLine;
+
+    private const float MinLineLength = 2f;
 
     public bool IsDragging => _isDragging;
     public Vector2 DragStart => _dragStart;
@@ -72,31 +74,13 @@ public class ObstaclePlacementManager : MonoBehaviour
     {
         Destroy(_previewObject);
         _previewObject = null;
-        Destroy(_linePreviewObject);
-        _linePreviewObject = null;
-    }
-
-    private void UpdateLinePreview(Vector3 start, Vector3 end)
-    {
-        if (_linePreviewObject == null)
-        {
-            _linePreviewObject = new GameObject("LinePreview");
-            _linePreviewObject.AddComponent<MeshFilter>().mesh = Resources.GetBuiltinResource<Mesh>("Cylinder.fbx");
-            var mr = _linePreviewObject.AddComponent<MeshRenderer>();
-            mr.material = previewMaterial;
-        }
-        float distance = Vector3.Distance(start, end);
-        _linePreviewObject.SetActive(distance > 0.5f);
-        if (distance > 0.5f)
-        {
-            _linePreviewObject.transform.position = (start + end) * 0.5f;
-            _linePreviewObject.transform.localScale = new Vector3(0.3f, distance / 2f, 0.3f);
-            _linePreviewObject.transform.rotation = Quaternion.FromToRotation(Vector3.up, (end - start).normalized);
-        }
     }
 
     private void Update()
     {
+        if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
+            return;
+
         // Escape clears both inventory selection and world selection
         if (Keyboard.current.escapeKey.wasPressedThisFrame)
         {
@@ -121,22 +105,44 @@ public class ObstaclePlacementManager : MonoBehaviour
             }
             else if (_selected.placementType == PlacementType.Line)
             {
+                if (_previewObject != null)
+                {
+                    if (_isDraggingLine && didHit)
+                    {
+                        float dist = Vector3.Distance(_lineDragStartWorld, hit.point);
+                        if (dist >= MinLineLength)
+                        {
+                            float naturalLength = _selected.prefab.GetComponentInChildren<MeshFilter>().sharedMesh.bounds.size.x;
+                            float scaleFactor = dist / naturalLength;
+                            _previewObject.transform.position = (_lineDragStartWorld + hit.point) * 0.5f;
+                            _previewObject.transform.rotation = Quaternion.FromToRotation(Vector3.right, (hit.point - _lineDragStartWorld).normalized);
+                            _previewObject.transform.localScale = new Vector3(scaleFactor, 1f, 1f);
+                        }
+                        else
+                        {
+                            _previewObject.transform.position = _lineDragStartWorld;
+                            _previewObject.transform.rotation = _selected.prefab.transform.rotation;
+                            _previewObject.transform.localScale = _selected.prefab.transform.localScale;
+                        }
+                    }
+                    else if (!_isDraggingLine)
+                    {
+                        _previewObject.transform.rotation = _selected.prefab.transform.rotation;
+                        _previewObject.transform.localScale = _selected.prefab.transform.localScale;
+                    }
+                }
+
                 if (Mouse.current.leftButton.wasPressedThisFrame && didHit)
                 {
                     _lineDragStartWorld = hit.point;
                     _isDraggingLine = true;
                 }
 
-                if (_isDraggingLine && Mouse.current.leftButton.isPressed && didHit)
-                    UpdateLinePreview(_lineDragStartWorld, hit.point);
-
                 if (_isDraggingLine && Mouse.current.leftButton.wasReleasedThisFrame)
                 {
-                    if (didHit && Vector3.Distance(_lineDragStartWorld, hit.point) > 0.5f)
+                    if (didHit)
                         PlaceLine(_lineDragStartWorld, hit.point);
                     _isDraggingLine = false;
-                    Destroy(_linePreviewObject);
-                    _linePreviewObject = null;
                 }
             }
             return;
@@ -213,12 +219,22 @@ public class ObstaclePlacementManager : MonoBehaviour
     private void PlaceLine(Vector3 start, Vector3 end)
     {
         float distance = Vector3.Distance(start, end);
-        var go = Instantiate(_selected.prefab, (start + end) * 0.5f,
-            _selected.prefab.transform.rotation);
-        go.transform.localScale = new Vector3(0.3f, distance / 2f, 0.3f);
-        var placed = go.AddComponent<PlacedObstacle>();
-        placed.obstacleSO = _selected;
-        _placedObstacles.Add(placed);
+        if (distance < MinLineLength)
+        {
+            var go = Instantiate(_selected.prefab, start, _selected.prefab.transform.rotation);
+            var placed = go.AddComponent<PlacedObstacle>();
+            placed.obstacleSO = _selected;
+            _placedObstacles.Add(placed);
+            return;
+        }
+        float naturalLength = _selected.prefab.GetComponentInChildren<MeshFilter>().sharedMesh.bounds.size.x;
+        float scaleFactor = distance / naturalLength;
+        var goLine = Instantiate(_selected.prefab, (start + end) * 0.5f,
+            Quaternion.FromToRotation(Vector3.right, (end - start).normalized));
+        goLine.transform.localScale = new Vector3(scaleFactor, 1f, 1f);
+        var placedLine = goLine.AddComponent<PlacedObstacle>();
+        placedLine.obstacleSO = _selected;
+        _placedObstacles.Add(placedLine);
     }
 
     private void SelectObstaclesInRect(Vector2 screenStart, Vector2 screenEnd)
