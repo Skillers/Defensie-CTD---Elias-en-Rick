@@ -15,6 +15,7 @@ public class ObstaclePlacementManager : MonoBehaviour
     private List<PlacedObstacle> _selectedObstacles = new List<PlacedObstacle>();
     private Vector2 _dragStart;
     private bool _isDragging;
+    private bool _clickedObstacle;
     private GameObject _previewObject;
     private GameObject _linePreviewObject;
     private Vector3 _lineDragStartWorld;
@@ -96,6 +97,13 @@ public class ObstaclePlacementManager : MonoBehaviour
 
     private void Update()
     {
+        // Escape clears both inventory selection and world selection
+        if (Keyboard.current.escapeKey.wasPressedThisFrame)
+        {
+            Deselect();
+            ClearWorldSelection();
+        }
+
         if (_selected != null)
         {
             Ray ray = placementCamera.ScreenPointToRay(Mouse.current.position.ReadValue());
@@ -141,6 +149,29 @@ public class ObstaclePlacementManager : MonoBehaviour
         {
             _dragStart = mousePos;
             _isDragging = false;
+
+            // Single click — raycast all layers to find PlacedObstacle or terrain
+            Ray clickRay = placementCamera.ScreenPointToRay(mousePos);
+            if (Physics.Raycast(clickRay, out RaycastHit clickHit, Mathf.Infinity))
+            {
+                var obstacle = clickHit.collider.GetComponentInParent<PlacedObstacle>();
+                if (obstacle != null)
+                {
+                    ClearWorldSelection();
+                    _selectedObstacles.Add(obstacle);
+                    obstacle.SetSelected(true);
+                    _clickedObstacle = true;
+                }
+                else
+                {
+                    ClearWorldSelection();
+                    _clickedObstacle = false;
+                }
+            }
+            else
+            {
+                _clickedObstacle = false;
+            }
         }
 
         if (mouse.leftButton.isPressed)
@@ -153,7 +184,10 @@ public class ObstaclePlacementManager : MonoBehaviour
         {
             if (_isDragging)
                 SelectObstaclesInRect(_dragStart, mousePos);
+            else if (!_clickedObstacle)
+                ClearWorldSelection(); // Single click on terrain clears selection
             _isDragging = false;
+            _clickedObstacle = false;
         }
 
         if (Keyboard.current.deleteKey.wasPressedThisFrame)
