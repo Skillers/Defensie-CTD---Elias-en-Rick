@@ -13,3 +13,14 @@ MonoBehaviour:
   m_Name: NewUnitType
   m_EditorClassIdentifier: Assembly-CSharp::UnitTypeSO
   typeName: Infantry
+  useAbsoluteSlope: 0
+  defaultSlopeMultiplier: 1
+  slopeRules:
+  - minSlopeDeg: 5
+    maxSlopeDeg: 20
+    costMultiplier: 3
+    blocked: 0
+  - minSlopeDeg: -20
+    maxSlopeDeg: -5
+    costMultiplier: 0.8
+    blocked: 1

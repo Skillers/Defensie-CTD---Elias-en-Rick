@@ -2,29 +2,35 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// Attach to the parent Agent GameObject.
-/// Finds path on Start, then smoothly moves cell to cell.
-/// Recalculates path whenever the flag moves to a different grid cell.
-/// Parent never rotates — rotation is handled here as a facing direction
-/// passed down to UnitFacer components on the children.
+/// Walks a unit along an A* path between two grid cells.
+/// Configure with <see cref="Initialize"/> (typical) or by setting the inspector
+/// fields and calling <see cref="GoTo"/> manually.
+/// Speed is divided by the biome cost AND the unit's slope multiplier of the cell
+/// being stepped from, so visual movement matches A*'s path cost.
+/// Y is snapped to the terrain's rounded height every frame so the unit follows hills.
 /// </summary>
 public class UnitMover : MonoBehaviour
 {
     [Header("References")]
     public TerrainDataStore terrainDataStore;
-    public Transform  flag;
 
     [Header("Unit")]
-    [Tooltip("Optional — used to resolve per-biome movement costs.")]
+    [Tooltip("Resolves per-biome movement costs and slope rules.")]
     public UnitTypeSO unitType;
+    [Tooltip("Square footprint in cells passed to A*'s CanFit check.")]
+    public int unitSize = 5;
 
     [Header("Movement")]
     public float moveSpeed   = 6f;
     public float turnSpeed   = 90f;
+    [Tooltip("Extra height added to the terrain surface when sticking the unit to the ground.")]
+    public float groundOffset = 0f;
 
     [Header("Path Visual")]
     public Color pathColor     = Color.yellow;
     public float pathLineWidth = 0.5f;
+    [Tooltip("Extra height above terrain at which the path line is drawn.")]
+    public float pathLineLift  = 0.1f;
 
     [HideInInspector] public Vector3 moveDirection = Vector3.forward;
 
@@ -33,20 +39,95 @@ public class UnitMover : MonoBehaviour
     List<Vector2Int> path = new List<Vector2Int>();
     int    waypointIndex  = 0;
     bool   moving         = false;
+    bool   initialized    = false;
 
+    Vector2Int currentCell;
     Vector3    currentTarget;
-    Vector2Int lastFlagCell;
     LineRenderer pathLine;
+
+    Vector2Int currentGoal;
+    bool       hasGoal;
+
+    /// <summary>
+    /// Configure the mover and start moving toward <paramref name="goalCell"/>.
+    /// Spawner-friendly entry point.
+    /// </summary>
+    public void Initialize(TerrainDataStore tds, Vector2Int goalCell, UnitTypeSO type)
+    {
+        terrainDataStore = tds;
+        unitType         = type;
+        initialized      = true;
+
+        SetupLineRenderer();
+        SnapToTerrain();
+        GoTo(goalCell);
+    }
+
+    /// <summary>
+    /// Computes a fresh path from the unit's current cell to <paramref name="goalCell"/>
+    /// and starts walking. Safe to call repeatedly.
+    /// </summary>
+    public void GoTo(Vector2Int goalCell)
+    {
+        if (terrainDataStore == null || terrainDataStore.grid == null)
+        {
+            Debug.LogWarning("UnitMover.GoTo: TerrainDataStore is missing or grid not loaded.");
+            return;
+        }
+
+        currentGoal = goalCell;
+        hasGoal     = true;
+
+        Vector2Int startCell = terrainDataStore.WorldToGrid(transform.position);
+        path = AStarPathfinder.FindPath(
+            terrainDataStore.grid,
+            terrainDataStore.GridWidth,
+            terrainDataStore.GridHeight,
+            startCell,
+            goalCell,
+            unitSize: unitSize,
+            unitType: unitType
+        );
+
+        if (path.Count > 1)
+        {
+            currentCell   = path[0];
+            waypointIndex = 1;
+            currentTarget = terrainDataStore.GridToWorld(path[waypointIndex]);
+            moving        = true;
+        }
+        else
+        {
+            moving = false;
+            Debug.LogWarning($"UnitMover: no path found from {startCell} to {goalCell} (or already at goal).");
+        }
+
+        DrawPath();
+    }
+
+    /// <summary>
+    /// Re-runs A* toward the last goal supplied to <see cref="GoTo"/> or <see cref="Initialize"/>.
+    /// Call this after the world changes (obstacle added, biome cost changed, etc.).
+    /// </summary>
+    public void RecomputePath()
+    {
+        if (!hasGoal) return;
+        GoTo(currentGoal);
+    }
+
+    /// <summary>Compat shim for older callers — same as <see cref="RecomputePath"/>.</summary>
+    public void RequestPath() => RecomputePath();
 
     void Start()
     {
-        SetupLineRenderer();
-        lastFlagCell = terrainDataStore.WorldToGrid(flag.position);
-        RequestPath();
+        if (initialized) return;
+        if (pathLine == null) SetupLineRenderer();
     }
 
     void SetupLineRenderer()
     {
+        if (pathLine != null) return;
+
         pathLine = gameObject.AddComponent<LineRenderer>();
         pathLine.useWorldSpace  = true;
         pathLine.startWidth     = pathLineWidth;
@@ -68,60 +149,26 @@ public class UnitMover : MonoBehaviour
         }
 
         var mat = shader != null ? new Material(shader) : new Material(Shader.Find("Standard"));
-        mat.color       = pathColor;
-        pathLine.material = mat;
+        mat.color           = pathColor;
+        pathLine.material   = mat;
         pathLine.startColor = pathColor;
         pathLine.endColor   = pathColor;
     }
 
-    public void RequestPath()
-    {
-        lastFlagCell = terrainDataStore.WorldToGrid(flag.position);
-
-        Vector2Int startCell = terrainDataStore.WorldToGrid(transform.position);
-        Vector2Int goalCell  = lastFlagCell;
-
-        path = AStarPathfinder.FindPath(
-            terrainDataStore.grid,
-            terrainDataStore.GridWidth,
-            terrainDataStore.GridHeight,
-            startCell,
-            goalCell,
-            unitType: unitType
-        );
-
-        if (path.Count > 1)
-        {
-            waypointIndex = 1;
-            currentTarget = terrainDataStore.GridToWorld(path[waypointIndex]);
-            moving = true;
-        }
-        else
-        {
-            moving = false;
-            Debug.LogWarning("UnitMover: no path found or already at goal.");
-        }
-
-        DrawPath();
-    }
-
     void DrawPath()
     {
+        if (pathLine == null) return;
         pathLine.positionCount = path.Count;
         for (int i = 0; i < path.Count; i++)
         {
             Vector3 wp = terrainDataStore.GridToWorld(path[i]);
-            wp.y = 0.1f;
+            wp.y = terrainDataStore.GetRoundedHeight(path[i].x, path[i].y) + pathLineLift;
             pathLine.SetPosition(i, wp);
         }
     }
 
     void Update()
     {
-        Vector2Int flagCell = terrainDataStore.WorldToGrid(flag.position);
-        if (flagCell != lastFlagCell)
-            RequestPath();
-
         if (!moving) return;
 
         Vector3 toTarget = currentTarget - transform.position;
@@ -131,7 +178,6 @@ public class UnitMover : MonoBehaviour
         if (dist > 0.05f)
         {
             Vector3 desiredDir = toTarget.normalized;
-
             moveDirection = desiredDir;
 
             squadDirection = Vector3.RotateTowards(
@@ -142,16 +188,15 @@ public class UnitMover : MonoBehaviour
             );
             transform.rotation = Quaternion.LookRotation(squadDirection);
 
-            Vector2Int currentCell = terrainDataStore.WorldToGrid(transform.position);
-            var cell = terrainDataStore.grid[currentCell.x, currentCell.y];
-            int terrainCost = cell.biome != null ? cell.biome.GetMovementCost(unitType) : 3;
-            float effectiveSpeed = moveSpeed / terrainCost;
-
+            float effectiveSpeed = ResolveStepSpeed();
             transform.position += desiredDir * effectiveSpeed * Time.deltaTime;
+            SnapToTerrain();
         }
         else
         {
             transform.position = currentTarget;
+            SnapToTerrain();
+            currentCell = path[waypointIndex];
             waypointIndex++;
 
             if (waypointIndex >= path.Count)
@@ -163,5 +208,33 @@ public class UnitMover : MonoBehaviour
 
             currentTarget = terrainDataStore.GridToWorld(path[waypointIndex]);
         }
+    }
+
+    /// <summary>
+    /// Speed for the current step = moveSpeed / (biomeCost * slopeMultiplier).
+    /// Biome and slope come from the cell we're stepping FROM, in the direction of the next waypoint.
+    /// </summary>
+    float ResolveStepSpeed()
+    {
+        if (terrainDataStore == null || terrainDataStore.grid == null) return moveSpeed;
+
+        CellData fromCell = terrainDataStore.grid[currentCell.x, currentCell.y];
+        Vector2Int delta  = path[waypointIndex] - currentCell;
+
+        int biomeCost = fromCell.biome != null ? fromCell.biome.GetMovementCost(unitType) : 3;
+        float slopeMul = AStarPathfinder.ResolveSlopeMultiplier(fromCell, delta, unitType, out bool blocked);
+
+        if (blocked || biomeCost <= 0) return 0f;
+        return moveSpeed / (biomeCost * slopeMul);
+    }
+
+    void SnapToTerrain()
+    {
+        if (terrainDataStore == null || terrainDataStore.grid == null) return;
+        Vector2Int g = terrainDataStore.WorldToGrid(transform.position);
+        float y = terrainDataStore.GetRoundedHeight(g.x, g.y) + groundOffset;
+        Vector3 p = transform.position;
+        p.y = y;
+        transform.position = p;
     }
 }
