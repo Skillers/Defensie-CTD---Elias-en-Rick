@@ -11,6 +11,10 @@ public class UnitSpawner : MonoBehaviour
 {
     [Header("References")]
     public TerrainDataStore terrainDataStore;
+    [Tooltip("Recommended. Builder that does the async visual terrain build. When wired, the spawner waits for OnBuildComplete (terrain visually ready) instead of OnSaveLoaded (data only).")]
+    public GameTerrainBuilder gameTerrainBuilder;
+    [Tooltip("Optional. Black-screen overlay shown while the terrain builds. Hides itself before the AoA warning appears.")]
+    public LoadingScreen loadingScreen;
     [Tooltip("Optional. If set and the save has avenues, the unit picks one at random and walks its waypoints before reaching the end flag.")]
     public AvenueRuntimeStore avenueStore;
     [Tooltip("Optional. If set, the avenue title is shown on screen for warningSeconds before the unit starts moving.")]
@@ -34,17 +38,31 @@ public class UnitSpawner : MonoBehaviour
 
     void Awake()
     {
-        if (terrainDataStore != null)
-            terrainDataStore.OnSaveLoaded += HandleSaveLoaded;
+        // Prefer OnBuildComplete: data-only OnSaveLoaded fires before the terrain mesh exists,
+        // so the unit would spawn into a void. Fall back to OnSaveLoaded for scenes without a builder.
+        if (gameTerrainBuilder != null)
+            gameTerrainBuilder.OnBuildComplete += HandleReady;
+        else if (terrainDataStore != null)
+            terrainDataStore.OnSaveLoaded += HandleReady;
     }
 
     void OnDestroy()
     {
-        if (terrainDataStore != null)
-            terrainDataStore.OnSaveLoaded -= HandleSaveLoaded;
+        if (gameTerrainBuilder != null)
+            gameTerrainBuilder.OnBuildComplete -= HandleReady;
+        else if (terrainDataStore != null)
+            terrainDataStore.OnSaveLoaded -= HandleReady;
     }
 
-    void HandleSaveLoaded()
+    void HandleReady()
+    {
+        // Loading screen waits out its min-display time, then chains into the spawn sequence.
+        // Without one, spawn immediately.
+        if (loadingScreen != null) loadingScreen.Hide(SpawnUnit);
+        else SpawnUnit();
+    }
+
+    void SpawnUnit()
     {
         if (terrainDataStore == null) return;
 
