@@ -79,7 +79,7 @@ public class UnitMover : MonoBehaviour
         hasGoal     = true;
 
         Vector2Int startCell = terrainDataStore.WorldToGrid(transform.position);
-        path = AStarPathfinder.FindPath(
+        List<Vector2Int> newPath = AStarPathfinder.FindPath(
             terrainDataStore.grid,
             terrainDataStore.GridWidth,
             terrainDataStore.GridHeight,
@@ -88,6 +88,95 @@ public class UnitMover : MonoBehaviour
             unitSize: unitSize,
             unitType: unitType
         );
+
+        if (newPath.Count <= 1)
+            Debug.LogWarning($"UnitMover: no path found from {startCell} to {goalCell} (or already at goal).");
+
+        StartFollowingPath(newPath);
+    }
+
+    /// <summary>
+    /// Configure the mover and walk a route: from the unit's current cell, through
+    /// each avenue waypoint in order, ending at <paramref name="finalGoal"/>. A* runs
+    /// once per leg and the segments are concatenated into one path that's drawn upfront.
+    /// Falls back to a direct path to <paramref name="finalGoal"/> if any leg fails.
+    /// </summary>
+    public void InitializeWithRoute(TerrainDataStore tds, IReadOnlyList<Vector2Int> avenueWaypoints, Vector2Int finalGoal, UnitTypeSO type)
+    {
+        terrainDataStore = tds;
+        unitType         = type;
+        initialized      = true;
+
+        SetupLineRenderer();
+        SnapToTerrain();
+        GoToRoute(avenueWaypoints, finalGoal);
+    }
+
+    /// <summary>
+    /// Build a concatenated A* path through the avenue waypoints to <paramref name="finalGoal"/>
+    /// and start walking it. If any leg has no path, falls back to a direct route.
+    /// </summary>
+    public void GoToRoute(IReadOnlyList<Vector2Int> avenueWaypoints, Vector2Int finalGoal)
+    {
+        if (terrainDataStore == null || terrainDataStore.grid == null)
+        {
+            Debug.LogWarning("UnitMover.GoToRoute: TerrainDataStore is missing or grid not loaded.");
+            return;
+        }
+
+        currentGoal = finalGoal;
+        hasGoal     = true;
+
+        Vector2Int startCell = terrainDataStore.WorldToGrid(transform.position);
+        List<Vector2Int> combined = BuildRoutePath(startCell, avenueWaypoints, finalGoal);
+
+        if (combined.Count <= 1)
+        {
+            Debug.LogWarning($"UnitMover.GoToRoute: route through {avenueWaypoints?.Count ?? 0} avenue waypoint(s) failed; falling back to direct path to {finalGoal}.");
+            GoTo(finalGoal);
+            return;
+        }
+
+        StartFollowingPath(combined);
+    }
+
+    List<Vector2Int> BuildRoutePath(Vector2Int startCell, IReadOnlyList<Vector2Int> avenueWaypoints, Vector2Int finalGoal)
+    {
+        List<Vector2Int> combined = new List<Vector2Int>();
+        Vector2Int from = startCell;
+
+        int stops = avenueWaypoints?.Count ?? 0;
+        for (int i = 0; i <= stops; i++)
+        {
+            Vector2Int to = i < stops ? avenueWaypoints[i] : finalGoal;
+
+            List<Vector2Int> segment = AStarPathfinder.FindPath(
+                terrainDataStore.grid,
+                terrainDataStore.GridWidth,
+                terrainDataStore.GridHeight,
+                from, to,
+                unitSize: unitSize,
+                unitType: unitType
+            );
+
+            // A* returns an empty list when no path exists — treat the whole route as failed.
+            if (segment.Count == 0) return new List<Vector2Int>();
+
+            // First leg: keep every cell. Later legs: skip the first cell which duplicates the
+            // previous leg's last cell, otherwise the unit pauses on the join.
+            int startIdx = combined.Count == 0 ? 0 : 1;
+            for (int s = startIdx; s < segment.Count; s++)
+                combined.Add(segment[s]);
+
+            from = to;
+        }
+
+        return combined;
+    }
+
+    void StartFollowingPath(List<Vector2Int> newPath)
+    {
+        path = newPath;
 
         if (path.Count > 1)
         {
@@ -99,7 +188,6 @@ public class UnitMover : MonoBehaviour
         else
         {
             moving = false;
-            Debug.LogWarning($"UnitMover: no path found from {startCell} to {goalCell} (or already at goal).");
         }
 
         DrawPath();
