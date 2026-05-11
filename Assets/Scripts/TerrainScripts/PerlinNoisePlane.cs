@@ -1,9 +1,12 @@
 using UnityEngine;
+using UnityEngine.UI;
 
-[RequireComponent(typeof(MeshFilter), typeof(MeshRenderer))]
 public class PerlinNoisePlane : MonoBehaviour
 {
     public TerrainDataStore terrainDataStore;
+
+    [Tooltip("UI RawImages that display the height map. All assigned images receive the same texture — wire the big tablet and the mini-tablet here so both stay in sync.")]
+    [SerializeField] RawImage[] rawImages;
 
     // Stored noise values [0..1] per vertex, in a flat 2d array (z * vertsX + x)
     public float[] NoiseValues { get; private set; }
@@ -26,37 +29,6 @@ public class PerlinNoisePlane : MonoBehaviour
         return true;
     }
 
-    public void BuildVisualSmooth()
-    {
-        if (NoiseValues == null || terrainDataStore == null) return;
-
-        var mf = GetComponent<MeshFilter>();
-        mf.sharedMesh = BuildQuad();
-
-        var tex = new Texture2D(VertsX, VertsZ, TextureFormat.RGB24, false)
-        {
-            filterMode = FilterMode.Bilinear,
-            wrapMode   = TextureWrapMode.Clamp
-        };
-
-        var pixels = new Color[NoiseValues.Length];
-        for (int i = 0; i < NoiseValues.Length; i++)
-        {
-            float v = NoiseValues[i];
-            pixels[i] = new Color(v, v, v);
-        }
-
-        tex.SetPixels(pixels);
-        tex.Apply();
-
-        var mr = GetComponent<MeshRenderer>();
-        var shader = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
-        if (mr.sharedMaterial == null)
-            mr.sharedMaterial = new Material(shader);
-
-        mr.sharedMaterial.mainTexture = tex;
-    }
-
     [Header("Visual Settings")]
     [Range(0.05f, 1f)]
     public float heightStepFraction = 0.4f;
@@ -69,12 +41,14 @@ public class PerlinNoisePlane : MonoBehaviour
             Debug.LogWarning("PerlinNoisePlane.BuildVisual: grid is null — call after TerrainDataStore.SetGrid().");
             return;
         }
+        if (rawImages == null || rawImages.Length == 0)
+        {
+            Debug.LogWarning("PerlinNoisePlane.BuildVisual: no RawImages assigned — nothing to render to.");
+            return;
+        }
 
         int w = terrainDataStore.GridWidth;
         int h = terrainDataStore.GridHeight;
-
-        var mf = GetComponent<MeshFilter>();
-        mf.sharedMesh = BuildQuad();
 
         // Number of distinct height bands for the strategic map look
         int layers = Mathf.Max(1, Mathf.RoundToInt(terrainDataStore.heightMultiplier * heightStepFraction));
@@ -100,37 +74,8 @@ public class PerlinNoisePlane : MonoBehaviour
         tex.SetPixels(pixels);
         tex.Apply();
 
-        var mr = GetComponent<MeshRenderer>();
-        var shader = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
-        if (mr.sharedMaterial == null)
-            mr.sharedMaterial = new Material(shader);
-
-        mr.sharedMaterial.mainTexture = tex;
-    }
-
-    Mesh BuildQuad()
-    {
-        float extX = terrainDataStore.extentX;
-        float extZ = terrainDataStore.extentZ;
-
-        var mesh = new Mesh { name = "PerlinQuad" };
-        mesh.vertices = new Vector3[]
-        {
-            new Vector3(-extX, 0f, -extZ),
-            new Vector3( extX, 0f, -extZ),
-            new Vector3( extX, 0f,  extZ),
-            new Vector3(-extX, 0f,  extZ),
-        };
-        mesh.uv = new Vector2[]
-        {
-            new Vector2(0f, 0f),
-            new Vector2(1f, 0f),
-            new Vector2(1f, 1f),
-            new Vector2(0f, 1f),
-        };
-        mesh.triangles = new int[] { 0, 2, 1, 0, 3, 2 };
-        mesh.RecalculateNormals();
-        return mesh;
+        for (int i = 0; i < rawImages.Length; i++)
+            if (rawImages[i] != null) rawImages[i].texture = tex;
     }
 
     private float[] SampleNoise(int vertsX, int vertsZ)

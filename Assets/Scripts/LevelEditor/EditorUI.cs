@@ -8,6 +8,7 @@ public class EditorUI : MonoBehaviour
     [Header("References")]
     public BrushController brushController;
     public FlagPlacementTool flagPlacementTool;
+    public AvenuesOfApproachHandler aoaHandler;
     public TerrainDataStore terrainDataStore;
 
     [Header("Tool Buttons")]
@@ -93,6 +94,8 @@ public class EditorUI : MonoBehaviour
         brushController.OnBiomeChanged += HandleBiomeChanged;
         if (flagPlacementTool != null)
             flagPlacementTool.OnStateChanged += RefreshUI;
+        if (aoaHandler != null)
+            aoaHandler.OnStateChanged += HandleAoAStateChanged;
 
         UpdateLabels();
         RefreshUI();
@@ -107,6 +110,8 @@ public class EditorUI : MonoBehaviour
         }
         if (flagPlacementTool != null)
             flagPlacementTool.OnStateChanged -= RefreshUI;
+        if (aoaHandler != null)
+            aoaHandler.OnStateChanged -= HandleAoAStateChanged;
     }
 
     // ── Button handlers (own the mutex between brush and flag tools) ──
@@ -114,24 +119,28 @@ public class EditorUI : MonoBehaviour
     void OnRaiseLowerClicked()
     {
         if (flagPlacementTool != null) flagPlacementTool.Cancel();
+        if (aoaHandler != null) aoaHandler.Close();
         brushController.ToggleRaiseLower();
     }
 
     void OnFlattenClicked()
     {
         if (flagPlacementTool != null) flagPlacementTool.Cancel();
+        if (aoaHandler != null) aoaHandler.Close();
         brushController.ToggleFlatten();
     }
 
     void OnBiomePaintClicked()
     {
         if (flagPlacementTool != null) flagPlacementTool.Cancel();
+        if (aoaHandler != null) aoaHandler.Close();
         brushController.ToggleBiomePaint();
     }
 
     void OnFlagClicked()
     {
         brushController.CancelTool();
+        if (aoaHandler != null) aoaHandler.Close();
         if (flagPlacementTool != null) flagPlacementTool.Toggle();
     }
 
@@ -139,6 +148,7 @@ public class EditorUI : MonoBehaviour
     {
         brushController.CancelTool();
         if (flagPlacementTool != null) flagPlacementTool.Cancel();
+        if (aoaHandler != null) aoaHandler.Close();
     }
 
     void OnExitToMenuClicked()
@@ -156,6 +166,16 @@ public class EditorUI : MonoBehaviour
     void HandleBrushToolChanged(BrushTool tool) => RefreshUI();
     void HandleBiomeChanged(BiomeSO biome)      => RefreshUI();
 
+    void HandleAoAStateChanged()
+    {
+        if (aoaHandler != null && aoaHandler.IsSelected)
+        {
+            brushController.CancelTool();
+            if (flagPlacementTool != null) flagPlacementTool.Cancel();
+        }
+        RefreshUI();
+    }
+
     void UpdateLabels()
     {
         if (radiusText != null)   radiusText.text   = $"Radius: {brushController.BrushRadius:F1}";
@@ -166,7 +186,8 @@ public class EditorUI : MonoBehaviour
     {
         BrushTool tool   = brushController.ActiveTool;
         bool flagActive  = flagPlacementTool != null && flagPlacementTool.IsActive;
-        bool anyActive   = flagActive || tool != BrushTool.None;
+        bool aoaActive   = aoaHandler != null && aoaHandler.IsSelected;
+        bool anyActive   = flagActive || aoaActive || tool != BrushTool.None;
 
         // Cancel button visible whenever any tool is active
         if (cancelButton != null)
@@ -184,16 +205,20 @@ public class EditorUI : MonoBehaviour
         SetButtonNormalColor(biomePaintButton, tool == BrushTool.BiomePaint ? activeButtonColor : _biomePaintNormal);
         SetButtonNormalColor(flagButton,       flagActive                   ? activeButtonColor : _flagNormal);
 
-        RefreshStatusLabels(tool, flagActive);
+        RefreshStatusLabels(tool, flagActive, aoaActive);
     }
 
-    void RefreshStatusLabels(BrushTool tool, bool flagActive)
+    void RefreshStatusLabels(BrushTool tool, bool flagActive, bool aoaActive)
     {
         if (mainText != null)
         {
-            if (flagActive)
+            if (aoaActive)
             {
-                mainText.text = "Tool: Place Flags";
+                mainText.text = "Tool: Avenues of Approach Placer";
+            }
+            else if (flagActive)
+            {
+                mainText.text = "Tool: Start and Target";
             }
             else
             {
@@ -207,7 +232,7 @@ public class EditorUI : MonoBehaviour
             }
         }
 
-        string sub = GetSubLabel(tool, flagActive);
+        string sub = GetSubLabel(tool, flagActive, aoaActive);
         if (subText != null)
         {
             subText.gameObject.SetActive(sub != null);
@@ -215,13 +240,15 @@ public class EditorUI : MonoBehaviour
         }
     }
 
-    string GetSubLabel(BrushTool tool, bool flagActive)
+    string GetSubLabel(BrushTool tool, bool flagActive, bool aoaActive)
     {
+        if (aoaActive) return null;
+
         if (flagActive)
         {
             return flagPlacementTool.CurrentPhase == FlagPhase.Start
                 ? "Click to place START flag"
-                : "Click to place END flag";
+                : "Click to place TARGET flag";
         }
 
         switch (tool)

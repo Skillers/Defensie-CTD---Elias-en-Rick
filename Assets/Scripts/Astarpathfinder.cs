@@ -17,12 +17,18 @@ public static class AStarPathfinder
     /// <summary>
     /// Returns a list of grid positions from start to goal (inclusive).
     /// Returns empty list if no path found.
+    /// <paramref name="totalCost"/> is set to the goal node's accumulated A* gCost on success,
+    /// or 0 when no path exists. Multiply by cell step and divide by move speed to get seconds —
+    /// see <see cref="CostToSeconds"/>.
     /// Supports 8-directional movement; diagonal steps cost sqrt(2) * terrain cost.
+    /// Step cost is also multiplied by the unit's slope rule for the outgoing direction
+    /// of the cell being stepped from. A blocked slope rule prunes the neighbour entirely.
     /// unitSize: the squad footprint in cells (e.g. 5 = 5x5).
-    /// unitType: optional unit type for resolving per-biome movement costs.
+    /// unitType: optional unit type for resolving per-biome movement costs and slope rules.
     /// </summary>
     public static List<Vector2Int> FindPath(CellData[,] grid, int gridWidth, int gridHeight,
                                             Vector2Int start, Vector2Int goal,
+                                            out float totalCost,
                                             int unitSize = 5, UnitTypeSO unitType = null)
     {
         var open   = new List<Node>();
@@ -40,17 +46,25 @@ public static class AStarPathfinder
             closed.Add(current.pos);
 
             if (current.pos == goal)
+            {
+                totalCost = current.gCost;
                 return BuildPath(current);
+            }
+
+            CellData fromCell = grid[current.pos.x, current.pos.y];
 
             foreach (var (neighbour, isDiagonal) in GetNeighbours(current.pos, gridWidth, gridHeight))
             {
                 if (closed.Contains(neighbour)) continue;
                 if (!CanFit(grid, gridWidth, gridHeight, neighbour, unitSize)) continue;
 
+                float slopeMultiplier = ResolveSlopeMultiplier(fromCell, neighbour - current.pos, unitType, out bool blocked);
+                if (blocked) continue;
+
                 var cell = grid[neighbour.x, neighbour.y];
                 int moveCost = cell.biome != null ? cell.biome.GetMovementCost(unitType) : 3;
 
-                float stepCost = isDiagonal ? SQRT2 * moveCost : moveCost;
+                float stepCost = (isDiagonal ? SQRT2 * moveCost : moveCost) * slopeMultiplier;
                 float newG     = current.gCost + stepCost;
 
                 Node existing = open.Find(n => n.pos == neighbour);
@@ -72,7 +86,46 @@ public static class AStarPathfinder
             }
         }
 
+        totalCost = 0f;
         return new List<Vector2Int>();
+    }
+
+    /// <summary>
+    /// Converts an A* total cost (sum of per-step weighted cell distances) into seconds
+    /// of travel time for a unit moving at <paramref name="moveSpeed"/> world units per second
+    /// on a grid with <paramref name="cellStep"/> world units between adjacent cells.
+    /// Returns +infinity when moveSpeed is non-positive.
+    /// </summary>
+    public static float CostToSeconds(float totalCost, float cellStep, float moveSpeed)
+        => moveSpeed > 0f ? totalCost * cellStep / moveSpeed : float.PositiveInfinity;
+
+    /// <summary>
+    /// Returns the slope multiplier for stepping from <paramref name="fromCell"/> in the given delta direction.
+    /// Sets <paramref name="blocked"/> to true if the unit cannot make this step.
+    /// Falls back to 1f when no unit type is supplied or slope data is missing.
+    /// </summary>
+    public static float ResolveSlopeMultiplier(CellData fromCell, Vector2Int delta, UnitTypeSO unitType, out bool blocked)
+    {
+        blocked = false;
+        if (unitType == null) return 1f;
+        if (fromCell.slopeOutgoing == null) return unitType.EvaluateSlope(0f, out blocked);
+
+        int dirIndex = GetDirectionIndex(delta);
+        if (dirIndex < 0) return unitType.EvaluateSlope(0f, out blocked);
+
+        float slope = fromCell.slopeOutgoing[dirIndex];
+        return unitType.EvaluateSlope(slope, out blocked);
+    }
+
+    /// <summary>
+    /// Maps an 8-neighbour delta (each component in {-1, 0, 1}, not both zero) to the
+    /// index in <see cref="CellData.Directions"/>. Returns -1 for invalid deltas.
+    /// </summary>
+    public static int GetDirectionIndex(Vector2Int delta)
+    {
+        for (int i = 0; i < CellData.Directions.Length; i++)
+            if (CellData.Directions[i] == delta) return i;
+        return -1;
     }
 
     static bool CanFit(CellData[,] grid, int w, int h, Vector2Int pos, int unitSize)

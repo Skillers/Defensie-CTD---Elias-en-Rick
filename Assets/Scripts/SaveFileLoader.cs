@@ -1,0 +1,58 @@
+using System.Collections.Generic;
+using System.IO;
+using UnityEngine;
+
+/// <summary>
+/// Lightweight, side-effect-free reader for level save files. Use from scenes that
+/// only need to display saved data (e.g. results screen) — does not touch
+/// <see cref="TerrainDataStore"/> or fire any events.
+/// </summary>
+public static class SaveFileLoader
+{
+    /// <summary>
+    /// Loads and parses <paramref name="fileName"/> from <see cref="Application.persistentDataPath"/>.
+    /// Returns null on any failure (missing file, parse error, empty name); logs the cause.
+    /// </summary>
+    public static SaveData LoadSave(string fileName)
+    {
+        if (string.IsNullOrEmpty(fileName))
+        {
+            Debug.LogError("SaveFileLoader.LoadSave: fileName is empty.");
+            return null;
+        }
+
+        string path = Path.Combine(Application.persistentDataPath, fileName);
+        if (!File.Exists(path))
+        {
+            Debug.LogError($"SaveFileLoader.LoadSave: file not found at {path}.");
+            return null;
+        }
+
+        try
+        {
+            string json = File.ReadAllText(path);
+            return JsonUtility.FromJson<SaveData>(json);
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogError($"SaveFileLoader.LoadSave failed: {e.Message}");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Builds a name → BiomeSO map from every BiomeSO asset under Resources/Biomes.
+    /// Mirrors <see cref="TerrainDataStore"/>'s lookup so colors and movement costs match
+    /// what gameplay used.
+    /// </summary>
+    public static IReadOnlyDictionary<string, BiomeSO> LoadBiomeLookup()
+    {
+        Dictionary<string, BiomeSO> map = new Dictionary<string, BiomeSO>();
+        foreach (BiomeSO b in Resources.LoadAll<BiomeSO>("Biomes"))
+        {
+            if (b != null && !string.IsNullOrEmpty(b.biomeName))
+                map[b.biomeName] = b;
+        }
+        return map;
+    }
+}

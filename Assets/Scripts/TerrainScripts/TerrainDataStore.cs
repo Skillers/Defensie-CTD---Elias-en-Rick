@@ -46,8 +46,16 @@ public class TerrainDataStore : MonoBehaviour
     public event System.Action OnSaveCreated;
     public event System.Action<string> OnSaveFailed;
 
+    // Subscribers populate extra fields on the SaveData payload right before
+    // it is written to disk (build) or read back into the scene (apply).
+    // Apply fires after the grid has been restored, so handlers can rely on
+    // grid-dependent queries like GetRoundedHeight.
+    public event System.Action<SaveData> OnBuildingSaveData;
+    public event System.Action<SaveData> OnApplyingSaveData;
+
     public string SaveFilePath => Path.Combine(Application.persistentDataPath, saveFileName);
     public bool SaveFileExists => File.Exists(SaveFilePath);
+    public string SaveFileName => saveFileName;
 
 
     Vector2Int? _startCell;
@@ -59,6 +67,12 @@ public class TerrainDataStore : MonoBehaviour
 
     void Awake()
     {
+        // If a MissionSession carried a save name into this scene, prefer it over
+        // the inspector default. Lets the menu pick which level to load while
+        // keeping the standalone-scene fallback intact.
+        if (MissionSession.Instance != null && !string.IsNullOrEmpty(MissionSession.Instance.saveFileName))
+            saveFileName = MissionSession.Instance.saveFileName;
+
         RegisterBiome(baseBiome);
     }
 
@@ -290,6 +304,8 @@ public class TerrainDataStore : MonoBehaviour
             }
         }
 
+        OnBuildingSaveData?.Invoke(data);
+
         return data;
     }
 
@@ -338,6 +354,8 @@ public class TerrainDataStore : MonoBehaviour
 
             SetGrid(restored);
         }
+
+        OnApplyingSaveData?.Invoke(data);
     }
 
     /// <summary>

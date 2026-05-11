@@ -17,4 +17,4 @@ MonoBehaviour:
   defaultMovementCost: 5
   unitWeights:
   - unitType: {fileID: 11400000, guid: a95043a850146a34a9eb4bba141aa8be, type: 2}
-    movementCost: 2
+    movementCost: 4

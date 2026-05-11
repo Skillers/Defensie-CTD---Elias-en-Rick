@@ -45,6 +45,20 @@ public class FlagPlacementTool : MonoBehaviour
     /// <summary>Fires whenever IsActive or CurrentPhase changes.</summary>
     public event Action OnStateChanged;
 
+    void Awake()
+    {
+        // Subscribe in Awake so we're hooked up before TerrainDataStore.Start
+        // fires its auto-load and we'd miss OnSaveLoaded.
+        if (terrainDataStore != null)
+            terrainDataStore.OnSaveLoaded += HandleSaveLoaded;
+    }
+
+    void OnDestroy()
+    {
+        if (terrainDataStore != null)
+            terrainDataStore.OnSaveLoaded -= HandleSaveLoaded;
+    }
+
     /// <summary>Wired to a UI button. Turns the tool on (idempotent).</summary>
     public void Activate()
     {
@@ -150,6 +164,28 @@ public class FlagPlacementTool : MonoBehaviour
             _leftDown = false;
             _rightDown = false;
             Debug.Log("FlagPlacement DEACTIVATED (both flags placed)");
+        }
+
+        OnStateChanged?.Invoke();
+    }
+
+    void HandleSaveLoaded()
+    {
+        if (terrainDataStore == null) return;
+
+        if (terrainDataStore.StartCell.HasValue)
+        {
+            Vector3 worldPos = WorldPosForCell(terrainDataStore.StartCell.Value);
+            SpawnOrMove(ref _startFlagInstance, startFlagPrefab, worldPos, "StartFlag");
+            _startPlaced = true;
+        }
+
+        if (terrainDataStore.EndCell.HasValue)
+        {
+            var prefab = endFlagPrefab != null ? endFlagPrefab : startFlagPrefab;
+            Vector3 worldPos = WorldPosForCell(terrainDataStore.EndCell.Value);
+            SpawnOrMove(ref _endFlagInstance, prefab, worldPos, "EndFlag");
+            _endPlaced = true;
         }
 
         OnStateChanged?.Invoke();
