@@ -1,0 +1,256 @@
+using System.Collections.Generic;
+using UnityEngine;
+using UnityEngine.EventSystems;
+using UnityEngine.InputSystem;
+
+public class ObstaclePlacementManager : MonoBehaviour
+{
+    public static ObstaclePlacementManager Instance { get; private set; }
+
+    [SerializeField] private Camera placementCamera;
+    [SerializeField] private LayerMask terrainLayer;
+    [SerializeField] private Material previewMaterial;
+
+    private ObstacleSO _selected;
+    private List<PlacedObstacle> _placedObstacles = new List<PlacedObstacle>();
+    private List<PlacedObstacle> _selectedObstacles = new List<PlacedObstacle>();
+    private Vector2 _dragStart;
+    private bool _isDragging;
+    private bool _clickedObstacle;
+    private GameObject _previewObject;
+    private Vector3 _lineDragStartWorld;
+    private bool _isDraggingLine;
+
+    private const float MinLineLength = 2f;
+
+    public bool IsDragging => _isDragging;
+    public Vector2 DragStart => _dragStart;
+
+    private void Awake()
+    {
+        if (Instance != null && Instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
+        Instance = this;
+    }
+
+    public void SelectObstacle(ObstacleSO obstacle)
+    {
+        ClearPreview();
+        _selected = obstacle;
+    }
+
+    public void Deselect()
+    {
+        ClearPreview();
+        _selected = null;
+    }
+
+    public void ClearWorldSelection()
+    {
+        foreach (var p in _selectedObstacles)
+            if (p != null) p.SetSelected(false);
+        _selectedObstacles.Clear();
+    }
+
+    private void UpdatePreview(Vector3 worldPos)
+    {
+        if (_previewObject == null)
+        {
+            _previewObject = Instantiate(_selected.prefab);
+            _previewObject.name = "Preview";
+            var col = _previewObject.GetComponentInChildren<Collider>();
+            if (col != null) col.enabled = false;
+            var r = _previewObject.GetComponentInChildren<Renderer>();
+            if (r != null) r.material = previewMaterial;
+        }
+        _previewObject.SetActive(true);
+        _previewObject.transform.position = worldPos;
+    }
+
+    private void ClearPreview()
+    {
+        Destroy(_previewObject);
+        _previewObject = null;
+    }
+
+    private void Update()
+    {
+        if (_selected == null && Mouse.current.leftButton.wasReleasedThisFrame)
+        {
+            if (_isDragging)
+                SelectObstaclesInRect(_dragStart, Mouse.current.position.ReadValue());
+            _isDragging = false;
+        }
+
+        if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
+            return;
+
+        // Escape clears both inventory selection and world selection
+        if (Keyboard.current.escapeKey.wasPressedThisFrame)
+        {
+            Deselect();
+            ClearWorldSelection();
+        }
+
+        if (_selected != null)
+        {
+            Ray ray = placementCamera.ScreenPointToRay(Mouse.current.position.ReadValue());
+            bool didHit = Physics.Raycast(ray, out RaycastHit hit, Mathf.Infinity, terrainLayer);
+
+            if (didHit)
+                UpdatePreview(hit.point);
+            else if (_previewObject != null)
+                _previewObject.SetActive(false);
+
+            if (_selected.placementType == PlacementType.Point)
+            {
+                if (didHit && Mouse.current.leftButton.wasPressedThisFrame)
+                    PlaceObstacle(hit.point);
+            }
+            else if (_selected.placementType == PlacementType.Line)
+            {
+                if (_previewObject != null)
+                {
+                    if (_isDraggingLine && didHit)
+                    {
+                        float dist = Vector3.Distance(_lineDragStartWorld, hit.point);
+                        if (dist >= MinLineLength)
+                        {
+                            float naturalLength = _selected.prefab.GetComponentInChildren<MeshFilter>().sharedMesh.bounds.size.x;
+                            float scaleFactor = dist / naturalLength;
+                            _previewObject.transform.position = (_lineDragStartWorld + hit.point) * 0.5f;
+                            _previewObject.transform.rotation = Quaternion.FromToRotation(Vector3.right, (hit.point - _lineDragStartWorld).normalized);
+                            _previewObject.transform.localScale = new Vector3(scaleFactor, 1f, 1f);
+                        }
+                        else
+                        {
+                            _previewObject.transform.position = _lineDragStartWorld;
+                            _previewObject.transform.rotation = _selected.prefab.transform.rotation;
+                            _previewObject.transform.localScale = _selected.prefab.transform.localScale;
+                        }
+                    }
+                    else if (!_isDraggingLine)
+                    {
+                        _previewObject.transform.rotation = _selected.prefab.transform.rotation;
+                        _previewObject.transform.localScale = _selected.prefab.transform.localScale;
+                    }
+                }
+
+                if (Mouse.current.leftButton.wasPressedThisFrame && didHit)
+                {
+                    _lineDragStartWorld = hit.point;
+                    _isDraggingLine = true;
+                }
+
+                if (_isDraggingLine && Mouse.current.leftButton.wasReleasedThisFrame)
+                {
+                    if (didHit)
+                        PlaceLine(_lineDragStartWorld, hit.point);
+                    _isDraggingLine = false;
+                }
+            }
+            return;
+        }
+
+        var mouse = Mouse.current;
+        var mousePos = mouse.position.ReadValue();
+
+        if (mouse.leftButton.wasPressedThisFrame)
+        {
+            _dragStart = mousePos;
+            _isDragging = false;
+
+            // Single click — raycast all layers to find PlacedObstacle or terrain
+            Ray clickRay = placementCamera.ScreenPointToRay(mousePos);
+            if (Physics.Raycast(clickRay, out RaycastHit clickHit, Mathf.Infinity))
+            {
+                var obstacle = clickHit.collider.GetComponentInParent<PlacedObstacle>();
+                if (obstacle != null)
+                {
+                    ClearWorldSelection();
+                    _selectedObstacles.Add(obstacle);
+                    obstacle.SetSelected(true);
+                    _clickedObstacle = true;
+                }
+                else
+                {
+                    ClearWorldSelection();
+                    _clickedObstacle = false;
+                }
+            }
+            else
+            {
+                _clickedObstacle = false;
+            }
+        }
+
+        if (mouse.leftButton.isPressed)
+        {
+            if (!_isDragging && Vector2.Distance(mousePos, _dragStart) > 10f)
+                _isDragging = true;
+        }
+
+        if (Keyboard.current.deleteKey.wasPressedThisFrame)
+        {
+            foreach (var p in _selectedObstacles)
+            {
+                if (p == null) continue;
+                _placedObstacles.Remove(p);
+                Destroy(p.gameObject);
+            }
+            _selectedObstacles.Clear();
+        }
+    }
+
+    private void PlaceObstacle(Vector3 position)
+    {
+        var go = Instantiate(_selected.prefab, position, _selected.prefab.transform.rotation);
+        var placed = go.AddComponent<PlacedObstacle>();
+        placed.obstacleSO = _selected;
+        _placedObstacles.Add(placed);
+    }
+
+    private void PlaceLine(Vector3 start, Vector3 end)
+    {
+        float distance = Vector3.Distance(start, end);
+        if (distance < MinLineLength)
+        {
+            var go = Instantiate(_selected.prefab, start, _selected.prefab.transform.rotation);
+            var placed = go.AddComponent<PlacedObstacle>();
+            placed.obstacleSO = _selected;
+            _placedObstacles.Add(placed);
+            return;
+        }
+        float naturalLength = _selected.prefab.GetComponentInChildren<MeshFilter>().sharedMesh.bounds.size.x;
+        float scaleFactor = distance / naturalLength;
+        var goLine = Instantiate(_selected.prefab, (start + end) * 0.5f,
+            Quaternion.FromToRotation(Vector3.right, (end - start).normalized));
+        goLine.transform.localScale = new Vector3(scaleFactor, 1f, 1f);
+        var placedLine = goLine.AddComponent<PlacedObstacle>();
+        placedLine.obstacleSO = _selected;
+        _placedObstacles.Add(placedLine);
+    }
+
+    private void SelectObstaclesInRect(Vector2 screenStart, Vector2 screenEnd)
+    {
+        ClearWorldSelection();
+        float minX = Mathf.Min(screenStart.x, screenEnd.x);
+        float minY = Mathf.Min(screenStart.y, screenEnd.y);
+        float maxX = Mathf.Max(screenStart.x, screenEnd.x);
+        float maxY = Mathf.Max(screenStart.y, screenEnd.y);
+        var rect = new Rect(minX, minY, maxX - minX, maxY - minY);
+        foreach (var placed in _placedObstacles)
+        {
+            if (placed == null) continue;
+            var screenPos = (Vector2)placementCamera.WorldToScreenPoint(placed.transform.position);
+            if (rect.Contains(screenPos))
+            {
+                _selectedObstacles.Add(placed);
+                placed.SetSelected(true);
+            }
+        }
+    }
+}

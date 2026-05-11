@@ -319,6 +319,7 @@ public class MarchingCubesTerrain : MonoBehaviour
         ApplyBiomeColors(mesh, _extX, _extZ);
 
         var chunkGO = new GameObject(mesh.name);
+        chunkGO.layer = gameObject.layer;
         chunkGO.transform.SetParent(transform, false);
         chunkGO.AddComponent<MeshFilter>().sharedMesh = mesh;
         chunkGO.AddComponent<MeshRenderer>().sharedMaterial = _sharedMat;
