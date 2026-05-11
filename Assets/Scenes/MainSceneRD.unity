@@ -2900,10 +2900,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6c52783c89002ed4092c6e11f7c386ac, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MainMenu
-  levelEditorScene: {fileID: 102900000, guid: 71de24346a9279246b1b6ed7150cf6b9, type: 3}
+  levelEditorScene: {fileID: 102900000, guid: 0ea4656887d959c4882cc39fbb0da428, type: 3}
   gameScene: {fileID: 102900000, guid: 9f0cf5ecf1ed4674a906b8ea129bcb98, type: 3}
-  levelEditorSceneName: TerrainTest
+  levelEditorSceneName: TerrainTestExpanded
   gameSceneName: UiScene
+  saveFileName: level2.json
   levelEditorButton: {fileID: 1341155124}
   gameButton: {fileID: 1088015060}
   notReadyButton1: {fileID: 1694068530}
