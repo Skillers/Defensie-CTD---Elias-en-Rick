@@ -4,13 +4,7 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="2719ef14-fe85-4389-85f2-34cbfe22855b" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Astarpathfinder.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Astarpathfinder.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/MainMenu.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/MainMenu.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/TerrainScripts/TerrainDataStore.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/TerrainScripts/TerrainDataStore.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/UnitMover.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/UnitMover.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/UnitSpawner.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/UnitSpawner.cs" afterDir="false" />
-    </list>
+    <list default="true" id="2719ef14-fe85-4389-85f2-34cbfe22855b" name="Changes" comment="" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -108,6 +102,7 @@
       <workItem from="1776061171996" duration="7454000" />
       <workItem from="1777976776241" duration="2713000" />
       <workItem from="1778482486040" duration="6000" />
+      <workItem from="1778489640034" duration="13000" />
     </task>
     <servers />
   </component>
