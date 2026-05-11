@@ -19,6 +19,8 @@ public class UnitMover : MonoBehaviour
     public UnitTypeSO unitType;
     [Tooltip("Square footprint in cells passed to A*'s CanFit check.")]
     public int unitSize = 5;
+    [Tooltip("Set by UnitSpawner. Used as the key when registering this unit's plan in MissionSession.")]
+    [HideInInspector] public int unitId;
 
     [Header("Movement")]
     public float moveSpeed   = 6f;
@@ -47,6 +49,9 @@ public class UnitMover : MonoBehaviour
 
     Vector2Int currentGoal;
     bool       hasGoal;
+
+    UnitPathPlan _activePlan;
+    float        _planStartTime;
 
     /// <summary>
     /// Configure the mover and start moving toward <paramref name="goalCell"/>.
@@ -85,12 +90,16 @@ public class UnitMover : MonoBehaviour
             terrainDataStore.GridHeight,
             startCell,
             goalCell,
+            out float totalCost,
             unitSize: unitSize,
             unitType: unitType
         );
 
-        if (newPath.Count <= 1)
+        bool failed = newPath.Count <= 1;
+        if (failed)
             Debug.LogWarning($"UnitMover: no path found from {startCell} to {goalCell} (or already at goal).");
+
+        RegisterPlan(startCell, goalCell, newPath, null, totalCost, failed);
 
         StartFollowingPath(newPath);
     }
@@ -128,22 +137,27 @@ public class UnitMover : MonoBehaviour
         hasGoal     = true;
 
         Vector2Int startCell = terrainDataStore.WorldToGrid(transform.position);
-        List<Vector2Int> combined = BuildRoutePath(startCell, avenueWaypoints, finalGoal);
+        List<Vector2Int> combined = BuildRoutePath(startCell, avenueWaypoints, finalGoal, out float totalCost);
 
         if (combined.Count <= 1)
         {
             Debug.LogWarning($"UnitMover.GoToRoute: route through {avenueWaypoints?.Count ?? 0} avenue waypoint(s) failed; falling back to direct path to {finalGoal}.");
+            // Register the route attempt as failed so the session reflects what was tried.
+            RegisterPlan(startCell, finalGoal, combined, avenueWaypoints, 0f, failed: true);
             GoTo(finalGoal);
             return;
         }
 
+        RegisterPlan(startCell, finalGoal, combined, avenueWaypoints, totalCost, failed: false);
+
         StartFollowingPath(combined);
     }
 
-    List<Vector2Int> BuildRoutePath(Vector2Int startCell, IReadOnlyList<Vector2Int> avenueWaypoints, Vector2Int finalGoal)
+    List<Vector2Int> BuildRoutePath(Vector2Int startCell, IReadOnlyList<Vector2Int> avenueWaypoints, Vector2Int finalGoal, out float totalCost)
     {
         List<Vector2Int> combined = new List<Vector2Int>();
         Vector2Int from = startCell;
+        totalCost = 0f;
 
         int stops = avenueWaypoints?.Count ?? 0;
         for (int i = 0; i <= stops; i++)
@@ -155,12 +169,19 @@ public class UnitMover : MonoBehaviour
                 terrainDataStore.GridWidth,
                 terrainDataStore.GridHeight,
                 from, to,
+                out float legCost,
                 unitSize: unitSize,
                 unitType: unitType
             );
 
             // A* returns an empty list when no path exists — treat the whole route as failed.
-            if (segment.Count == 0) return new List<Vector2Int>();
+            if (segment.Count == 0)
+            {
+                totalCost = 0f;
+                return new List<Vector2Int>();
+            }
+
+            totalCost += legCost;
 
             // First leg: keep every cell. Later legs: skip the first cell which duplicates the
             // previous leg's last cell, otherwise the unit pauses on the join.
@@ -184,6 +205,13 @@ public class UnitMover : MonoBehaviour
             waypointIndex = 1;
             currentTarget = terrainDataStore.GridToWorld(path[waypointIndex]);
             moving        = true;
+
+            if (_activePlan != null)
+            {
+                _planStartTime = Time.time;
+                _activePlan.actualPath.Clear();
+                _activePlan.actualPath.Add(path[0]);
+            }
         }
         else
         {
@@ -259,42 +287,73 @@ public class UnitMover : MonoBehaviour
     {
         if (!moving) return;
 
+        // Rotation runs once per frame using the current bearing — visual only,
+        // doesn't gate movement.
         Vector3 toTarget = currentTarget - transform.position;
         toTarget.y = 0f;
-        float dist = toTarget.magnitude;
+        Vector3 desiredDir = toTarget.sqrMagnitude > 0f ? toTarget.normalized : moveDirection;
+        moveDirection = desiredDir;
 
-        if (dist > 0.05f)
+        squadDirection = Vector3.RotateTowards(
+            squadDirection,
+            desiredDir,
+            turnSpeed * Mathf.Deg2Rad * Time.deltaTime,
+            0f
+        );
+        transform.rotation = Quaternion.LookRotation(squadDirection);
+
+        // Consume the frame's time budget across as many waypoints as the speed allows.
+        // Carrying the remainder between waypoints prevents per-step rounding from
+        // accumulating into a measurable drift between actualSeconds and estimatedSeconds.
+        float remainingTime = Time.deltaTime;
+        while (remainingTime > 0f && moving)
         {
-            Vector3 desiredDir = toTarget.normalized;
-            moveDirection = desiredDir;
-
-            squadDirection = Vector3.RotateTowards(
-                squadDirection,
-                desiredDir,
-                turnSpeed * Mathf.Deg2Rad * Time.deltaTime,
-                0f
-            );
-            transform.rotation = Quaternion.LookRotation(squadDirection);
+            Vector3 delta = currentTarget - transform.position;
+            delta.y = 0f;
+            float dist = delta.magnitude;
 
             float effectiveSpeed = ResolveStepSpeed();
-            transform.position += desiredDir * effectiveSpeed * Time.deltaTime;
-            SnapToTerrain();
-        }
-        else
-        {
-            transform.position = currentTarget;
-            SnapToTerrain();
-            currentCell = path[waypointIndex];
-            waypointIndex++;
+            if (effectiveSpeed <= 0f) break;  // blocked / zero cost — can't make progress this frame
 
-            if (waypointIndex >= path.Count)
+            float canMove = effectiveSpeed * remainingTime;
+
+            if (canMove < dist)
             {
-                moving = false;
-                pathLine.positionCount = 0;
-                return;
+                // Partial step inside the current cell — consume the whole frame.
+                Vector3 dir = dist > 0f ? delta / dist : Vector3.zero;
+                transform.position += dir * canMove;
+                SnapToTerrain();
+                remainingTime = 0f;
             }
+            else
+            {
+                // Reached this waypoint with time to spare. Snap exactly to it, charge only
+                // the time it actually took, then loop to spend the rest on the next cell.
+                transform.position = currentTarget;
+                SnapToTerrain();
+                currentCell = path[waypointIndex];
 
-            currentTarget = terrainDataStore.GridToWorld(path[waypointIndex]);
+                if (_activePlan != null) _activePlan.actualPath.Add(path[waypointIndex]);
+
+                remainingTime -= dist / effectiveSpeed;
+                waypointIndex++;
+
+                if (waypointIndex >= path.Count)
+                {
+                    moving = false;
+                    pathLine.positionCount = 0;
+
+                    if (_activePlan != null)
+                    {
+                        _activePlan.actualSeconds = Time.time - _planStartTime;
+                        _activePlan.completed     = true;
+                        _activePlan               = null;
+                    }
+                    return;
+                }
+
+                currentTarget = terrainDataStore.GridToWorld(path[waypointIndex]);
+            }
         }
     }
 
@@ -324,5 +383,35 @@ public class UnitMover : MonoBehaviour
         Vector3 p = transform.position;
         p.y = y;
         transform.position = p;
+    }
+
+    void RegisterPlan(Vector2Int startCell, Vector2Int goalCell, List<Vector2Int> walkPath,
+                      IReadOnlyList<Vector2Int> requestedWaypoints, float totalCost, bool failed)
+    {
+        float seconds = failed
+            ? float.PositiveInfinity
+            : AStarPathfinder.CostToSeconds(totalCost, terrainDataStore.step, moveSpeed);
+
+        UnitPathPlan plan = new UnitPathPlan
+        {
+            unitId             = unitId,
+            startCell          = startCell,
+            goalCell           = goalCell,
+            path               = walkPath != null ? new List<Vector2Int>(walkPath) : new List<Vector2Int>(),
+            estimatedSeconds   = seconds,
+            failed             = failed,
+            recordedAt         = Time.time,
+        };
+
+        if (requestedWaypoints != null)
+            plan.requestedWaypoints = new List<Vector2Int>(requestedWaypoints);
+
+        // Track this plan so Update can fill in actualPath / actualSeconds as the unit walks.
+        // Each new plan resets tracking — actuals are scoped to the current walk.
+        _activePlan = failed ? null : plan;
+
+        // Lazy-create the session so it works both for menu-driven play (where the session
+        // is pre-populated with a save file name) and direct in-scene play (no menu involved).
+        MissionSession.GetOrCreate().RegisterPlan(plan);
     }
 }

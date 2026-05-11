@@ -36,6 +36,8 @@ public class UnitSpawner : MonoBehaviour
 
     GameObject _spawned;
 
+    static int _nextUnitId = 1;
+
     void Awake()
     {
         // Prefer OnBuildComplete: data-only OnSaveLoaded fires before the terrain mesh exists,
@@ -94,6 +96,8 @@ public class UnitSpawner : MonoBehaviour
             Debug.LogError("UnitSpawner: spawned prefab has no UnitMover component on its root.");
             return;
         }
+
+        mover.unitId = _nextUnitId++;
 
         AvenueData picked = PickRandomAvenue();
         if (picked == null)

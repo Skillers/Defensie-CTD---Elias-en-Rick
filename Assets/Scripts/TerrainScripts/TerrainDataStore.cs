@@ -55,6 +55,7 @@ public class TerrainDataStore : MonoBehaviour
 
     public string SaveFilePath => Path.Combine(Application.persistentDataPath, saveFileName);
     public bool SaveFileExists => File.Exists(SaveFilePath);
+    public string SaveFileName => saveFileName;
 
 
     Vector2Int? _startCell;
@@ -66,6 +67,12 @@ public class TerrainDataStore : MonoBehaviour
 
     void Awake()
     {
+        // If a MissionSession carried a save name into this scene, prefer it over
+        // the inspector default. Lets the menu pick which level to load while
+        // keeping the standalone-scene fallback intact.
+        if (MissionSession.Instance != null && !string.IsNullOrEmpty(MissionSession.Instance.saveFileName))
+            saveFileName = MissionSession.Instance.saveFileName;
+
         RegisterBiome(baseBiome);
     }
 

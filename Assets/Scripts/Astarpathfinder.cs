@@ -17,6 +17,9 @@ public static class AStarPathfinder
     /// <summary>
     /// Returns a list of grid positions from start to goal (inclusive).
     /// Returns empty list if no path found.
+    /// <paramref name="totalCost"/> is set to the goal node's accumulated A* gCost on success,
+    /// or 0 when no path exists. Multiply by cell step and divide by move speed to get seconds —
+    /// see <see cref="CostToSeconds"/>.
     /// Supports 8-directional movement; diagonal steps cost sqrt(2) * terrain cost.
     /// Step cost is also multiplied by the unit's slope rule for the outgoing direction
     /// of the cell being stepped from. A blocked slope rule prunes the neighbour entirely.
@@ -25,6 +28,7 @@ public static class AStarPathfinder
     /// </summary>
     public static List<Vector2Int> FindPath(CellData[,] grid, int gridWidth, int gridHeight,
                                             Vector2Int start, Vector2Int goal,
+                                            out float totalCost,
                                             int unitSize = 5, UnitTypeSO unitType = null)
     {
         var open   = new List<Node>();
@@ -42,7 +46,10 @@ public static class AStarPathfinder
             closed.Add(current.pos);
 
             if (current.pos == goal)
+            {
+                totalCost = current.gCost;
                 return BuildPath(current);
+            }
 
             CellData fromCell = grid[current.pos.x, current.pos.y];
 
@@ -79,8 +86,18 @@ public static class AStarPathfinder
             }
         }
 
+        totalCost = 0f;
         return new List<Vector2Int>();
     }
+
+    /// <summary>
+    /// Converts an A* total cost (sum of per-step weighted cell distances) into seconds
+    /// of travel time for a unit moving at <paramref name="moveSpeed"/> world units per second
+    /// on a grid with <paramref name="cellStep"/> world units between adjacent cells.
+    /// Returns +infinity when moveSpeed is non-positive.
+    /// </summary>
+    public static float CostToSeconds(float totalCost, float cellStep, float moveSpeed)
+        => moveSpeed > 0f ? totalCost * cellStep / moveSpeed : float.PositiveInfinity;
 
     /// <summary>
     /// Returns the slope multiplier for stepping from <paramref name="fromCell"/> in the given delta direction.
