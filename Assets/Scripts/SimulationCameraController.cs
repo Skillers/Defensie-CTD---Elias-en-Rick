@@ -4,17 +4,25 @@ using UnityEngine.InputSystem;
 public class SimulationCameraController : MonoBehaviour
 {
     [SerializeField] float panSpeed = 25f;
+    [SerializeField] float panHeightScale = 220f;
     [SerializeField] float zoomSpeed = 25f;
-    [SerializeField] float maxZoom = 100f;
-    [SerializeField] private Camera placementCamera;
-    [SerializeField] private float minHeightAboveTerrain = 10f;
-    [SerializeField] private LayerMask terrainLayerMask;
+    [SerializeField] float minY = 0f;
+    [SerializeField] float maxY = 250f;
+    [SerializeField] float startDistance = 200f;
+    [SerializeField] float startAngle = 45f;
+    [SerializeField] float panBottomBuffer = 50f;
+    [SerializeField] private TerrainDataStore terrainDataStore;
 
     private Vector2 _lastMousePos;
 
     private void Awake()
     {
-        transform.rotation = Quaternion.Euler(90f, 0f, 0f);
+        if (terrainDataStore == null)
+            terrainDataStore = FindFirstObjectByType<TerrainDataStore>();
+
+        float rad = startAngle * Mathf.Deg2Rad;
+        transform.position = new Vector3(0f, Mathf.Sin(rad) * startDistance, -Mathf.Cos(rad) * startDistance);
+        transform.rotation = Quaternion.Euler(startAngle, 0f, 0f);
     }
 
     private void Update()
@@ -28,63 +36,28 @@ public class SimulationCameraController : MonoBehaviour
         {
             Vector2 currentPos = mouse.position.ReadValue();
             Vector2 delta = currentPos - _lastMousePos;
-            transform.position += new Vector3(-delta.x, 0f, -delta.y) * panSpeed * (transform.position.y / 220f) * Time.deltaTime;
+            transform.position += new Vector3(-delta.x, 0f, -delta.y) * panSpeed * (transform.position.y / panHeightScale);
             _lastMousePos = currentPos;
         }
 
         float scroll = mouse.scroll.ReadValue().y;
         if (scroll != 0f)
-        {
-            float targetY = transform.position.y - (scroll * zoomSpeed * Time.deltaTime);
-            targetY = Mathf.Min(targetY, maxZoom);
+            transform.position += Vector3.down * (scroll * zoomSpeed);
 
-            float highestHitY = float.MinValue;
-            Vector3[] corners = new Vector3[]
-            {
-                placementCamera.ScreenToWorldPoint(new Vector3(0, 0, 0)),
-                placementCamera.ScreenToWorldPoint(new Vector3(Screen.width, 0, 0)),
-                placementCamera.ScreenToWorldPoint(new Vector3(0, Screen.height, 0)),
-                placementCamera.ScreenToWorldPoint(new Vector3(Screen.width, Screen.height, 0))
-            };
-            foreach (var corner in corners)
-            {
-                Vector3 origin = new Vector3(corner.x, transform.position.y, corner.z);
-                if (Physics.Raycast(new Ray(origin, Vector3.down), out RaycastHit hit, Mathf.Infinity, terrainLayerMask))
-                    highestHitY = Mathf.Max(highestHitY, hit.point.y);
-            }
-            if (highestHitY > float.MinValue)
-            {
-                float minY = highestHitY + minHeightAboveTerrain;
-                targetY = Mathf.Max(targetY, minY);
-            }
-
-            transform.position = new Vector3(transform.position.x, targetY, transform.position.z);
-        }
-
-        ClampToTerrain();
+        ClampPosition();
     }
 
-    private void ClampToTerrain()
+    private void ClampPosition()
     {
         Vector3 pos = transform.position;
+        pos.y = Mathf.Clamp(pos.y, minY, maxY);
 
-        float highestHitY = float.MinValue;
-        Vector3[] corners = new Vector3[]
+        if (terrainDataStore != null)
         {
-            placementCamera.ScreenToWorldPoint(new Vector3(0, 0, 0)),
-            placementCamera.ScreenToWorldPoint(new Vector3(Screen.width, 0, 0)),
-            placementCamera.ScreenToWorldPoint(new Vector3(0, Screen.height, 0)),
-            placementCamera.ScreenToWorldPoint(new Vector3(Screen.width, Screen.height, 0))
-        };
-        foreach (var corner in corners)
-        {
-            Vector3 origin = new Vector3(corner.x, pos.y, corner.z);
-            if (Physics.Raycast(new Ray(origin, Vector3.down), out RaycastHit hit, Mathf.Infinity, terrainLayerMask))
-                highestHitY = Mathf.Max(highestHitY, hit.point.y);
+            Vector3 mapCenter = terrainDataStore.transform.position;
+            pos.x = Mathf.Clamp(pos.x, mapCenter.x - terrainDataStore.extentX, mapCenter.x + terrainDataStore.extentX);
+            pos.z = Mathf.Clamp(pos.z, mapCenter.z - terrainDataStore.extentZ - panBottomBuffer, mapCenter.z + terrainDataStore.extentZ);
         }
-        if (highestHitY > float.MinValue)
-            pos.y = Mathf.Max(pos.y, highestHitY + minHeightAboveTerrain);
-        pos.y = Mathf.Min(pos.y, maxZoom);
 
         transform.position = pos;
     }
