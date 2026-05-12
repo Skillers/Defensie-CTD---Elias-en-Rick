@@ -10,17 +10,21 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 2ad699f71fa246743a6f2a28a79bae9a, type: 3}
-  m_Name: NewUnitType
+  m_Name: Infantry
   m_EditorClassIdentifier: Assembly-CSharp::UnitTypeSO
   typeName: Infantry
   useAbsoluteSlope: 0
   defaultSlopeMultiplier: 1
   slopeRules:
   - minSlopeDeg: 5
-    maxSlopeDeg: 20
+    maxSlopeDeg: 15
     costMultiplier: 3
     blocked: 0
   - minSlopeDeg: -20
     maxSlopeDeg: -5
     costMultiplier: 0.8
+    blocked: 0
+  - minSlopeDeg: -40
+    maxSlopeDeg: -20
+    costMultiplier: 1
     blocked: 1

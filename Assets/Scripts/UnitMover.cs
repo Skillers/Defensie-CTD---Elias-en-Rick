@@ -410,8 +410,13 @@ public class UnitMover : MonoBehaviour
         // Each new plan resets tracking — actuals are scoped to the current walk.
         _activePlan = failed ? null : plan;
 
-        // Lazy-create the session so it works both for menu-driven play (where the session
-        // is pre-populated with a save file name) and direct in-scene play (no menu involved).
-        MissionSession.GetOrCreate().RegisterPlan(plan);
+        // The unit owns the session lifecycle: this is the only place a MissionSession is created.
+        if (MissionSession.Instance == null)
+            new GameObject("MissionSession").AddComponent<MissionSession>();
+
+        if (terrainDataStore != null)
+            MissionSession.Instance.saveFileName = terrainDataStore.SaveFileName;
+
+        MissionSession.Instance.RegisterPlan(plan);
     }
 }

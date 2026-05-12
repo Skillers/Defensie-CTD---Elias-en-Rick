@@ -12,10 +12,6 @@ public class MainMenu : MonoBehaviour
     [SerializeField, HideInInspector] private string levelEditorSceneName = "MainSceneRD";
     [SerializeField, HideInInspector] private string gameSceneName = "SampleScene";
 
-    [Header("Save File")]
-    [Tooltip("Save file name handed to the destination scene via MissionSession. The TerrainDataStore there reads it instead of its inspector default.")]
-    [SerializeField] private string saveFileName = "level.json";
-
 #if UNITY_EDITOR
     private void OnValidate()
     {
@@ -62,13 +58,11 @@ public class MainMenu : MonoBehaviour
 
     public void LoadLevelEditor()
     {
-        MissionSession.GetOrCreate().saveFileName = saveFileName;
         SceneManager.LoadScene(levelEditorSceneName);
     }
 
     public void LoadGame()
     {
-        MissionSession.GetOrCreate().saveFileName = saveFileName;
         SceneManager.LoadScene(gameSceneName);
     }
 

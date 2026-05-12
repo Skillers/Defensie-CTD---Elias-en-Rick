@@ -2904,7 +2904,6 @@ MonoBehaviour:
   gameScene: {fileID: 102900000, guid: 9f0cf5ecf1ed4674a906b8ea129bcb98, type: 3}
   levelEditorSceneName: TerrainTestExpanded
   gameSceneName: UiScene
-  saveFileName: level2.json
   levelEditorButton: {fileID: 1341155124}
   gameButton: {fileID: 1088015060}
   notReadyButton1: {fileID: 1694068530}

@@ -3,35 +3,25 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 
 /// <summary>
-/// Single, persistent-for-one-scene-transition session carrier. Created in the menu
-/// scene before <see cref="SceneManager.LoadScene(string)"/>, marked DontDestroyOnLoad
-/// so it survives into the destination scene, then re-parented into that scene on the
-/// first sceneLoaded event so it dies naturally with the next scene change.
-/// Carries the save file name into the destination scene's <see cref="TerrainDataStore"/>
-/// and collects per-unit <see cref="UnitPathPlan"/> records as units pathfind.
+/// Single, persistent-for-one-scene-transition session carrier. Created by the first
+/// <see cref="UnitMover"/> that registers a plan — that is the only spawn path. Marked
+/// DontDestroyOnLoad so it survives the gameplay → results transition, then re-parented
+/// into the next loaded scene on the first sceneLoaded event so it dies naturally with
+/// the scene change after that. Carries the save file name (set by the creating unit
+/// from its <see cref="TerrainDataStore"/>) into the results scene and collects per-unit
+/// <see cref="UnitPathPlan"/> records as units pathfind.
 /// </summary>
 public class MissionSession : MonoBehaviour
 {
     public static MissionSession Instance { get; private set; }
 
-    /// <summary>Save file the destination scene's TerrainDataStore should load.</summary>
+    /// <summary>Save file the unit's TerrainDataStore loaded — read by the results scene.</summary>
     public string saveFileName;
 
     [SerializeField] List<UnitPathPlan> _plans = new List<UnitPathPlan>();
 
     /// <summary>Read-only view of every plan registered this session.</summary>
     public IReadOnlyList<UnitPathPlan> Plans => _plans;
-
-    /// <summary>
-    /// Returns the existing session or lazily creates one. Use from menu-scene
-    /// transition code to populate <see cref="saveFileName"/> just before LoadScene.
-    /// </summary>
-    public static MissionSession GetOrCreate()
-    {
-        if (Instance != null) return Instance;
-        var go = new GameObject("MissionSession");
-        return go.AddComponent<MissionSession>();
-    }
 
     void Awake()
     {
@@ -43,14 +33,6 @@ public class MissionSession : MonoBehaviour
         Instance = this;
         DontDestroyOnLoad(gameObject);
         SceneManager.sceneLoaded += OnSceneLoaded;
-
-        // Direct-in-scene play (no menu bootstrap): fall back to whatever the scene's
-        // TerrainDataStore is configured to load, so the save name isn't empty.
-        if (string.IsNullOrEmpty(saveFileName))
-        {
-            TerrainDataStore tds = FindFirstObjectByType<TerrainDataStore>();
-            if (tds != null) saveFileName = tds.SaveFileName;
-        }
     }
 
     void OnDestroy()

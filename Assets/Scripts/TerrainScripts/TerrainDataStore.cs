@@ -67,12 +67,6 @@ public class TerrainDataStore : MonoBehaviour
 
     void Awake()
     {
-        // If a MissionSession carried a save name into this scene, prefer it over
-        // the inspector default. Lets the menu pick which level to load while
-        // keeping the standalone-scene fallback intact.
-        if (MissionSession.Instance != null && !string.IsNullOrEmpty(MissionSession.Instance.saveFileName))
-            saveFileName = MissionSession.Instance.saveFileName;
-
         RegisterBiome(baseBiome);
     }
 
