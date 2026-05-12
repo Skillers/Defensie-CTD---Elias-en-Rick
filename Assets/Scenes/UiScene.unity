@@ -1442,14 +1442,19 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 29ef13fd5fe626c4b9ff4e0779b4994a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SimulationCameraController
-  panSpeed: 0.01
-  panHeightScale: 5
   zoomSpeed: 8
+  keyboardPanSpeed: 0.5
+  yawSpeed: 0.3
+  pitchSpeed: 0.3
+  minAngle: 10
+  maxAngle: 89
   minY: 0
   maxY: 250
   startDistance: 200
-  startAngle: 45
+  startAngle: 55
   panBottomBuffer: 50
+  orbSize: 1.5
+  orbColor: {r: 0, g: 1, b: 1, a: 1}
   terrainDataStore: {fileID: 87598852}
 --- !u!1001 &653818736
 PrefabInstance:
