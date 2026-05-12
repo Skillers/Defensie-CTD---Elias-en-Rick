@@ -36,14 +36,16 @@ public class SimulationCameraController : MonoBehaviour
         {
             Vector2 currentPos = mouse.position.ReadValue();
             Vector2 delta = currentPos - _lastMousePos;
-            transform.position += new Vector3(-delta.x, 0f, -delta.y) * panSpeed * (transform.position.y / panHeightScale);
+            transform.position += new Vector3(-delta.x, 0f, -delta.y) * panSpeed * (transform.position.y * panHeightScale);
             _lastMousePos = currentPos;
         }
 
+        if(!mouse.middleButton.isPressed){
         float scroll = mouse.scroll.ReadValue().y;
         if (scroll != 0f)
             transform.position += Vector3.down * (scroll * zoomSpeed);
-
+        }
+        
         ClampPosition();
     }
 
