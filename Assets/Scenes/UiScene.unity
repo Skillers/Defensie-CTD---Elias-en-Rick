@@ -1444,17 +1444,23 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::SimulationCameraController
   zoomSpeed: 8
   keyboardPanSpeed: 0.5
+  keyboardYawSpeed: 60
   yawSpeed: 0.3
   pitchSpeed: 0.3
   minAngle: 10
   maxAngle: 89
   minY: 0
   maxY: 250
+  groundClearance: 5
+  forwardEdgeBuffer: 0.3
+  backEdgeBuffer: 0.5
+  maxEdgeExtension: 200
   startDistance: 200
   startAngle: 55
-  panBottomBuffer: 50
   orbSize: 1.5
   orbColor: {r: 0, g: 1, b: 1, a: 1}
+  edgeWallColor: {r: 0.21568629, g: 0.21568629, b: 0.21568629, a: 0}
+  edgeWallHeight: 250
   terrainDataStore: {fileID: 87598852}
 --- !u!1001 &653818736
 PrefabInstance:

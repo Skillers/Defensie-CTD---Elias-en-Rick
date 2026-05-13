@@ -13,6 +13,10 @@ public class SimulationCameraController : MonoBehaviour
     [SerializeField] float maxAngle = 89f;
     [SerializeField] float minY = 0f;
     [SerializeField] float maxY = 250f;
+    [SerializeField] float groundClearance = 5f;
+    [SerializeField] float forwardEdgeBuffer = 0.1f;
+    [SerializeField] float backEdgeBuffer = 1f;
+    [SerializeField] float maxEdgeExtension = 200f;
     [SerializeField] float startDistance = 200f;
     [SerializeField] float startAngle = 45f;
     [SerializeField] float orbSize = 1.5f;
@@ -28,6 +32,7 @@ public class SimulationCameraController : MonoBehaviour
     private bool _orbiting;
     private GameObject _orbVisual;
     private GameObject[] _edgeWalls;
+    private bool _groundFollowing;
 
     private void Awake()
     {
@@ -99,7 +104,10 @@ public class SimulationCameraController : MonoBehaviour
         if (!mouse.middleButton.isPressed)
         {
             if (mouse.rightButton.wasPressedThisFrame)
+            {
                 _grabbing = TryScreenToTerrain(mouse.position.ReadValue(), out _grabWorld);
+                _groundFollowing = false;
+            }
 
             if (mouse.rightButton.isPressed && _grabbing)
             {
@@ -119,7 +127,10 @@ public class SimulationCameraController : MonoBehaviour
         {
             float scroll = mouse.scroll.ReadValue().y;
             if (scroll != 0f)
+            {
+                if (scroll < 0f) _groundFollowing = false;
                 transform.position += transform.forward * (scroll * zoomSpeed);
+            }
         }
 
         HandleOrbit(mouse);
@@ -144,6 +155,7 @@ public class SimulationCameraController : MonoBehaviour
                 _orbVisual.transform.position = _orbitFocal;
                 _orbVisual.SetActive(true);
             }
+            _groundFollowing = false;
         }
 
         if (!mouse.middleButton.isPressed)
@@ -208,10 +220,18 @@ public class SimulationCameraController : MonoBehaviour
         if (kb.qKey.isPressed) dir -= 1f;
         if (dir == 0f) return;
 
+        float angle = dir * keyboardYawSpeed * Time.deltaTime;
+
+        if (_groundFollowing)
+        {
+            transform.Rotate(0f, angle, 0f, Space.World);
+            return;
+        }
+
         Vector2 screenCenter = new Vector2(Screen.width * 0.5f, Screen.height * 0.5f);
         if (!TryScreenToTerrain(screenCenter, out Vector3 focal)) return;
 
-        transform.RotateAround(focal, Vector3.up, dir * keyboardYawSpeed * Time.deltaTime);
+        transform.RotateAround(focal, Vector3.up, angle);
     }
 
     private bool TryScreenToTerrain(Vector2 screen, out Vector3 hit)
@@ -277,6 +297,7 @@ public class SimulationCameraController : MonoBehaviour
     private void ClampPosition()
     {
         Vector3 pos = transform.position;
+        float startY = pos.y;
         pos.y = Mathf.Clamp(pos.y, minY, maxY);
 
         if (terrainDataStore != null)
@@ -285,17 +306,31 @@ public class SimulationCameraController : MonoBehaviour
             Vector3 fwd = transform.forward;
 
             float groundT = (fwd.y < -1e-4f) ? pos.y / -fwd.y : 0f;
-            float dx = fwd.x * groundT;
-            float dz = fwd.z * groundT;
+            float dx = Mathf.Clamp(fwd.x * groundT, -maxEdgeExtension, maxEdgeExtension);
+            float dz = Mathf.Clamp(fwd.z * groundT, -maxEdgeExtension, maxEdgeExtension);
 
-            float minX = mapCenter.x - terrainDataStore.extentX - Mathf.Max(0f, dx);
-            float maxX = mapCenter.x + terrainDataStore.extentX - Mathf.Min(0f, dx);
-            float minZ = mapCenter.z - terrainDataStore.extentZ - Mathf.Max(0f, dz);
-            float maxZ = mapCenter.z + terrainDataStore.extentZ - Mathf.Min(0f, dz);
+            float minX = mapCenter.x - terrainDataStore.extentX - Mathf.Max(0f, dx) * backEdgeBuffer - Mathf.Min(0f, dx) * forwardEdgeBuffer;
+            float maxX = mapCenter.x + terrainDataStore.extentX - Mathf.Min(0f, dx) * backEdgeBuffer - Mathf.Max(0f, dx) * forwardEdgeBuffer;
+            float minZ = mapCenter.z - terrainDataStore.extentZ - Mathf.Max(0f, dz) * backEdgeBuffer - Mathf.Min(0f, dz) * forwardEdgeBuffer;
+            float maxZ = mapCenter.z + terrainDataStore.extentZ - Mathf.Min(0f, dz) * backEdgeBuffer - Mathf.Max(0f, dz) * forwardEdgeBuffer;
 
             pos.x = Mathf.Clamp(pos.x, minX, maxX);
             pos.z = Mathf.Clamp(pos.z, minZ, maxZ);
+
+            float terrainY = terrainDataStore.GetRawHeight(pos);
+            float floorY = terrainY + groundClearance;
+            if (_groundFollowing)
+            {
+                pos.y = floorY;
+            }
+            else if (pos.y < floorY)
+            {
+                pos.y = floorY;
+                _groundFollowing = true;
+            }
         }
+
+        if (_grabbing) _grabWorld.y += pos.y - startY;
 
         transform.position = pos;
     }
