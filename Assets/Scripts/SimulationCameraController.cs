@@ -23,6 +23,12 @@ public class SimulationCameraController : MonoBehaviour
     [SerializeField] bool showLastTerrainOrb = true;
     [SerializeField] Color focalEdgeOrbColor = new Color(0.3f, 0.95f, 0.4f, 1f);
     [SerializeField] bool showFocalEdgeOrb = true;
+    [SerializeField] Color yAlignedOrbColor = new Color(1f, 0.5f, 0.1f, 1f);
+    [SerializeField] bool showYAlignedOrb = true;
+    [SerializeField] bool autoRecenter = true;
+    [SerializeField] float recenterBaseSpeed = 3f;
+    [SerializeField] float recenterDistanceFactor = 1f;
+    [SerializeField] float recenterDeadZone = 0.5f;
     [SerializeField] private TerrainDataStore terrainDataStore;
 
     private Camera _cam;
@@ -34,13 +40,20 @@ public class SimulationCameraController : MonoBehaviour
     private GameObject _focalOrb;
     private GameObject _lastTerrainOrb;
     private GameObject _focalEdgeOrb;
+    private GameObject _yAlignedOrb;
     private bool _groundFollowing;
+
+    public enum TerrainPointSource { None, LastTerrain, FocalEdge }
 
     public Vector3 FocalPoint { get; private set; }
     public Vector3 LastTerrainPoint { get; private set; }
     public bool HasLastTerrainPoint { get; private set; }
     public Vector3 FocalEdgePoint { get; private set; }
     public bool HasFocalEdgePoint { get; private set; }
+    public Vector3 ClosestTerrainPoint { get; private set; }
+    public TerrainPointSource ClosestTerrainSource { get; private set; }
+    public Vector3 YAlignedFocalPoint { get; private set; }
+    public bool HasYAlignedFocalPoint { get; private set; }
 
     public bool ShowFocalOrb
     {
@@ -78,6 +91,20 @@ public class SimulationCameraController : MonoBehaviour
 
     public void ToggleFocalEdgeOrb() => ShowFocalEdgeOrb = !ShowFocalEdgeOrb;
 
+    public bool ShowYAlignedOrb
+    {
+        get => showYAlignedOrb;
+        set
+        {
+            showYAlignedOrb = value;
+            if (_yAlignedOrb != null) _yAlignedOrb.SetActive(value && HasYAlignedFocalPoint);
+        }
+    }
+
+    public void ToggleYAlignedOrb() => ShowYAlignedOrb = !ShowYAlignedOrb;
+
+    public bool AutoRecenter { get => autoRecenter; set => autoRecenter = value; }
+
     private void Awake()
     {
         _cam = GetComponent<Camera>();
@@ -92,6 +119,7 @@ public class SimulationCameraController : MonoBehaviour
         CreateFocalOrb();
         CreateLastTerrainOrb();
         CreateFocalEdgeOrb();
+        CreateYAlignedOrb();
     }
 
     private void OnDestroy()
@@ -100,6 +128,7 @@ public class SimulationCameraController : MonoBehaviour
         if (_focalOrb != null) Destroy(_focalOrb);
         if (_lastTerrainOrb != null) Destroy(_lastTerrainOrb);
         if (_focalEdgeOrb != null) Destroy(_focalEdgeOrb);
+        if (_yAlignedOrb != null) Destroy(_yAlignedOrb);
     }
 
     private void CreateOrbVisual()
@@ -150,11 +179,24 @@ public class SimulationCameraController : MonoBehaviour
         _focalEdgeOrb.SetActive(false);
     }
 
+    private void CreateYAlignedOrb()
+    {
+        _yAlignedOrb = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        _yAlignedOrb.name = "CameraYAlignedFocalPoint";
+        var col = _yAlignedOrb.GetComponent<Collider>();
+        if (col != null) Destroy(col);
+        _yAlignedOrb.transform.localScale = Vector3.one * orbSize;
+        var mr = _yAlignedOrb.GetComponent<MeshRenderer>();
+        if (mr != null) mr.material.color = yAlignedOrbColor;
+        _yAlignedOrb.SetActive(false);
+    }
+
     private void OnValidate()
     {
         if (_focalOrb != null) _focalOrb.SetActive(showFocalOrb);
         if (_lastTerrainOrb != null) _lastTerrainOrb.SetActive(showLastTerrainOrb && HasLastTerrainPoint);
         if (_focalEdgeOrb != null) _focalEdgeOrb.SetActive(showFocalEdgeOrb && HasFocalEdgePoint);
+        if (_yAlignedOrb != null) _yAlignedOrb.SetActive(showYAlignedOrb && HasYAlignedFocalPoint);
     }
 
     private void UpdateFocalPoint()
@@ -182,11 +224,87 @@ public class SimulationCameraController : MonoBehaviour
         }
 
         UpdateFocalEdgePoint();
+        UpdateClosestTerrainPoint();
+        UpdateYAlignedFocalPoint();
+    }
+
+    private void UpdateYAlignedFocalPoint()
+    {
+        bool valid = false;
+
+        if (ClosestTerrainSource != TerrainPointSource.None)
+        {
+            Vector3 origin = transform.position;
+            Vector3 dir = transform.forward;
+            if (dir.y < -1e-6f)
+            {
+                float t = (ClosestTerrainPoint.y - origin.y) / dir.y;
+                if (t > 0f)
+                {
+                    YAlignedFocalPoint = origin + dir * t;
+                    valid = true;
+                }
+            }
+        }
+
+        HasYAlignedFocalPoint = valid;
+
+        if (_yAlignedOrb == null) return;
+        if (valid)
+        {
+            _yAlignedOrb.transform.position = YAlignedFocalPoint;
+            _yAlignedOrb.SetActive(showYAlignedOrb);
+        }
+        else
+        {
+            _yAlignedOrb.SetActive(false);
+        }
+    }
+
+    private void UpdateClosestTerrainPoint()
+    {
+        if (HasLastTerrainPoint && HasFocalEdgePoint)
+        {
+            float dLast = SqXZ(LastTerrainPoint, FocalPoint);
+            float dEdge = SqXZ(FocalEdgePoint, FocalPoint);
+            if (dLast <= dEdge)
+            {
+                ClosestTerrainPoint = LastTerrainPoint;
+                ClosestTerrainSource = TerrainPointSource.LastTerrain;
+            }
+            else
+            {
+                ClosestTerrainPoint = FocalEdgePoint;
+                ClosestTerrainSource = TerrainPointSource.FocalEdge;
+            }
+        }
+        else if (HasLastTerrainPoint)
+        {
+            ClosestTerrainPoint = LastTerrainPoint;
+            ClosestTerrainSource = TerrainPointSource.LastTerrain;
+        }
+        else if (HasFocalEdgePoint)
+        {
+            ClosestTerrainPoint = FocalEdgePoint;
+            ClosestTerrainSource = TerrainPointSource.FocalEdge;
+        }
+        else
+        {
+            ClosestTerrainSource = TerrainPointSource.None;
+        }
+    }
+
+    private static float SqXZ(Vector3 a, Vector3 b)
+    {
+        float dx = a.x - b.x;
+        float dz = a.z - b.z;
+        return dx * dx + dz * dz;
     }
 
     private void UpdateFocalEdgePoint()
     {
-        if (TryEdgeCrossingTowardCenter(FocalPoint, out Vector3 edge))
+        Vector3 source = HasYAlignedFocalPoint ? YAlignedFocalPoint : FocalPoint;
+        if (TryEdgeCrossingTowardCenter(source, out Vector3 edge))
         {
             FocalEdgePoint = edge;
             HasFocalEdgePoint = true;
@@ -305,8 +423,48 @@ public class SimulationCameraController : MonoBehaviour
             HandleKeyboardYaw();
         }
 
+        ApplyAutoRecenter();
         ClampPosition();
         UpdateFocalPoint();
+    }
+
+    private void ApplyAutoRecenter()
+    {
+        if (!autoRecenter) return;
+        if (_orbiting) return;
+        if (HasKeyboardYawInput()) return;
+        if (!HasYAlignedFocalPoint) return;
+
+        float dx = ClosestTerrainPoint.x - YAlignedFocalPoint.x;
+        float dz = ClosestTerrainPoint.z - YAlignedFocalPoint.z;
+        float distSq = dx * dx + dz * dz;
+        if (distSq < recenterDeadZone * recenterDeadZone) return;
+
+        float dist = Mathf.Sqrt(distSq);
+        float speed = recenterBaseSpeed + dist * recenterDistanceFactor;
+        float step = Mathf.Min(speed * Time.deltaTime, dist);
+        float scale = step / dist;
+
+        float moveX = dx * scale;
+        float moveZ = dz * scale;
+
+        Vector3 pos = transform.position;
+        pos.x += moveX;
+        pos.z += moveZ;
+        transform.position = pos;
+
+        if (_grabbing)
+        {
+            _grabWorld.x += moveX;
+            _grabWorld.z += moveZ;
+        }
+    }
+
+    private bool HasKeyboardYawInput()
+    {
+        var kb = Keyboard.current;
+        if (kb == null) return false;
+        return kb.eKey.isPressed || kb.qKey.isPressed;
     }
 
     private void HandleOrbit(Mouse mouse)
