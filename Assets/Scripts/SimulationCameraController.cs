@@ -19,6 +19,8 @@ public class SimulationCameraController : MonoBehaviour
     [SerializeField] Color orbColor = Color.cyan;
     [SerializeField] Color focalOrbColor = new Color(0.65f, 0.25f, 0.95f, 1f);
     [SerializeField] bool showFocalOrb = true;
+    [SerializeField] Color lastTerrainOrbColor = new Color(1f, 0.85f, 0.1f, 1f);
+    [SerializeField] bool showLastTerrainOrb = true;
     [SerializeField] private TerrainDataStore terrainDataStore;
 
     private Camera _cam;
@@ -28,9 +30,12 @@ public class SimulationCameraController : MonoBehaviour
     private bool _orbiting;
     private GameObject _orbVisual;
     private GameObject _focalOrb;
+    private GameObject _lastTerrainOrb;
     private bool _groundFollowing;
 
     public Vector3 FocalPoint { get; private set; }
+    public Vector3 LastTerrainPoint { get; private set; }
+    public bool HasLastTerrainPoint { get; private set; }
 
     public bool ShowFocalOrb
     {
@@ -44,6 +49,18 @@ public class SimulationCameraController : MonoBehaviour
 
     public void ToggleFocalOrb() => ShowFocalOrb = !ShowFocalOrb;
 
+    public bool ShowLastTerrainOrb
+    {
+        get => showLastTerrainOrb;
+        set
+        {
+            showLastTerrainOrb = value;
+            if (_lastTerrainOrb != null) _lastTerrainOrb.SetActive(value && HasLastTerrainPoint);
+        }
+    }
+
+    public void ToggleLastTerrainOrb() => ShowLastTerrainOrb = !ShowLastTerrainOrb;
+
     private void Awake()
     {
         _cam = GetComponent<Camera>();
@@ -56,12 +73,14 @@ public class SimulationCameraController : MonoBehaviour
 
         CreateOrbVisual();
         CreateFocalOrb();
+        CreateLastTerrainOrb();
     }
 
     private void OnDestroy()
     {
         if (_orbVisual != null) Destroy(_orbVisual);
         if (_focalOrb != null) Destroy(_focalOrb);
+        if (_lastTerrainOrb != null) Destroy(_lastTerrainOrb);
     }
 
     private void CreateOrbVisual()
@@ -88,17 +107,47 @@ public class SimulationCameraController : MonoBehaviour
         _focalOrb.SetActive(showFocalOrb);
     }
 
+    private void CreateLastTerrainOrb()
+    {
+        _lastTerrainOrb = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        _lastTerrainOrb.name = "CameraLastTerrainPoint";
+        var col = _lastTerrainOrb.GetComponent<Collider>();
+        if (col != null) Destroy(col);
+        _lastTerrainOrb.transform.localScale = Vector3.one * orbSize;
+        var mr = _lastTerrainOrb.GetComponent<MeshRenderer>();
+        if (mr != null) mr.material.color = lastTerrainOrbColor;
+        _lastTerrainOrb.SetActive(false);
+    }
+
     private void OnValidate()
     {
         if (_focalOrb != null) _focalOrb.SetActive(showFocalOrb);
+        if (_lastTerrainOrb != null) _lastTerrainOrb.SetActive(showLastTerrainOrb && HasLastTerrainPoint);
     }
 
     private void UpdateFocalPoint()
     {
         Vector2 screenCenter = new Vector2(Screen.width * 0.5f, Screen.height * 0.5f);
-        if (!TryScreenToTerrain(screenCenter, out Vector3 hit)) return;
-        FocalPoint = hit;
-        if (_focalOrb != null) _focalOrb.transform.position = hit;
+        Ray r = _cam.ScreenPointToRay(screenCenter);
+
+        if (terrainDataStore != null && terrainDataStore.RaycastTerrain(r, out Vector3 terrainHit))
+        {
+            FocalPoint = terrainHit;
+            LastTerrainPoint = terrainHit;
+            HasLastTerrainPoint = true;
+        }
+        else if (TryRayToPlane(r, 0f, out Vector3 planeHit))
+        {
+            FocalPoint = planeHit;
+        }
+
+        if (_focalOrb != null) _focalOrb.transform.position = FocalPoint;
+
+        if (_lastTerrainOrb != null && HasLastTerrainPoint)
+        {
+            _lastTerrainOrb.transform.position = LastTerrainPoint;
+            _lastTerrainOrb.SetActive(showLastTerrainOrb);
+        }
     }
 
     private void Update()
@@ -109,7 +158,8 @@ public class SimulationCameraController : MonoBehaviour
         {
             if (mouse.rightButton.wasPressedThisFrame)
             {
-                _grabbing = TryScreenToTerrain(mouse.position.ReadValue(), out _grabWorld);
+                Ray grabRay = _cam.ScreenPointToRay(mouse.position.ReadValue());
+                _grabbing = terrainDataStore != null && terrainDataStore.RaycastTerrain(grabRay, out _grabWorld);
                 _groundFollowing = false;
             }
 
