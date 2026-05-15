@@ -6,6 +6,7 @@ public class SimulationCameraController : MonoBehaviour
 {
     [SerializeField] float zoomSpeed = 8f;
     [SerializeField] float zoomSmoothness = 12f;
+    [SerializeField] float zoomOutMaxDistance = 200f;
     [SerializeField] float keyboardPanSpeed = 0.5f;
     [SerializeField] float keyboardYawSpeed = 60f;
     [SerializeField] float yawSpeed = 0.3f;
@@ -421,6 +422,18 @@ public class SimulationCameraController : MonoBehaviour
         if (Mathf.Abs(_pendingZoom) > 1e-4f)
         {
             float step = _pendingZoom * (1f - Mathf.Exp(-zoomSmoothness * Time.deltaTime));
+
+            if (step < 0f && HasYAlignedFocalPoint)
+            {
+                float currentDist = Vector3.Distance(transform.position, YAlignedFocalPoint);
+                float minStep = Mathf.Min(0f, currentDist - zoomOutMaxDistance);
+                if (step < minStep)
+                {
+                    step = minStep;
+                    _pendingZoom = step;
+                }
+            }
+
             transform.position += transform.forward * step;
             _pendingZoom -= step;
         }
@@ -477,8 +490,7 @@ public class SimulationCameraController : MonoBehaviour
     private void ApplyAutoRecenter()
     {
         if (!autoRecenter) return;
-        if (_orbiting) return;
-        if (HasKeyboardYawInput()) return;
+        if (_grabbing || _orbiting) return;
         if (!HasYAlignedFocalPoint) return;
 
         float dx = ClosestTerrainPoint.x - YAlignedFocalPoint.x;
@@ -491,29 +503,13 @@ public class SimulationCameraController : MonoBehaviour
         float step = Mathf.Min(speed * Time.deltaTime, dist);
         float scale = step / dist;
 
-        float moveX = dx * scale;
-        float moveZ = dz * scale;
-
         Vector3 pos = transform.position;
-        pos.x += moveX;
-        pos.z += moveZ;
+        pos.x += dx * scale;
+        pos.z += dz * scale;
         transform.position = pos;
-
-        if (_grabbing)
-        {
-            _grabWorld.x += moveX;
-            _grabWorld.z += moveZ;
-        }
     }
 
-    private bool HasKeyboardYawInput()
-    {
-        var kb = Keyboard.current;
-        if (kb == null) return false;
-        return kb.eKey.isPressed || kb.qKey.isPressed;
-    }
-
-    private void HandleOrbit(Mouse mouse)
+private void HandleOrbit(Mouse mouse)
     {
         if (mouse.middleButton.wasPressedThisFrame)
         {
