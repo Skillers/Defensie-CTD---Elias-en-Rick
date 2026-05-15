@@ -5,6 +5,7 @@ using UnityEngine.InputSystem;
 public class SimulationCameraController : MonoBehaviour
 {
     [SerializeField] float zoomSpeed = 8f;
+    [SerializeField] float zoomSmoothness = 12f;
     [SerializeField] float keyboardPanSpeed = 0.5f;
     [SerializeField] float keyboardYawSpeed = 60f;
     [SerializeField] float yawSpeed = 0.3f;
@@ -29,11 +30,13 @@ public class SimulationCameraController : MonoBehaviour
     [SerializeField] float recenterBaseSpeed = 3f;
     [SerializeField] float recenterDistanceFactor = 1f;
     [SerializeField] float recenterDeadZone = 0.5f;
+    [SerializeField] float yAlignedDistanceFactor = 2f;
     [SerializeField] private TerrainDataStore terrainDataStore;
 
     private Camera _cam;
     private Vector3 _grabWorld;
     private bool _grabbing;
+    private float _pendingZoom;
     private Vector3 _orbitFocal;
     private bool _orbiting;
     private GameObject _orbVisual;
@@ -411,8 +414,15 @@ public class SimulationCameraController : MonoBehaviour
             if (scroll != 0f)
             {
                 if (scroll < 0f) _groundFollowing = false;
-                transform.position += transform.forward * (scroll * zoomSpeed);
+                _pendingZoom += scroll * zoomSpeed;
             }
+        }
+
+        if (Mathf.Abs(_pendingZoom) > 1e-4f)
+        {
+            float step = _pendingZoom * (1f - Mathf.Exp(-zoomSmoothness * Time.deltaTime));
+            transform.position += transform.forward * step;
+            _pendingZoom -= step;
         }
 
         HandleOrbit(mouse);
@@ -426,6 +436,42 @@ public class SimulationCameraController : MonoBehaviour
         ApplyAutoRecenter();
         ClampPosition();
         UpdateFocalPoint();
+        if (ApplyDistanceCap()) UpdateFocalPoint();
+    }
+
+    private bool ApplyDistanceCap()
+    {
+        if (terrainDataStore == null) return false;
+        if (ClosestTerrainSource == TerrainPointSource.None) return false;
+        if (!HasYAlignedFocalPoint) return false;
+
+        Vector3 mapCenter = terrainDataStore.transform.position;
+        float cx = ClosestTerrainPoint.x - mapCenter.x;
+        float cz = ClosestTerrainPoint.z - mapCenter.z;
+        float capDist = yAlignedDistanceFactor * Mathf.Sqrt(cx * cx + cz * cz);
+
+        float dx = YAlignedFocalPoint.x - ClosestTerrainPoint.x;
+        float dz = YAlignedFocalPoint.z - ClosestTerrainPoint.z;
+        float distSq = dx * dx + dz * dz;
+        if (distSq <= capDist * capDist) return false;
+
+        float dist = Mathf.Sqrt(distSq);
+        float pull = 1f - capDist / dist;
+        float shiftX = -dx * pull;
+        float shiftZ = -dz * pull;
+
+        Vector3 pos = transform.position;
+        pos.x += shiftX;
+        pos.z += shiftZ;
+        transform.position = pos;
+
+        if (_grabbing)
+        {
+            _grabWorld.x += shiftX;
+            _grabWorld.z += shiftZ;
+        }
+
+        return true;
     }
 
     private void ApplyAutoRecenter()
