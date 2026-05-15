@@ -173,19 +173,30 @@ public class TerrainDataStore : MonoBehaviour
         if (grid == null) return false;
 
         float stepDist = step * 0.5f;
-        Vector3 pos = ray.origin;
+        bool everInside = false;
 
         for (float d = 0f; d < maxDistance; d += stepDist)
         {
-            pos = ray.GetPoint(d);
+            Vector3 pos = ray.GetPoint(d);
 
-            // Check if within terrain bounds
             float lx = pos.x - transform.position.x;
             float lz = pos.z - transform.position.z;
-            if (lx < -extentX || lx > extentX || lz < -extentZ || lz > extentZ)
+            bool inside = lx >= -extentX && lx <= extentX && lz >= -extentZ && lz <= extentZ;
+
+            if (!inside)
+            {
+                if (everInside) return false;
                 continue;
+            }
 
             float terrainY = GetRoundedHeight(pos);
+
+            if (!everInside)
+            {
+                if (pos.y < terrainY) return false;
+                everInside = true;
+            }
+
             if (pos.y <= terrainY)
             {
                 hitPoint = new Vector3(pos.x, terrainY, pos.z);

@@ -12,17 +12,13 @@ public class SimulationCameraController : MonoBehaviour
     [SerializeField] float minAngle = 10f;
     [SerializeField] float maxAngle = 89f;
     [SerializeField] float minY = 0f;
-    [SerializeField] float maxY = 250f;
     [SerializeField] float groundClearance = 5f;
-    [SerializeField] float forwardEdgeBuffer = 0.1f;
-    [SerializeField] float backEdgeBuffer = 1f;
-    [SerializeField] float maxEdgeExtension = 200f;
     [SerializeField] float startDistance = 200f;
     [SerializeField] float startAngle = 45f;
     [SerializeField] float orbSize = 1.5f;
     [SerializeField] Color orbColor = Color.cyan;
-    [SerializeField] Color edgeWallColor = new Color(0f, 0.5f, 1f, 1f);
-    [SerializeField] float edgeWallHeight = 250f;
+    [SerializeField] Color focalOrbColor = new Color(0.65f, 0.25f, 0.95f, 1f);
+    [SerializeField] bool showFocalOrb = true;
     [SerializeField] private TerrainDataStore terrainDataStore;
 
     private Camera _cam;
@@ -31,8 +27,22 @@ public class SimulationCameraController : MonoBehaviour
     private Vector3 _orbitFocal;
     private bool _orbiting;
     private GameObject _orbVisual;
-    private GameObject[] _edgeWalls;
+    private GameObject _focalOrb;
     private bool _groundFollowing;
+
+    public Vector3 FocalPoint { get; private set; }
+
+    public bool ShowFocalOrb
+    {
+        get => showFocalOrb;
+        set
+        {
+            showFocalOrb = value;
+            if (_focalOrb != null) _focalOrb.SetActive(value);
+        }
+    }
+
+    public void ToggleFocalOrb() => ShowFocalOrb = !ShowFocalOrb;
 
     private void Awake()
     {
@@ -45,14 +55,13 @@ public class SimulationCameraController : MonoBehaviour
         transform.rotation = Quaternion.Euler(startAngle, 0f, 0f);
 
         CreateOrbVisual();
-        CreateEdgeWalls();
+        CreateFocalOrb();
     }
 
     private void OnDestroy()
     {
         if (_orbVisual != null) Destroy(_orbVisual);
-        if (_edgeWalls != null)
-            foreach (var w in _edgeWalls) if (w != null) Destroy(w);
+        if (_focalOrb != null) Destroy(_focalOrb);
     }
 
     private void CreateOrbVisual()
@@ -67,34 +76,29 @@ public class SimulationCameraController : MonoBehaviour
         _orbVisual.SetActive(false);
     }
 
-    private void CreateEdgeWalls()
+    private void CreateFocalOrb()
     {
-        if (terrainDataStore == null) return;
-
-        Vector3 center = terrainDataStore.transform.position;
-        float ex = terrainDataStore.extentX;
-        float ez = terrainDataStore.extentZ;
-        float h = edgeWallHeight;
-
-        _edgeWalls = new GameObject[4];
-        _edgeWalls[0] = MakeEdgeWall("EdgeWallSouth", new Vector3(center.x, h * 0.5f, center.z - ez), Quaternion.Euler(0f, 180f, 0f), new Vector3(ex * 2f, h, 1f));
-        _edgeWalls[1] = MakeEdgeWall("EdgeWallNorth", new Vector3(center.x, h * 0.5f, center.z + ez), Quaternion.identity,         new Vector3(ex * 2f, h, 1f));
-        _edgeWalls[2] = MakeEdgeWall("EdgeWallWest",  new Vector3(center.x - ex, h * 0.5f, center.z), Quaternion.Euler(0f, -90f, 0f), new Vector3(ez * 2f, h, 1f));
-        _edgeWalls[3] = MakeEdgeWall("EdgeWallEast",  new Vector3(center.x + ex, h * 0.5f, center.z), Quaternion.Euler(0f,  90f, 0f), new Vector3(ez * 2f, h, 1f));
+        _focalOrb = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        _focalOrb.name = "CameraScreenFocal";
+        var col = _focalOrb.GetComponent<Collider>();
+        if (col != null) Destroy(col);
+        _focalOrb.transform.localScale = Vector3.one * orbSize;
+        var mr = _focalOrb.GetComponent<MeshRenderer>();
+        if (mr != null) mr.material.color = focalOrbColor;
+        _focalOrb.SetActive(showFocalOrb);
     }
 
-    private GameObject MakeEdgeWall(string name, Vector3 pos, Quaternion rot, Vector3 scale)
+    private void OnValidate()
     {
-        var go = GameObject.CreatePrimitive(PrimitiveType.Quad);
-        go.name = name;
-        var col = go.GetComponent<Collider>();
-        if (col != null) Destroy(col);
-        go.transform.position = pos;
-        go.transform.rotation = rot;
-        go.transform.localScale = scale;
-        var mr = go.GetComponent<MeshRenderer>();
-        if (mr != null) mr.material.color = edgeWallColor;
-        return go;
+        if (_focalOrb != null) _focalOrb.SetActive(showFocalOrb);
+    }
+
+    private void UpdateFocalPoint()
+    {
+        Vector2 screenCenter = new Vector2(Screen.width * 0.5f, Screen.height * 0.5f);
+        if (!TryScreenToTerrain(screenCenter, out Vector3 hit)) return;
+        FocalPoint = hit;
+        if (_focalOrb != null) _focalOrb.transform.position = hit;
     }
 
     private void Update()
@@ -142,6 +146,7 @@ public class SimulationCameraController : MonoBehaviour
         }
 
         ClampPosition();
+        UpdateFocalPoint();
     }
 
     private void HandleOrbit(Mouse mouse)
@@ -239,49 +244,7 @@ public class SimulationCameraController : MonoBehaviour
         Ray r = _cam.ScreenPointToRay(screen);
         if (terrainDataStore != null && terrainDataStore.RaycastTerrain(r, out hit))
             return true;
-        if (TryEdgeWallRaycast(r, out hit))
-            return true;
         return TryRayToPlane(r, 0f, out hit);
-    }
-
-    private bool TryEdgeWallRaycast(Ray r, out Vector3 hit)
-    {
-        hit = Vector3.zero;
-        if (terrainDataStore == null) return false;
-
-        Vector3 c = terrainDataStore.transform.position;
-        float ex = terrainDataStore.extentX;
-        float ez = terrainDataStore.extentZ;
-        float h = edgeWallHeight;
-
-        float bestT = float.MaxValue;
-        Vector3 bestHit = Vector3.zero;
-        bool found = false;
-
-        TryWallHit(r, true,  c.z - ez, +1f, c.x - ex, c.x + ex, h, ref bestT, ref bestHit, ref found);
-        TryWallHit(r, true,  c.z + ez, -1f, c.x - ex, c.x + ex, h, ref bestT, ref bestHit, ref found);
-        TryWallHit(r, false, c.x - ex, +1f, c.z - ez, c.z + ez, h, ref bestT, ref bestHit, ref found);
-        TryWallHit(r, false, c.x + ex, -1f, c.z - ez, c.z + ez, h, ref bestT, ref bestHit, ref found);
-
-        hit = bestHit;
-        return found;
-    }
-
-    private void TryWallHit(Ray r, bool planePerpZ, float planeCoord, float normalSign, float minLat, float maxLat, float maxH, ref float bestT, ref Vector3 bestHit, ref bool found)
-    {
-        float rDir = planePerpZ ? r.direction.z : r.direction.x;
-        float rOri = planePerpZ ? r.origin.z    : r.origin.x;
-        if (Mathf.Abs(rDir) < 1e-6f) return;
-        if (rDir * normalSign >= 0f) return; // back-face / parallel: ignore
-        float t = (planeCoord - rOri) / rDir;
-        if (t <= 0f || t >= bestT) return;
-        Vector3 p = r.origin + r.direction * t;
-        if (p.y < 0f || p.y > maxH) return;
-        float lat = planePerpZ ? p.x : p.z;
-        if (lat < minLat || lat > maxLat) return;
-        bestT = t;
-        bestHit = p;
-        found = true;
     }
 
     private bool TryRayToPlane(Ray r, float planeY, out Vector3 hit)
@@ -298,25 +261,10 @@ public class SimulationCameraController : MonoBehaviour
     {
         Vector3 pos = transform.position;
         float startY = pos.y;
-        pos.y = Mathf.Clamp(pos.y, minY, maxY);
+        pos.y = Mathf.Max(pos.y, minY);
 
         if (terrainDataStore != null)
         {
-            Vector3 mapCenter = terrainDataStore.transform.position;
-            Vector3 fwd = transform.forward;
-
-            float groundT = (fwd.y < -1e-4f) ? pos.y / -fwd.y : 0f;
-            float dx = Mathf.Clamp(fwd.x * groundT, -maxEdgeExtension, maxEdgeExtension);
-            float dz = Mathf.Clamp(fwd.z * groundT, -maxEdgeExtension, maxEdgeExtension);
-
-            float minX = mapCenter.x - terrainDataStore.extentX - Mathf.Max(0f, dx) * backEdgeBuffer - Mathf.Min(0f, dx) * forwardEdgeBuffer;
-            float maxX = mapCenter.x + terrainDataStore.extentX - Mathf.Min(0f, dx) * backEdgeBuffer - Mathf.Max(0f, dx) * forwardEdgeBuffer;
-            float minZ = mapCenter.z - terrainDataStore.extentZ - Mathf.Max(0f, dz) * backEdgeBuffer - Mathf.Min(0f, dz) * forwardEdgeBuffer;
-            float maxZ = mapCenter.z + terrainDataStore.extentZ - Mathf.Min(0f, dz) * backEdgeBuffer - Mathf.Max(0f, dz) * forwardEdgeBuffer;
-
-            pos.x = Mathf.Clamp(pos.x, minX, maxX);
-            pos.z = Mathf.Clamp(pos.z, minZ, maxZ);
-
             float terrainY = terrainDataStore.GetRawHeight(pos);
             float floorY = terrainY + groundClearance;
             if (_groundFollowing)
