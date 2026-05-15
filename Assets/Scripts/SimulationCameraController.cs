@@ -21,6 +21,8 @@ public class SimulationCameraController : MonoBehaviour
     [SerializeField] bool showFocalOrb = true;
     [SerializeField] Color lastTerrainOrbColor = new Color(1f, 0.85f, 0.1f, 1f);
     [SerializeField] bool showLastTerrainOrb = true;
+    [SerializeField] Color focalEdgeOrbColor = new Color(0.3f, 0.95f, 0.4f, 1f);
+    [SerializeField] bool showFocalEdgeOrb = true;
     [SerializeField] private TerrainDataStore terrainDataStore;
 
     private Camera _cam;
@@ -31,11 +33,14 @@ public class SimulationCameraController : MonoBehaviour
     private GameObject _orbVisual;
     private GameObject _focalOrb;
     private GameObject _lastTerrainOrb;
+    private GameObject _focalEdgeOrb;
     private bool _groundFollowing;
 
     public Vector3 FocalPoint { get; private set; }
     public Vector3 LastTerrainPoint { get; private set; }
     public bool HasLastTerrainPoint { get; private set; }
+    public Vector3 FocalEdgePoint { get; private set; }
+    public bool HasFocalEdgePoint { get; private set; }
 
     public bool ShowFocalOrb
     {
@@ -61,6 +66,18 @@ public class SimulationCameraController : MonoBehaviour
 
     public void ToggleLastTerrainOrb() => ShowLastTerrainOrb = !ShowLastTerrainOrb;
 
+    public bool ShowFocalEdgeOrb
+    {
+        get => showFocalEdgeOrb;
+        set
+        {
+            showFocalEdgeOrb = value;
+            if (_focalEdgeOrb != null) _focalEdgeOrb.SetActive(value && HasFocalEdgePoint);
+        }
+    }
+
+    public void ToggleFocalEdgeOrb() => ShowFocalEdgeOrb = !ShowFocalEdgeOrb;
+
     private void Awake()
     {
         _cam = GetComponent<Camera>();
@@ -74,6 +91,7 @@ public class SimulationCameraController : MonoBehaviour
         CreateOrbVisual();
         CreateFocalOrb();
         CreateLastTerrainOrb();
+        CreateFocalEdgeOrb();
     }
 
     private void OnDestroy()
@@ -81,6 +99,7 @@ public class SimulationCameraController : MonoBehaviour
         if (_orbVisual != null) Destroy(_orbVisual);
         if (_focalOrb != null) Destroy(_focalOrb);
         if (_lastTerrainOrb != null) Destroy(_lastTerrainOrb);
+        if (_focalEdgeOrb != null) Destroy(_focalEdgeOrb);
     }
 
     private void CreateOrbVisual()
@@ -119,10 +138,23 @@ public class SimulationCameraController : MonoBehaviour
         _lastTerrainOrb.SetActive(false);
     }
 
+    private void CreateFocalEdgeOrb()
+    {
+        _focalEdgeOrb = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        _focalEdgeOrb.name = "CameraFocalEdgePoint";
+        var col = _focalEdgeOrb.GetComponent<Collider>();
+        if (col != null) Destroy(col);
+        _focalEdgeOrb.transform.localScale = Vector3.one * orbSize;
+        var mr = _focalEdgeOrb.GetComponent<MeshRenderer>();
+        if (mr != null) mr.material.color = focalEdgeOrbColor;
+        _focalEdgeOrb.SetActive(false);
+    }
+
     private void OnValidate()
     {
         if (_focalOrb != null) _focalOrb.SetActive(showFocalOrb);
         if (_lastTerrainOrb != null) _lastTerrainOrb.SetActive(showLastTerrainOrb && HasLastTerrainPoint);
+        if (_focalEdgeOrb != null) _focalEdgeOrb.SetActive(showFocalEdgeOrb && HasFocalEdgePoint);
     }
 
     private void UpdateFocalPoint()
@@ -148,6 +180,84 @@ public class SimulationCameraController : MonoBehaviour
             _lastTerrainOrb.transform.position = LastTerrainPoint;
             _lastTerrainOrb.SetActive(showLastTerrainOrb);
         }
+
+        UpdateFocalEdgePoint();
+    }
+
+    private void UpdateFocalEdgePoint()
+    {
+        if (TryEdgeCrossingTowardCenter(FocalPoint, out Vector3 edge))
+        {
+            FocalEdgePoint = edge;
+            HasFocalEdgePoint = true;
+        }
+        else
+        {
+            HasFocalEdgePoint = false;
+        }
+
+        if (_focalEdgeOrb == null) return;
+
+        if (HasFocalEdgePoint)
+        {
+            _focalEdgeOrb.transform.position = FocalEdgePoint;
+            _focalEdgeOrb.SetActive(showFocalEdgeOrb);
+        }
+        else
+        {
+            _focalEdgeOrb.SetActive(false);
+        }
+    }
+
+    private bool TryEdgeCrossingTowardCenter(Vector3 from, out Vector3 hit)
+    {
+        hit = Vector3.zero;
+        if (terrainDataStore == null) return false;
+
+        Vector3 c = terrainDataStore.transform.position;
+        float minX = c.x - terrainDataStore.extentX;
+        float maxX = c.x + terrainDataStore.extentX;
+        float minZ = c.z - terrainDataStore.extentZ;
+        float maxZ = c.z + terrainDataStore.extentZ;
+
+        if (from.x >= minX && from.x <= maxX && from.z >= minZ && from.z <= maxZ) return false;
+
+        float dx = c.x - from.x;
+        float dz = c.z - from.z;
+        if (Mathf.Abs(dx) < 1e-6f && Mathf.Abs(dz) < 1e-6f) return false;
+
+        float bestT = float.MaxValue;
+        float bestX = 0f, bestZ = 0f;
+
+        if (Mathf.Abs(dx) > 1e-6f)
+        {
+            TryAxisEdge(true,  minX, from, dx, dz, minZ, maxZ, ref bestT, ref bestX, ref bestZ);
+            TryAxisEdge(true,  maxX, from, dx, dz, minZ, maxZ, ref bestT, ref bestX, ref bestZ);
+        }
+        if (Mathf.Abs(dz) > 1e-6f)
+        {
+            TryAxisEdge(false, minZ, from, dx, dz, minX, maxX, ref bestT, ref bestX, ref bestZ);
+            TryAxisEdge(false, maxZ, from, dx, dz, minX, maxX, ref bestT, ref bestX, ref bestZ);
+        }
+
+        if (bestT == float.MaxValue) return false;
+
+        float terrainY = terrainDataStore.GetRoundedHeight(new Vector3(bestX, 0f, bestZ));
+        hit = new Vector3(bestX, terrainY, bestZ);
+        return true;
+    }
+
+    private void TryAxisEdge(bool xAxis, float edgeCoord, Vector3 from, float dx, float dz, float lateralMin, float lateralMax, ref float bestT, ref float bestX, ref float bestZ)
+    {
+        float dir = xAxis ? dx : dz;
+        float ori = xAxis ? from.x : from.z;
+        float t = (edgeCoord - ori) / dir;
+        if (t <= 0f || t > 1f || t >= bestT) return;
+        float lateral = xAxis ? (from.z + dz * t) : (from.x + dx * t);
+        if (lateral < lateralMin || lateral > lateralMax) return;
+        bestT = t;
+        if (xAxis) { bestX = edgeCoord; bestZ = lateral; }
+        else       { bestX = lateral;   bestZ = edgeCoord; }
     }
 
     private void Update()

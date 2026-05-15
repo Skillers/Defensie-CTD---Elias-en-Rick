@@ -7,7 +7,6 @@
     <list default="true" id="2719ef14-fe85-4389-85f2-34cbfe22855b" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/.idea.Defensie-CTD---Elias-en-Rick/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.Defensie-CTD---Elias-en-Rick/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scripts/SimulationCameraController.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/SimulationCameraController.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/UserSettings/EditorUserSettings.asset" beforeDir="false" afterPath="$PROJECT_DIR$/UserSettings/EditorUserSettings.asset" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -122,6 +121,7 @@
       <workItem from="1778482486040" duration="6000" />
       <workItem from="1778489640034" duration="13000" />
       <workItem from="1778664129273" duration="3767000" />
+      <workItem from="1778840480575" duration="318000" />
     </task>
     <servers />
   </component>
