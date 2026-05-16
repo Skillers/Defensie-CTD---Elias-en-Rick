@@ -4,6 +4,7 @@ using UnityEngine.InputSystem;
 using UnityEngine.Serialization;
 
 public enum BrushTool { None, RaiseLower, Flatten, BiomePaint }
+public enum BrushShape { Circle, Square }
 
 public class BrushController : MonoBehaviour
 {
@@ -31,6 +32,21 @@ public class BrushController : MonoBehaviour
         }
     }
 
+    [Header("Drawing Shape")]
+    [Tooltip("Brush footprint selected in the UI. The apply math is still circular until Square is wired up.")]
+    [SerializeField] BrushShape _drawingShape = BrushShape.Circle;
+
+    public BrushShape DrawingShape
+    {
+        get => _drawingShape;
+        set
+        {
+            if (_drawingShape == value) return;
+            _drawingShape = value;
+            OnShapeChanged?.Invoke(_drawingShape);
+        }
+    }
+
     [Header("Brush Indicator")]
     public Color indicatorColor = Color.yellow;
     public Color centerColor    = Color.red;
@@ -40,6 +56,7 @@ public class BrushController : MonoBehaviour
 
     public event Action<BrushTool> OnToolChanged;
     public event Action<BiomeSO>   OnBiomeChanged;
+    public event Action<BrushShape> OnShapeChanged;
     bool _leftDown;
     bool _rightDown;
     bool _leftBlocked;

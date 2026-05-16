@@ -40,9 +40,6 @@ public class AvenuesOfApproachHandler : MonoBehaviour
     [Tooltip("Button that toggles the AoA tool open/closed.")]
     [SerializeField] private Button toggleButton;
 
-    [Tooltip("Root GameObject of the AoA panel. Hidden when the tool is closed.")]
-    [SerializeField] private GameObject toolPanel;
-
     [Tooltip("Centered warning shown when the user tries to open the tool without start/target flags placed.")]
     [SerializeField] private GameObject warningPanel;
 
@@ -173,7 +170,6 @@ public class AvenuesOfApproachHandler : MonoBehaviour
         if (titleInput != null)          titleInput.onValueChanged.AddListener(OnTitleChanged);
 
         if (warningPanel != null) warningPanel.SetActive(false);
-        if (toolPanel    != null) toolPanel.SetActive(false);
 
         // Only auto-open if conditions are met; never pop a warning unprompted on scene load.
         if (startOpen && CanOpen()) ApplyState(true);
@@ -637,8 +633,6 @@ public class AvenuesOfApproachHandler : MonoBehaviour
 
         _isSelected = selected;
         _isOpen     = nextOpen;
-
-        if (toolPanel != null) toolPanel.SetActive(_isOpen);
 
         if (_isSelected && !_isOpen) ShowWarning();
         else                          HideWarning();
