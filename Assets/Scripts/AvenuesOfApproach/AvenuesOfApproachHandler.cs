@@ -75,6 +75,43 @@ public class AvenuesOfApproachHandler : MonoBehaviour
     [Tooltip("Extra height above the terrain surface when positioning a waypoint sphere.")]
     [SerializeField] private float waypointHeightOffset = 0.2f;
 
+    [Header("Waypoint Editing")]
+    [Tooltip("Screen-space pixel radius around an existing waypoint of the current avenue. A left-press within this radius grabs and drags that waypoint instead of placing a new one. Larger = more forgiving.")]
+    [SerializeField] private float grabPixelRadius = 24f;
+
+    [Tooltip("Steps the selection to the previous waypoint of the current avenue.")]
+    [SerializeField] private Button prevWaypointButton;
+
+    [Tooltip("Steps the selection to the next waypoint of the current avenue.")]
+    [SerializeField] private Button nextWaypointButton;
+
+    [Tooltip("Moves the selected waypoint one grid cell in -X.")]
+    [SerializeField] private Button waypointXMinusButton;
+
+    [Tooltip("Moves the selected waypoint one grid cell in +X.")]
+    [SerializeField] private Button waypointXPlusButton;
+
+    [Tooltip("Moves the selected waypoint one grid cell in -Z.")]
+    [SerializeField] private Button waypointZMinusButton;
+
+    [Tooltip("Moves the selected waypoint one grid cell in +Z.")]
+    [SerializeField] private Button waypointZPlusButton;
+
+    [Tooltip("Integer grid X of the selected waypoint. Editable; commits on end-edit.")]
+    [SerializeField] private TMP_InputField waypointXInput;
+
+    [Tooltip("Integer grid Z of the selected waypoint. Editable; commits on end-edit.")]
+    [SerializeField] private TMP_InputField waypointZInput;
+
+    [Tooltip("Optional. Shows '<selected> / <total>' for the current avenue's waypoints.")]
+    [SerializeField] private TMP_Text waypointCounterText;
+
+    [Tooltip("Optional. Drag-scrub overlay sitting over the X field (Unity-Inspector style: click to type, horizontal drag to change).")]
+    [SerializeField] private ScrubbableNumberField waypointXScrub;
+
+    [Tooltip("Optional. Drag-scrub overlay sitting over the Z field.")]
+    [SerializeField] private ScrubbableNumberField waypointZScrub;
+
     [Header("Waypoint Visuals")]
     [Tooltip("Diameter of waypoints belonging to the currently selected avenue (except the last one).")]
     [SerializeField] private float currentSphereSize = 0.5f;
@@ -119,6 +156,11 @@ public class AvenuesOfApproachHandler : MonoBehaviour
     bool _isSelected;
     bool _isOpen;
     bool _leftDown;
+    bool _draggingOrb;
+    int _dragOrbIndex = -1;
+    bool _dragMoved;
+    int _selectedWaypoint = -1;
+    bool _scrubChanged;
 
     readonly List<AvenueOfApproach> _avenues = new List<AvenueOfApproach>();
     int _currentIndex = -1;
@@ -169,6 +211,28 @@ public class AvenuesOfApproachHandler : MonoBehaviour
         if (removeAvenueButton != null)  removeAvenueButton.onClick.AddListener(RemoveCurrentAvenue);
         if (titleInput != null)          titleInput.onValueChanged.AddListener(OnTitleChanged);
 
+        if (prevWaypointButton  != null) prevWaypointButton.onClick.AddListener(GoToPreviousWaypoint);
+        if (nextWaypointButton  != null) nextWaypointButton.onClick.AddListener(GoToNextWaypoint);
+        if (waypointXMinusButton != null) waypointXMinusButton.onClick.AddListener(NudgeSelectedWaypointXMinus);
+        if (waypointXPlusButton  != null) waypointXPlusButton.onClick.AddListener(NudgeSelectedWaypointXPlus);
+        if (waypointZMinusButton != null) waypointZMinusButton.onClick.AddListener(NudgeSelectedWaypointZMinus);
+        if (waypointZPlusButton  != null) waypointZPlusButton.onClick.AddListener(NudgeSelectedWaypointZPlus);
+        if (waypointXInput != null)      waypointXInput.onEndEdit.AddListener(OnWaypointXChanged);
+        if (waypointZInput != null)      waypointZInput.onEndEdit.AddListener(OnWaypointZChanged);
+
+        if (waypointXScrub != null)
+        {
+            waypointXScrub.ScrubBegan   += OnScrubBegin;
+            waypointXScrub.ScrubStepped += OnScrubX;
+            waypointXScrub.ScrubEnded   += OnScrubEnd;
+        }
+        if (waypointZScrub != null)
+        {
+            waypointZScrub.ScrubBegan   += OnScrubBegin;
+            waypointZScrub.ScrubStepped += OnScrubZ;
+            waypointZScrub.ScrubEnded   += OnScrubEnd;
+        }
+
         if (warningPanel != null) warningPanel.SetActive(false);
 
         // Only auto-open if conditions are met; never pop a warning unprompted on scene load.
@@ -185,6 +249,28 @@ public class AvenuesOfApproachHandler : MonoBehaviour
         if (newAvenueButton != null)     newAvenueButton.onClick.RemoveListener(CreateNewAvenue);
         if (removeAvenueButton != null)  removeAvenueButton.onClick.RemoveListener(RemoveCurrentAvenue);
         if (titleInput != null)          titleInput.onValueChanged.RemoveListener(OnTitleChanged);
+
+        if (prevWaypointButton  != null) prevWaypointButton.onClick.RemoveListener(GoToPreviousWaypoint);
+        if (nextWaypointButton  != null) nextWaypointButton.onClick.RemoveListener(GoToNextWaypoint);
+        if (waypointXMinusButton != null) waypointXMinusButton.onClick.RemoveListener(NudgeSelectedWaypointXMinus);
+        if (waypointXPlusButton  != null) waypointXPlusButton.onClick.RemoveListener(NudgeSelectedWaypointXPlus);
+        if (waypointZMinusButton != null) waypointZMinusButton.onClick.RemoveListener(NudgeSelectedWaypointZMinus);
+        if (waypointZPlusButton  != null) waypointZPlusButton.onClick.RemoveListener(NudgeSelectedWaypointZPlus);
+        if (waypointXInput != null)      waypointXInput.onEndEdit.RemoveListener(OnWaypointXChanged);
+        if (waypointZInput != null)      waypointZInput.onEndEdit.RemoveListener(OnWaypointZChanged);
+
+        if (waypointXScrub != null)
+        {
+            waypointXScrub.ScrubBegan   -= OnScrubBegin;
+            waypointXScrub.ScrubStepped -= OnScrubX;
+            waypointXScrub.ScrubEnded   -= OnScrubEnd;
+        }
+        if (waypointZScrub != null)
+        {
+            waypointZScrub.ScrubBegan   -= OnScrubBegin;
+            waypointZScrub.ScrubStepped -= OnScrubZ;
+            waypointZScrub.ScrubEnded   -= OnScrubEnd;
+        }
 
         if (terrainDataStore != null)
         {
@@ -214,16 +300,109 @@ public class AvenuesOfApproachHandler : MonoBehaviour
         if (mouse == null) return;
 
         bool leftPressed = mouse.leftButton.isPressed;
+        Vector2 screenPos = mouse.position.ReadValue();
+
         if (leftPressed && !_leftDown)
         {
             _leftDown = true;
             bool overUI = EventSystem.current != null && EventSystem.current.IsPointerOverGameObject();
-            if (!overUI) TryPlaceAtCursor(mouse.position.ReadValue());
+            if (!overUI)
+            {
+                // Grabbing an existing waypoint of the active avenue takes
+                // priority over placing a new one.
+                if (TryPickOrbOnCurrentAvenue(screenPos, out int orbIndex))
+                {
+                    _draggingOrb = true;
+                    _dragOrbIndex = orbIndex;
+                    _dragMoved = false;
+                    // Grabbing an orb also makes it the selected/highlighted one.
+                    SelectWaypoint(orbIndex);
+                }
+                else
+                {
+                    TryPlaceAtCursor(screenPos);
+                }
+            }
+        }
+        else if (leftPressed && _leftDown && _draggingOrb)
+        {
+            DragOrbToCursor(screenPos);
         }
         else if (!leftPressed && _leftDown)
         {
             _leftDown = false;
+            if (_draggingOrb)
+            {
+                _draggingOrb = false;
+                _dragOrbIndex = -1;
+                // Defer the change notification (and any save churn) to the
+                // end of the drag, and only if the waypoint actually moved.
+                if (_dragMoved) OnAvenueChanged?.Invoke();
+                _dragMoved = false;
+            }
         }
+    }
+
+    /// <summary>
+    /// Finds the waypoint of the <em>current</em> avenue whose on-screen
+    /// position is nearest the cursor, within <see cref="grabPixelRadius"/>.
+    /// Only the active avenue's waypoints are grabbable; other avenues' orbs
+    /// stay transparent to input.
+    /// </summary>
+    bool TryPickOrbOnCurrentAvenue(Vector2 screenPos, out int index)
+    {
+        index = -1;
+        var avenue = CurrentAvenue;
+        if (avenue == null || editorCamera == null) return false;
+
+        int count = Mathf.Min(avenue.waypoints.Count, avenue.waypointSpheres.Count);
+        float bestDistSqr = grabPixelRadius * grabPixelRadius;
+
+        for (int i = 0; i < count; i++)
+        {
+            var sphere = avenue.waypointSpheres[i];
+            if (sphere == null) continue;
+
+            Vector3 sp = editorCamera.WorldToScreenPoint(sphere.transform.position);
+            if (sp.z <= 0f) continue; // behind the camera
+
+            float dx = sp.x - screenPos.x;
+            float dy = sp.y - screenPos.y;
+            float distSqr = dx * dx + dy * dy;
+            if (distSqr <= bestDistSqr)
+            {
+                bestDistSqr = distSqr;
+                index = i;
+            }
+        }
+
+        return index >= 0;
+    }
+
+    /// <summary>
+    /// Moves the waypoint being dragged to the terrain cell under the cursor.
+    /// Updates data and visuals live; the drag stays alive (but the orb holds
+    /// position) while the cursor is over panel UI.
+    /// </summary>
+    void DragOrbToCursor(Vector2 screenPos)
+    {
+        var avenue = CurrentAvenue;
+        if (avenue == null || editorCamera == null || terrainDataStore == null) return;
+        if (_dragOrbIndex < 0 || _dragOrbIndex >= avenue.waypoints.Count) return;
+
+        bool overUI = EventSystem.current != null && EventSystem.current.IsPointerOverGameObject();
+        if (overUI) return;
+
+        var ray = editorCamera.ScreenPointToRay(screenPos);
+        if (!Physics.Raycast(ray, out RaycastHit hit)) return;
+
+        Vector2Int cell = terrainDataStore.WorldToGrid(hit.point);
+        if (cell == avenue.waypoints[_dragOrbIndex]) return; // same cell — nothing to update
+
+        avenue.waypoints[_dragOrbIndex] = cell;
+        _dragMoved = true;
+        RefreshAvenueVisuals();
+        RefreshWaypointEditorUI();
     }
 
     /// <summary>Wired to a UI button. Selects/deselects AoA. If start/target aren't placed, the panel stays closed but the warning shows and the tool is still considered selected.</summary>
@@ -245,6 +424,7 @@ public class AvenuesOfApproachHandler : MonoBehaviour
         avenue.line = SpawnLine();
         _avenues.Add(avenue);
         _currentIndex = _avenues.Count - 1;
+        _selectedWaypoint = -1; // new avenue has no waypoints yet
         RefreshAvenueUI();
         OnAvenueChanged?.Invoke();
     }
@@ -258,6 +438,7 @@ public class AvenuesOfApproachHandler : MonoBehaviour
         if (avenue.line != null) Destroy(avenue.line.gameObject);
         _avenues.RemoveAt(_currentIndex);
         _currentIndex = _avenues.Count == 0 ? -1 : Mathf.Min(_currentIndex, _avenues.Count - 1);
+        ResetSelectionToLast();
         RefreshAvenueUI();
         OnAvenueChanged?.Invoke();
     }
@@ -269,6 +450,7 @@ public class AvenuesOfApproachHandler : MonoBehaviour
         int next = Mathf.Min(_currentIndex + 1, _avenues.Count - 1);
         if (next == _currentIndex) return;
         _currentIndex = next;
+        ResetSelectionToLast();
         RefreshAvenueUI();
         OnAvenueChanged?.Invoke();
     }
@@ -280,6 +462,7 @@ public class AvenuesOfApproachHandler : MonoBehaviour
         int prev = Mathf.Max(_currentIndex - 1, 0);
         if (prev == _currentIndex) return;
         _currentIndex = prev;
+        ResetSelectionToLast();
         RefreshAvenueUI();
         OnAvenueChanged?.Invoke();
     }
@@ -291,8 +474,173 @@ public class AvenuesOfApproachHandler : MonoBehaviour
         CurrentAvenue.waypoints.Add(cell);
         var sphere = SpawnSphere(cell);
         CurrentAvenue.waypointSpheres.Add(sphere);
+        _selectedWaypoint = CurrentAvenue.waypoints.Count - 1; // last placed = selected
         RefreshAvenueVisuals();
+        RefreshWaypointEditorUI();
         OnAvenueChanged?.Invoke();
+    }
+
+    // ---- Waypoint selection & editing ----
+
+    /// <summary>Selects the current avenue's last waypoint, or none if it has none.</summary>
+    void ResetSelectionToLast()
+    {
+        var avenue = CurrentAvenue;
+        _selectedWaypoint = (avenue != null && avenue.waypoints.Count > 0)
+            ? avenue.waypoints.Count - 1
+            : -1;
+    }
+
+    /// <summary>Selects a waypoint of the current avenue by index (clamped). Editor-only state — does not fire OnAvenueChanged.</summary>
+    public void SelectWaypoint(int index)
+    {
+        var avenue = CurrentAvenue;
+        int count = avenue != null ? avenue.waypoints.Count : 0;
+        _selectedWaypoint = count == 0 ? -1 : Mathf.Clamp(index, 0, count - 1);
+        RefreshAvenueVisuals();
+        RefreshWaypointEditorUI();
+    }
+
+    /// <summary>Wired to the previous-waypoint button. No wrap-around.</summary>
+    public void GoToPreviousWaypoint() => SelectWaypoint(_selectedWaypoint - 1);
+
+    /// <summary>Wired to the next-waypoint button. No wrap-around.</summary>
+    public void GoToNextWaypoint() => SelectWaypoint(_selectedWaypoint + 1);
+
+    // Wired to the four arrow buttons — nudge the selected waypoint one grid cell.
+    public void NudgeSelectedWaypointXMinus() => NudgeSelectedWaypoint(-1, 0);
+    public void NudgeSelectedWaypointXPlus()  => NudgeSelectedWaypoint(+1, 0);
+    public void NudgeSelectedWaypointZMinus() => NudgeSelectedWaypoint(0, -1);
+    public void NudgeSelectedWaypointZPlus()  => NudgeSelectedWaypoint(0, +1);
+
+    void NudgeSelectedWaypoint(int dx, int dz)
+    {
+        var avenue = CurrentAvenue;
+        if (avenue == null || _selectedWaypoint < 0 || _selectedWaypoint >= avenue.waypoints.Count) return;
+        Vector2Int c = avenue.waypoints[_selectedWaypoint];
+        MoveSelectedWaypointTo(new Vector2Int(c.x + dx, c.y + dz));
+    }
+
+    /// <summary>Wired to the X input field's end-edit. Garbage/empty input reverts the field.</summary>
+    void OnWaypointXChanged(string s)
+    {
+        var avenue = CurrentAvenue;
+        if (avenue == null || _selectedWaypoint < 0 || _selectedWaypoint >= avenue.waypoints.Count) return;
+        if (!int.TryParse(s, out int x)) { RefreshWaypointEditorUI(); return; }
+        Vector2Int c = avenue.waypoints[_selectedWaypoint];
+        MoveSelectedWaypointTo(new Vector2Int(x, c.y));
+    }
+
+    /// <summary>Wired to the Z input field's end-edit. Garbage/empty input reverts the field.</summary>
+    void OnWaypointZChanged(string s)
+    {
+        var avenue = CurrentAvenue;
+        if (avenue == null || _selectedWaypoint < 0 || _selectedWaypoint >= avenue.waypoints.Count) return;
+        if (!int.TryParse(s, out int z)) { RefreshWaypointEditorUI(); return; }
+        Vector2Int c = avenue.waypoints[_selectedWaypoint];
+        MoveSelectedWaypointTo(new Vector2Int(c.x, z));
+    }
+
+    /// <summary>Moves the selected waypoint and notifies immediately. Used by the type fields and the nudge arrows (one discrete edit each).</summary>
+    void MoveSelectedWaypointTo(Vector2Int cell)
+    {
+        if (ApplySelectedWaypointMove(cell)) OnAvenueChanged?.Invoke();
+    }
+
+    /// <summary>
+    /// Clamps into the terrain grid, applies the move, and refreshes visuals.
+    /// Returns true if the waypoint actually changed cell. Does NOT fire
+    /// OnAvenueChanged — the caller decides when to notify (immediately for
+    /// type/nudge, deferred to drag-end for scrub).
+    /// </summary>
+    bool ApplySelectedWaypointMove(Vector2Int cell)
+    {
+        var avenue = CurrentAvenue;
+        if (avenue == null || _selectedWaypoint < 0 || _selectedWaypoint >= avenue.waypoints.Count) return false;
+
+        if (terrainDataStore != null && terrainDataStore.GridWidth > 0 && terrainDataStore.GridHeight > 0)
+        {
+            cell.x = Mathf.Clamp(cell.x, 0, terrainDataStore.GridWidth - 1);
+            cell.y = Mathf.Clamp(cell.y, 0, terrainDataStore.GridHeight - 1);
+        }
+
+        if (cell == avenue.waypoints[_selectedWaypoint])
+        {
+            // No net change (edge clamp, or a typed value that clamped back).
+            // Resync the fields so they show the truth.
+            RefreshWaypointEditorUI();
+            return false;
+        }
+
+        avenue.waypoints[_selectedWaypoint] = cell;
+        RefreshAvenueVisuals();
+        RefreshWaypointEditorUI();
+        return true;
+    }
+
+    // ---- Drag-scrub on the X/Z fields (deferred commit) ----
+
+    void OnScrubBegin() => _scrubChanged = false;
+
+    void OnScrubX(int steps)
+    {
+        var avenue = CurrentAvenue;
+        if (avenue == null || _selectedWaypoint < 0 || _selectedWaypoint >= avenue.waypoints.Count) return;
+        Vector2Int c = avenue.waypoints[_selectedWaypoint];
+        if (ApplySelectedWaypointMove(new Vector2Int(c.x + steps, c.y))) _scrubChanged = true;
+    }
+
+    void OnScrubZ(int steps)
+    {
+        var avenue = CurrentAvenue;
+        if (avenue == null || _selectedWaypoint < 0 || _selectedWaypoint >= avenue.waypoints.Count) return;
+        Vector2Int c = avenue.waypoints[_selectedWaypoint];
+        if (ApplySelectedWaypointMove(new Vector2Int(c.x, c.y + steps))) _scrubChanged = true;
+    }
+
+    void OnScrubEnd()
+    {
+        if (_scrubChanged) OnAvenueChanged?.Invoke();
+        _scrubChanged = false;
+    }
+
+    /// <summary>Syncs the waypoint cycle/nudge controls and X/Z fields to the current selection.</summary>
+    void RefreshWaypointEditorUI()
+    {
+        var avenue = CurrentAvenue;
+        int count = avenue != null ? avenue.waypoints.Count : 0;
+
+        // Defensive clamp — selection can go stale after load/remove.
+        if (count == 0) _selectedWaypoint = -1;
+        else if (_selectedWaypoint >= count) _selectedWaypoint = count - 1;
+
+        bool hasSel = _selectedWaypoint >= 0 && _selectedWaypoint < count;
+        Vector2Int sel = hasSel ? avenue.waypoints[_selectedWaypoint] : default;
+
+        if (waypointCounterText != null)
+            waypointCounterText.text = hasSel ? $"{_selectedWaypoint + 1} / {count}" : $"0 / {count}";
+
+        if (waypointXInput != null)
+        {
+            waypointXInput.interactable = hasSel;
+            // SetTextWithoutNotify so syncing from code never re-fires onEndEdit.
+            waypointXInput.SetTextWithoutNotify(hasSel ? sel.x.ToString() : string.Empty);
+        }
+        if (waypointZInput != null)
+        {
+            waypointZInput.interactable = hasSel;
+            waypointZInput.SetTextWithoutNotify(hasSel ? sel.y.ToString() : string.Empty);
+        }
+
+        if (prevWaypointButton != null)
+            prevWaypointButton.interactable = hasSel && _selectedWaypoint > 0;
+        if (nextWaypointButton != null)
+            nextWaypointButton.interactable = hasSel && _selectedWaypoint < count - 1;
+
+        if (waypointXMinusButton != null) waypointXMinusButton.interactable = hasSel;
+        if (waypointXPlusButton  != null) waypointXPlusButton.interactable  = hasSel;
+        if (waypointZMinusButton != null) waypointZMinusButton.interactable = hasSel;
+        if (waypointZPlusButton  != null) waypointZPlusButton.interactable  = hasSel;
     }
 
     void OnTitleChanged(string newTitle)
@@ -363,6 +711,7 @@ public class AvenuesOfApproachHandler : MonoBehaviour
             _currentIndex = _avenues.Count > 0 ? 0 : -1;
         }
 
+        ResetSelectionToLast();
         RefreshAvenueUI();
         OnAvenueChanged?.Invoke();
     }
@@ -455,6 +804,7 @@ public class AvenuesOfApproachHandler : MonoBehaviour
             removeAvenueButton.interactable = hasAny;
 
         RefreshAvenueVisuals();
+        RefreshWaypointEditorUI();
     }
 
     void RefreshAvenueVisuals()
@@ -463,7 +813,6 @@ public class AvenuesOfApproachHandler : MonoBehaviour
         {
             var avenue = _avenues[i];
             bool isCurrent = i == _currentIndex;
-            int lastIdx = avenue.waypointSpheres.Count - 1;
 
             for (int w = 0; w < avenue.waypointSpheres.Count; w++)
             {
@@ -471,8 +820,8 @@ public class AvenuesOfApproachHandler : MonoBehaviour
                 if (sphere == null) continue;
                 // Reposition each refresh so spheres stay in sync with waypointHeightOffset and terrain height tweaks.
                 sphere.transform.position = WorldPosForCell(avenue.waypoints[w]);
-                bool isLast = isCurrent && w == lastIdx;
-                ApplySphereStyle(sphere, isCurrent, isLast);
+                bool isHighlighted = isCurrent && w == _selectedWaypoint;
+                ApplySphereStyle(sphere, isCurrent, isHighlighted);
             }
 
             RefreshAvenueLine(avenue, isCurrent);
@@ -501,7 +850,7 @@ public class AvenuesOfApproachHandler : MonoBehaviour
         }
         _startIndicatorSphere.transform.position = WorldPosForCell(terrainDataStore.StartCell.Value);
         _startIndicatorSphere.SetActive(true);
-        ApplySphereStyle(_startIndicatorSphere, isCurrent: true, isLast: true);
+        ApplySphereStyle(_startIndicatorSphere, isCurrent: true, isHighlighted: true);
     }
 
     void RefreshAvenueLine(AvenueOfApproach avenue, bool isCurrent)
@@ -558,11 +907,11 @@ public class AvenuesOfApproachHandler : MonoBehaviour
         else mat.color = color;
     }
 
-    void ApplySphereStyle(GameObject sphere, bool isCurrent, bool isLast)
+    void ApplySphereStyle(GameObject sphere, bool isCurrent, bool isHighlighted)
     {
         float size;
         Color color;
-        if (isLast)         { size = lastSphereSize;    color = lastSphereColor; }
+        if (isHighlighted)  { size = lastSphereSize;    color = lastSphereColor; }
         else if (isCurrent) { size = currentSphereSize; color = currentSphereColor; }
         else                { size = otherSphereSize;   color = otherSphereColor; }
 
