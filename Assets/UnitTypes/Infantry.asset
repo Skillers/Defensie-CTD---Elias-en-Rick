@@ -27,4 +27,4 @@ MonoBehaviour:
   - minSlopeDeg: -40
     maxSlopeDeg: -20
     costMultiplier: 1
-    blocked: 1
+    blocked: 0

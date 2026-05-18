@@ -63,6 +63,36 @@ public class AStarPathGeneration : MonoBehaviour
     [Tooltip("Height above terrain for the final shortcut line. Keep highest so it draws on top.")]
     public float shortcutLineLift = 0.2f;
 
+    [Header("Corner Detection")]
+    [Tooltip("Find sharp turning points on the final path and mark each with a sphere — these are the corners the bevel cuts.")]
+    public bool drawCornerMarkers = true;
+    [Tooltip("Minimum turn angle (degrees) for a vertex to count as a sharp corner. The 16-direction grid bends by ~22-27° at its gentlest, so keep this above that to skip stair-step jitter and only catch real corners.")]
+    public float cornerAngleThresholdDeg = 60f;
+    [Tooltip("Colour of the corner marker spheres.")]
+    public Color cornerMarkerColor = new Color(1f, 0.5f, 0f, 1f);
+    [Tooltip("Diameter of the corner marker spheres in world units.")]
+    public float cornerMarkerSize = 1.2f;
+    [Tooltip("Height above terrain at which the corner spheres are centred.")]
+    public float cornerMarkerLift = 0.25f;
+
+    [Header("Corner Bevel")]
+    [Tooltip("Bevel each detected sharp corner: step a few cells back and forward along the path, then replace the corner in between with a curve from the back point, bending toward the corner, to the forward point. XZ only; the beveled curve is rasterized back onto the grid.")]
+    public bool drawBeveledPath = true;
+    [Tooltip("Make the beveled path the route the unit actually walks (rasterized to the grid). Off = the unit walks the un-beveled A* path and the bevel is just a preview line. NOTE: the bevel is geometric and ignores obstacles/blocked biomes/steep slopes — see chat caveat. Tunable live in Play mode (only affects units spawned after the change).")]
+    public bool useBeveledPathForUnit = true;
+    [Tooltip("How many path cells to step outward from each sharp corner along each side before bridging. Larger = a bigger bite taken out of the corner. Tunable live in Play mode.")]
+    [Range(1, 20)]
+    public int bevelStepsPerSide = 4;
+    [Tooltip("How many straight segments the bevel curve is split into. 1 = a single straight chamfer (no rounding). Higher = more subdivisions, so the corner gets progressively smoother/rounder instead of just one half-way cut. Tunable live in Play mode.")]
+    [Range(1, 16)]
+    public int bevelSegments = 1;
+    [Tooltip("Colour of the beveled path line.")]
+    public Color bevelLineColor = new Color(0.2f, 1f, 0.55f, 1f);
+    [Tooltip("Width of the beveled path line.")]
+    public float bevelLineWidth = 0.5f;
+    [Tooltip("Height above terrain for the beveled line. Keep highest so it draws on top of the other path lines. Provisional only — the real Y is resolved later when the line is rebuilt on the 16-direction grid.")]
+    public float bevelLineLift = 0.3f;
+
     /// <summary>
     /// One generated route, keyed by unit type. <see cref="path"/> is the full
     /// concatenated walk (or a direct start→end fallback if any avenue leg failed).
@@ -85,6 +115,11 @@ public class AStarPathGeneration : MonoBehaviour
 
         // The concatenated route before RemoveLoops — kept only for the debug line.
         public List<Vector2Int> rawPath = new List<Vector2Int>();
+
+        // The post-proximity-shortcut path, snapshotted before beveling. Stable
+        // source for corner detection + the bevel so live tweaks never compound;
+        // also the fallback when the bevel is disabled or unusable.
+        public List<Vector2Int> basePath = new List<Vector2Int>();
     }
 
     readonly Dictionary<UnitTypeSO, GeneratedRoute> _routes = new Dictionary<UnitTypeSO, GeneratedRoute>();
@@ -93,6 +128,8 @@ public class AStarPathGeneration : MonoBehaviour
     readonly List<(Vector3 a, Vector3 b)> _proximityPairs = new List<(Vector3, Vector3)>();
     readonly List<GameObject> _proximityPairLines = new List<GameObject>();
     readonly List<GameObject> _shortcutLineObjects = new List<GameObject>();
+    readonly List<GameObject> _cornerMarkers = new List<GameObject>();
+    readonly List<GameObject> _bevelLineObjects = new List<GameObject>();
     bool _generated;
 
     void Awake()
@@ -101,6 +138,27 @@ public class AStarPathGeneration : MonoBehaviour
         if (unitSpawner == null)      unitSpawner      = FindFirstObjectByType<UnitSpawner>();
         if (avenueStore == null)      avenueStore      = FindFirstObjectByType<AvenueRuntimeStore>();
     }
+
+#if UNITY_EDITOR
+    bool _smoothingVizDirty;
+
+    // Live bevel tuning. OnValidate fires on every inspector edit (incl. during
+    // Play) but must not spawn/destroy objects itself, so it just flags a rebuild
+    // that Update applies next frame. The rebuild only redraws the corner + bevel
+    // viz from the already-stored route.path — it never re-runs A* or re-picks the
+    // random avenue. Editor-only: compiled out of player builds, no per-frame cost.
+    void OnValidate() => _smoothingVizDirty = true;
+
+    void Update()
+    {
+        if (_smoothingVizDirty && Application.isPlaying && _generated)
+        {
+            _smoothingVizDirty = false;
+            DetectAndMarkCorners();
+            ApplyAndDrawBevel();
+        }
+    }
+#endif
 
     /// <summary>
     /// Returns the route generated for <paramref name="type"/>, generating all
@@ -162,6 +220,14 @@ public class AStarPathGeneration : MonoBehaviour
 
         DrawRawPaths();
         ApplyProximityShortcuts();
+
+        // Snapshot the post-shortcut path as the stable bevel source before any
+        // beveling mutates route.path.
+        foreach (var kv in _routes)
+            kv.Value.basePath = new List<Vector2Int>(kv.Value.path);
+
+        DetectAndMarkCorners();
+        ApplyAndDrawBevel();
     }
 
     /// <summary>
@@ -628,6 +694,239 @@ public class AStarPathGeneration : MonoBehaviour
 
         return line;
     }
+
+    /// <summary>
+    /// Marks every sharp turning point on each route's final path with an orange
+    /// sphere. A vertex is a corner when the step direction changes there, and it
+    /// counts as "sharp" when the deviation between the incoming and outgoing
+    /// direction is at least <see cref="cornerAngleThresholdDeg"/> degrees. This is
+    /// the set of corners the bevel pass later cuts off. Runs after
+    /// <see cref="ApplyProximityShortcuts"/> so it sees the final walked path.
+    /// Rebuilt on every call so a regenerate never stacks stale spheres.
+    /// </summary>
+    void DetectAndMarkCorners()
+    {
+        for (int i = 0; i < _cornerMarkers.Count; i++)
+            if (_cornerMarkers[i] != null) Destroy(_cornerMarkers[i]);
+        _cornerMarkers.Clear();
+
+        if (!drawCornerMarkers || terrainDataStore == null) return;
+
+        Material mat = MakeMarkerMaterial(cornerMarkerColor);
+
+        foreach (var kv in _routes)
+        {
+            List<Vector2Int> path = (kv.Value.basePath != null && kv.Value.basePath.Count > 0)
+                ? kv.Value.basePath : kv.Value.path;
+            List<int> corners = FindCornerIndices(path, cornerAngleThresholdDeg);
+            if (corners.Count == 0) continue;
+
+            string label = kv.Value.unitType != null ? kv.Value.unitType.typeName : "Unit";
+            foreach (int idx in corners)
+            {
+                Vector2Int c = path[idx];
+                Vector3 w = terrainDataStore.GridToWorld(c);
+                w.y = terrainDataStore.GetRoundedHeight(c.x, c.y) + cornerMarkerLift;
+                _cornerMarkers.Add(MakeCornerMarker($"CornerMarker ({label})", w, mat));
+            }
+        }
+    }
+
+    /// <summary>
+    /// Returns the indices into <paramref name="path"/> of every interior vertex
+    /// where the step direction turns by at least <paramref name="minAngleDeg"/>
+    /// degrees. Endpoints are never corners. Inside a run of constant direction the
+    /// per-step delta is identical, so the deviation only has to be measured between
+    /// the step arriving at the vertex and the step leaving it.
+    /// </summary>
+    public static List<int> FindCornerIndices(List<Vector2Int> path, float minAngleDeg)
+    {
+        var corners = new List<int>();
+        if (path == null || path.Count < 3) return corners;
+
+        for (int i = 1; i < path.Count - 1; i++)
+        {
+            Vector2Int inDelta  = path[i]     - path[i - 1];
+            Vector2Int outDelta = path[i + 1] - path[i];
+            if (inDelta == outDelta) continue;  // straight through this cell
+
+            Vector2 a = ((Vector2)inDelta).normalized;
+            Vector2 b = ((Vector2)outDelta).normalized;
+            float dot = Mathf.Clamp(Vector2.Dot(a, b), -1f, 1f);
+            float deviation = Mathf.Acos(dot) * Mathf.Rad2Deg;
+            if (deviation >= minAngleDeg)
+                corners.Add(i);
+        }
+        return corners;
+    }
+
+    GameObject MakeCornerMarker(string objectName, Vector3 worldPos, Material mat)
+    {
+        var go = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        go.name = objectName;
+        go.transform.SetParent(transform, false);
+        go.transform.position   = worldPos;
+        go.transform.localScale = Vector3.one * cornerMarkerSize;
+
+        Destroy(go.GetComponent<Collider>());
+        go.GetComponent<MeshRenderer>().sharedMaterial = mat;
+        return go;
+    }
+
+    /// <summary>
+    /// Builds each route's beveled curve from its stable
+    /// <see cref="GeneratedRoute.basePath"/>, rasterizes it back onto the grid as
+    /// 8-connected steps (every step is a <see cref="CellData.Directions"/> entry,
+    /// so <see cref="UnitMover"/> resolves slope/biome per step and Y comes from
+    /// the grid), de-loops it, and — when <see cref="useBeveledPathForUnit"/> —
+    /// makes that the route's walked <see cref="GeneratedRoute.path"/>. The drawn
+    /// line is the actual walked path, so what you see is what the unit follows.
+    /// Idempotent: always derives from basePath, never from an already-beveled
+    /// path, so live tweaks / regenerates never compound. Rebuilt on every call.
+    /// </summary>
+    void ApplyAndDrawBevel()
+    {
+        for (int i = 0; i < _bevelLineObjects.Count; i++)
+            if (_bevelLineObjects[i] != null) Destroy(_bevelLineObjects[i]);
+        _bevelLineObjects.Clear();
+
+        if (terrainDataStore == null) return;
+
+        foreach (var kv in _routes)
+        {
+            GeneratedRoute route = kv.Value;
+            List<Vector2Int> src = (route.basePath != null && route.basePath.Count > 0)
+                ? route.basePath : route.path;
+            if (src == null || src.Count < 2) continue;
+
+            List<int> corners        = FindCornerIndices(src, cornerAngleThresholdDeg);
+            List<Vector3> curve      = BuildBeveledCurve(src, corners);
+            List<Vector2Int> beveled = RasterizeCurveToGrid(curve);
+
+            // Geometric bevel — if rasterizing collapsed it, fall back to the base
+            // path so the unit always has a valid route to walk.
+            bool usable = beveled.Count > 1;
+            route.path = (useBeveledPathForUnit && usable)
+                ? beveled
+                : new List<Vector2Int>(src);
+
+            if (drawBeveledPath)
+            {
+                string label = route.unitType != null ? route.unitType.typeName : "Unit";
+                _bevelLineObjects.Add(BuildCellLine($"BeveledPathLine ({label})",
+                    route.path, bevelLineColor, bevelLineWidth, bevelLineLift));
+            }
+        }
+    }
+
+    /// <summary>
+    /// Snaps a world XZ curve back to grid cells: each point is rounded to its
+    /// cell and consecutive cells are joined with an 8-connected Bresenham line
+    /// (<see cref="StraightLine8"/>), so every step is one of the 16
+    /// <see cref="CellData.Directions"/> the mover understands. Self-intersections
+    /// the bevel may introduce are removed with <see cref="RemoveLoops"/>.
+    /// </summary>
+    List<Vector2Int> RasterizeCurveToGrid(List<Vector3> curve)
+    {
+        var cells = new List<Vector2Int>();
+        if (curve == null || curve.Count == 0) return cells;
+
+        Vector2Int prev = ClampToGrid(terrainDataStore.WorldToGrid(curve[0]));
+        cells.Add(prev);
+        for (int i = 1; i < curve.Count; i++)
+        {
+            Vector2Int cur = ClampToGrid(terrainDataStore.WorldToGrid(curve[i]));
+            if (cur == prev) continue;
+
+            List<Vector2Int> seg = StraightLine8(prev, cur);
+            for (int s = 1; s < seg.Count; s++) cells.Add(seg[s]);
+            prev = cur;
+        }
+        return RemoveLoops(cells);
+    }
+
+    /// <summary>
+    /// Returns <paramref name="path"/> as an XZ world polyline with every sharp
+    /// <paramref name="corners"/> beveled. For each corner at index c the cells
+    /// from c-<see cref="bevelStepsPerSide"/> (S1) to c+<see cref="bevelStepsPerSide"/>
+    /// (S2) are dropped and replaced by a quadratic Bézier with S1 and S2 as the
+    /// endpoints and the corner cell as the control point, sampled into
+    /// <see cref="bevelSegments"/> straight segments. 1 segment = the straight
+    /// S1→S2 chamfer; more segments = a progressively rounder corner that bends
+    /// toward the original corner. The reach is clamped so a bevel never crosses
+    /// the previous bevel, the neighbouring corner, or the path ends; a corner
+    /// whose window collapses to nothing is left untouched. All other cells are
+    /// copied verbatim, so the line still follows the real route. Y is left at 0
+    /// here and filled in by the caller's provisional re-ground.
+    /// </summary>
+    List<Vector3> BuildBeveledCurve(List<Vector2Int> path, List<int> corners)
+    {
+        int n = path.Count;
+        var result = new List<Vector3>();
+
+        if (corners.Count == 0)
+        {
+            for (int j = 0; j < n; j++) result.Add(CellWorld(path[j], bevelLineLift));
+            return result;
+        }
+
+        int w = Mathf.Max(1, bevelStepsPerSide);
+        int cursor = 0;
+
+        for (int ci = 0; ci < corners.Count; ci++)
+        {
+            int c = corners[ci];
+
+            // Reach w each side, but never cross the previous bevel (cursor), the
+            // next sharp corner, or the path ends.
+            int nextLimit = (ci + 1 < corners.Count) ? corners[ci + 1] : n - 1;
+            int leftIdx   = Mathf.Max(c - w, cursor);
+            int rightIdx  = Mathf.Min(c + w, nextLimit);
+
+            // Window collapsed (corners too close): leave this corner as-is.
+            if (rightIdx - leftIdx < 2) continue;
+
+            // Copy untouched cells up to and including the left side point S1.
+            for (int k = cursor; k <= leftIdx; k++)
+                result.Add(CellWorld(path[k], bevelLineLift));
+
+            // Quadratic Bézier in XZ: S1 → (corner = control) → S2, sampled into
+            // bevelSegments straight pieces. More segments = a smoother round.
+            Vector3 p0 = CellWorld(path[leftIdx],  bevelLineLift);
+            Vector3 p1 = CellWorld(path[c],        bevelLineLift);
+            Vector3 p2 = CellWorld(path[rightIdx], bevelLineLift);
+
+            int segs = Mathf.Max(1, bevelSegments);
+            // p0 == path[leftIdx] is already the last copied cell, so emit the
+            // samples for t = 1/segs .. 1 (the t = 1 sample is exactly S2).
+            for (int seg = 1; seg <= segs; seg++)
+            {
+                float t = (float)seg / segs;
+                float u = 1f - t;
+                float bx = u * u * p0.x + 2f * u * t * p1.x + t * t * p2.x;
+                float bz = u * u * p0.z + 2f * u * t * p1.z + t * t * p2.z;
+                result.Add(new Vector3(bx, 0f, bz));
+            }
+
+            cursor = rightIdx + 1;
+        }
+
+        for (int idx = cursor; idx < n; idx++)
+            result.Add(CellWorld(path[idx], bevelLineLift));
+
+        return result;
+    }
+
+    Vector3 CellWorld(Vector2Int cell, float lift)
+    {
+        Vector3 w = terrainDataStore.GridToWorld(cell);
+        w.y = terrainDataStore.GetRoundedHeight(cell.x, cell.y) + lift;
+        return w;
+    }
+
+    Vector2Int ClampToGrid(Vector2Int g) => new Vector2Int(
+        Mathf.Clamp(g.x, 0, terrainDataStore.GridWidth  - 1),
+        Mathf.Clamp(g.y, 0, terrainDataStore.GridHeight - 1));
 
     GameObject BuildPairLine(Vector3 a, Vector3 b)
     {

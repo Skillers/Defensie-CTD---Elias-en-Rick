@@ -542,17 +542,37 @@ PrefabInstance:
     m_TransformParent: {fileID: 0}
     m_Modifications:
     - target: {fileID: 4808060888872438280, guid: 34f8a3d10a4a9a040ae0dc503f8ab6bf, type: 3}
+      propertyPath: formation
+      value: 3
+      objectReference: {fileID: 0}
+    - target: {fileID: 4808060888872438280, guid: 34f8a3d10a4a9a040ae0dc503f8ab6bf, type: 3}
+      propertyPath: squadSize
+      value: 6
+      objectReference: {fileID: 0}
+    - target: {fileID: 4808060888872438280, guid: 34f8a3d10a4a9a040ae0dc503f8ab6bf, type: 3}
       propertyPath: avenueStore
       value: 
       objectReference: {fileID: 1407791791}
+    - target: {fileID: 4808060888872438280, guid: 34f8a3d10a4a9a040ae0dc503f8ab6bf, type: 3}
+      propertyPath: formationLead
+      value: 3
+      objectReference: {fileID: 0}
     - target: {fileID: 4808060888872438280, guid: 34f8a3d10a4a9a040ae0dc503f8ab6bf, type: 3}
       propertyPath: loadingScreen
       value: 
       objectReference: {fileID: 1800273227}
     - target: {fileID: 4808060888872438280, guid: 34f8a3d10a4a9a040ae0dc503f8ab6bf, type: 3}
+      propertyPath: minSeparation
+      value: 1.5
+      objectReference: {fileID: 0}
+    - target: {fileID: 4808060888872438280, guid: 34f8a3d10a4a9a040ae0dc503f8ab6bf, type: 3}
       propertyPath: warningDisplay
       value: 
       objectReference: {fileID: 356561803}
+    - target: {fileID: 4808060888872438280, guid: 34f8a3d10a4a9a040ae0dc503f8ab6bf, type: 3}
+      propertyPath: formationSpacing
+      value: 2
+      objectReference: {fileID: 0}
     - target: {fileID: 4808060888872438280, guid: 34f8a3d10a4a9a040ae0dc503f8ab6bf, type: 3}
       propertyPath: terrainDataStore
       value: 
@@ -561,6 +581,10 @@ PrefabInstance:
       propertyPath: gameTerrainBuilder
       value: 
       objectReference: {fileID: 94873265}
+    - target: {fileID: 4808060888872438280, guid: 34f8a3d10a4a9a040ae0dc503f8ab6bf, type: 3}
+      propertyPath: personalSpaceMargin
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 5469956446649950277, guid: 34f8a3d10a4a9a040ae0dc503f8ab6bf, type: 3}
       propertyPath: m_LocalPosition.x
       value: 464.5619
@@ -1102,6 +1126,81 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6e01fa2f9bb1b5b499bdd3681b151fa6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::WarningDisplay
+--- !u!1 &416015733
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 416015735}
+  - component: {fileID: 416015734}
+  m_Layer: 0
+  m_Name: GameObject
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &416015734
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 416015733}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0c57a6902b03fb5499529d3fc9533526, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::AStarPathGeneration
+  terrainDataStore: {fileID: 87598852}
+  unitSpawner: {fileID: 1959012459}
+  avenueStore: {fileID: 1407791791}
+  drawRawPath: 1
+  rawPathColor: {r: 1, g: 0.25, b: 0.2, a: 1}
+  rawPathLineWidth: 0.5
+  rawPathLineLift: 2
+  drawProximityMarkers: 1
+  proximityWorldDistance: 4
+  proximityLookaheadSteps: 10
+  proximityWindowSteps: 10
+  proximityMarkerColor: {r: 0.2, g: 0.6, b: 1, a: 1}
+  proximityMarkerSize: 1
+  proximityMarkerLift: 2
+  proximityPairLineColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
+  proximityPairLineWidth: 1
+  applyShortcuts: 1
+  shortcutLineColor: {r: 0.6, g: 0.2, b: 1, a: 1}
+  shortcutLineWidth: 0.5
+  shortcutLineLift: 4
+  drawCornerMarkers: 1
+  cornerAngleThresholdDeg: 50
+  cornerMarkerColor: {r: 1, g: 0.5, b: 0, a: 1}
+  cornerMarkerSize: 1.2
+  cornerMarkerLift: 0.25
+  drawBeveledPath: 1
+  bevelStepsPerSide: 6
+  bevelSegments: 8
+  bevelLineColor: {r: 0.2, g: 1, b: 0.55, a: 1}
+  bevelLineWidth: 0.5
+  bevelLineLift: 0.3
+--- !u!4 &416015735
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 416015733}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 62.41068, y: -0, z: -26.49141}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &435289247
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -3656,6 +3755,17 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: ba49849a848fe874ebf1fb804e1fdbd3, type: 3}
+--- !u!114 &1959012459 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 4808060888872438280, guid: 34f8a3d10a4a9a040ae0dc503f8ab6bf, type: 3}
+  m_PrefabInstance: {fileID: 259201140}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 750fe797939b1034fb74d5fca45f77e3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::UnitSpawner
 --- !u!1 &1969247180
 GameObject:
   m_ObjectHideFlags: 0
@@ -4421,3 +4531,4 @@ SceneRoots:
   - {fileID: 259201140}
   - {fileID: 1800273228}
   - {fileID: 356561802}
+  - {fileID: 416015735}
