@@ -1,11 +1,12 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// Spawns a unit at the start flag cell when the save is loaded. If an
-/// <see cref="AvenueRuntimeStore"/> is wired and the save contains avenues, picks
-/// one at random, shows a 3-second on-screen warning naming it, then walks the
-/// unit through that avenue's waypoints to the end flag. Otherwise pathfinds
-/// directly start → end.
+/// Spawns a unit at the start flag cell when the save is loaded, then hands it the
+/// route built by <see cref="AStarPathGeneration"/> for its unit type. If that
+/// route runs through an avenue, an on-screen warning naming the avenue is shown
+/// for <see cref="warningSeconds"/> before the unit starts moving.
+/// Path <em>making</em> lives in the scene path maker, not on the unit.
 /// </summary>
 public class UnitSpawner : MonoBehaviour
 {
@@ -15,8 +16,8 @@ public class UnitSpawner : MonoBehaviour
     public GameTerrainBuilder gameTerrainBuilder;
     [Tooltip("Optional. Black-screen overlay shown while the terrain builds. Hides itself before the AoA warning appears.")]
     public LoadingScreen loadingScreen;
-    [Tooltip("Optional. If set and the save has avenues, the unit picks one at random and walks its waypoints before reaching the end flag.")]
-    public AvenueRuntimeStore avenueStore;
+    [Tooltip("Scene path maker. Generates one route per unit type. Auto-found if left empty.")]
+    public AStarPathGeneration pathGeneration;
     [Tooltip("Optional. If set, the avenue title is shown on screen for warningSeconds before the unit starts moving.")]
     public WarningDisplay warningDisplay;
 
@@ -38,8 +39,27 @@ public class UnitSpawner : MonoBehaviour
 
     static int _nextUnitId = 1;
 
+    /// <summary>One unit the spawner will instantiate, paired with its type.</summary>
+    public struct SpawnRequest
+    {
+        public GameObject prefab;
+        public UnitTypeSO unitType;
+    }
+
+    /// <summary>
+    /// The units this spawner will spawn, read by <see cref="AStarPathGeneration"/>
+    /// to generate one route per type. Single entry today; becomes a real list when
+    /// multi-type spawning is added.
+    /// </summary>
+    public IEnumerable<SpawnRequest> GetSpawnRequests()
+    {
+        yield return new SpawnRequest { prefab = unitPrefab, unitType = unitType };
+    }
+
     void Awake()
     {
+        if (pathGeneration == null) pathGeneration = FindFirstObjectByType<AStarPathGeneration>();
+
         // Prefer OnBuildComplete: data-only OnSaveLoaded fires before the terrain mesh exists,
         // so the unit would spawn into a void. Fall back to OnSaveLoaded for scenes without a builder.
         if (gameTerrainBuilder != null)
@@ -80,8 +100,13 @@ public class UnitSpawner : MonoBehaviour
             return;
         }
 
+        if (pathGeneration == null)
+        {
+            Debug.LogError("UnitSpawner: no AStarPathGeneration in the scene — cannot route the unit.");
+            return;
+        }
+
         Vector2Int startCell = terrainDataStore.StartCell.Value;
-        Vector2Int endCell   = terrainDataStore.EndCell.Value;
 
         Vector3 spawnPos = terrainDataStore.GridToWorld(startCell);
         spawnPos.y = terrainDataStore.GetRoundedHeight(startCell.x, startCell.y) + heightOffset;
@@ -99,35 +124,35 @@ public class UnitSpawner : MonoBehaviour
 
         mover.unitId = _nextUnitId++;
 
-        AvenueData picked = PickRandomAvenue();
-        if (picked == null)
+        AStarPathGeneration.GeneratedRoute route = pathGeneration.GetRoute(unitType);
+        if (route == null)
         {
-            // No avenues loaded — preserve the original direct-to-end behaviour.
-            mover.Initialize(terrainDataStore, endCell, unitType);
+            Debug.LogWarning($"UnitSpawner: AStarPathGeneration produced no route for unit type '{unitType?.typeName}'.");
             return;
         }
 
-        if (warningDisplay != null && warningSeconds > 0f)
+        // Capture for the closure so a later spawn can't redirect this unit's route.
+        // Plan registration is deferred to movement start to keep MissionSession's
+        // latest-only timing identical to the old per-unit flow.
+        TerrainDataStore tds  = terrainDataStore;
+        UnitTypeSO       type = unitType;
+        AStarPathGeneration gen = pathGeneration;
+
+        if (warningDisplay != null && warningSeconds > 0f && !string.IsNullOrEmpty(route.avenueTitle))
         {
-            // Capture for the closure so a later spawn can't redirect this unit's route.
-            TerrainDataStore tds = terrainDataStore;
-            UnitTypeSO type      = unitType;
             warningDisplay.Show(
-                $"Unit taking: {picked.title}",
+                $"Unit taking: {route.avenueTitle}",
                 warningSeconds,
-                () => mover.InitializeWithRoute(tds, picked.waypoints, endCell, type));
+                () =>
+                {
+                    UnitPathPlan plan = gen.BuildAndRegisterPlan(mover.unitId, type);
+                    mover.FollowPath(tds, type, route.goalCell, route.path, plan);
+                });
         }
         else
         {
-            mover.InitializeWithRoute(terrainDataStore, picked.waypoints, endCell, unitType);
+            UnitPathPlan plan = gen.BuildAndRegisterPlan(mover.unitId, type);
+            mover.FollowPath(tds, type, route.goalCell, route.path, plan);
         }
-    }
-
-    AvenueData PickRandomAvenue()
-    {
-        if (avenueStore == null) return null;
-        var list = avenueStore.Avenues;
-        if (list == null || list.Count == 0) return null;
-        return list[Random.Range(0, list.Count)];
     }
 }

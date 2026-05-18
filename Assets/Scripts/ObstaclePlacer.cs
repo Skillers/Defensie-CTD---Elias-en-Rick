@@ -12,6 +12,8 @@ public class ObstaclePlacer : MonoBehaviour
 {
     [Header("References")]
     public TerrainDataStore terrainDataStore;
+    [Tooltip("Scene path maker. Re-routes live units after the world changes. Auto-found if left empty.")]
+    public AStarPathGeneration pathGeneration;
 
     [Header("Blocking biome (impassable)")]
     [Tooltip("Assign a BiomeSO with defaultMovementCost = int.MaxValue.")]
@@ -23,6 +25,11 @@ public class ObstaclePlacer : MonoBehaviour
 
     [Header("Cost")]
     public int slowCostIncrease = 5;
+
+    void Awake()
+    {
+        if (pathGeneration == null) pathGeneration = FindFirstObjectByType<AStarPathGeneration>();
+    }
 
     void Update()
     {
@@ -70,8 +77,8 @@ public class ObstaclePlacer : MonoBehaviour
         cube.GetComponent<MeshRenderer>().material =
             CreateTransparentMaterial(block ? blockColor : slowColor);
 
-        foreach (var mover in FindObjectsByType<UnitMover>(FindObjectsSortMode.None))
-            mover.RequestPath();
+        if (pathGeneration != null)
+            pathGeneration.RecomputeForLiveUnits();
     }
 
     static Material CreateTransparentMaterial(Color color)

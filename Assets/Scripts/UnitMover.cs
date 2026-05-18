@@ -2,9 +2,10 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// Walks a unit along an A* path between two grid cells.
-/// Configure with <see cref="Initialize"/> (typical) or by setting the inspector
-/// fields and calling <see cref="GoTo"/> manually.
+/// Walks a unit along a precomputed A* path. Path <em>making</em> lives in the
+/// scene (<see cref="AStarPathGeneration"/>) — this component never runs A* itself.
+/// Drive it with <see cref="FollowPath"/>: the caller supplies the cells to walk,
+/// the goal, and the <see cref="UnitPathPlan"/> to fill in as the unit moves.
 /// Speed is divided by the biome cost AND the unit's slope multiplier of the cell
 /// being stepped from, so visual movement matches A*'s path cost.
 /// Y is snapped to the terrain's rounded height every frame so the unit follows hills.
@@ -15,9 +16,9 @@ public class UnitMover : MonoBehaviour
     public TerrainDataStore terrainDataStore;
 
     [Header("Unit")]
-    [Tooltip("Resolves per-biome movement costs and slope rules.")]
+    [Tooltip("Resolves per-biome movement costs and slope rules. Set by the scene path maker.")]
     public UnitTypeSO unitType;
-    [Tooltip("Square footprint in cells passed to A*'s CanFit check.")]
+    [Tooltip("Square footprint in cells. Read by AStarPathGeneration for A*'s CanFit check.")]
     public int unitSize = 5;
     [Tooltip("Set by UnitSpawner. Used as the key when registering this unit's plan in MissionSession.")]
     [HideInInspector] public int unitId;
@@ -36,6 +37,12 @@ public class UnitMover : MonoBehaviour
 
     [HideInInspector] public Vector3 moveDirection = Vector3.forward;
 
+    /// <summary>Goal cell of the path this unit is following. Read by the scene path maker when re-routing.</summary>
+    public Vector2Int GoalCell { get; private set; }
+
+    /// <summary>True once <see cref="FollowPath"/> has been called — i.e. this unit has been given a route.</summary>
+    public bool HasPath { get; private set; }
+
     Vector3 squadDirection = Vector3.forward;
 
     List<Vector2Int> path = new List<Vector2Int>();
@@ -47,152 +54,31 @@ public class UnitMover : MonoBehaviour
     Vector3    currentTarget;
     LineRenderer pathLine;
 
-    Vector2Int currentGoal;
-    bool       hasGoal;
-
     UnitPathPlan _activePlan;
     float        _planStartTime;
 
     /// <summary>
-    /// Configure the mover and start moving toward <paramref name="goalCell"/>.
-    /// Spawner-friendly entry point.
+    /// Configure the mover and start walking <paramref name="precomputedPath"/> (built
+    /// by <see cref="AStarPathGeneration"/>). <paramref name="plan"/> is filled in with
+    /// the actual path/seconds as the unit walks; pass null to skip tracking.
     /// </summary>
-    public void Initialize(TerrainDataStore tds, Vector2Int goalCell, UnitTypeSO type)
+    public void FollowPath(TerrainDataStore tds, UnitTypeSO type, Vector2Int goalCell,
+                           List<Vector2Int> precomputedPath, UnitPathPlan plan)
     {
         terrainDataStore = tds;
         unitType         = type;
+        GoalCell         = goalCell;
+        HasPath          = true;
         initialized      = true;
 
         SetupLineRenderer();
         SnapToTerrain();
-        GoTo(goalCell);
-    }
 
-    /// <summary>
-    /// Computes a fresh path from the unit's current cell to <paramref name="goalCell"/>
-    /// and starts walking. Safe to call repeatedly.
-    /// </summary>
-    public void GoTo(Vector2Int goalCell)
-    {
-        if (terrainDataStore == null || terrainDataStore.grid == null)
-        {
-            Debug.LogWarning("UnitMover.GoTo: TerrainDataStore is missing or grid not loaded.");
-            return;
-        }
+        // Only track a plan that has a walkable path — a failed/empty path leaves
+        // the registered plan flagged failed and Update never finalizes it.
+        _activePlan = (plan != null && precomputedPath != null && precomputedPath.Count > 1) ? plan : null;
 
-        currentGoal = goalCell;
-        hasGoal     = true;
-
-        Vector2Int startCell = terrainDataStore.WorldToGrid(transform.position);
-        List<Vector2Int> newPath = AStarPathfinder.FindPath(
-            terrainDataStore.grid,
-            terrainDataStore.GridWidth,
-            terrainDataStore.GridHeight,
-            startCell,
-            goalCell,
-            out float totalCost,
-            unitSize: unitSize,
-            unitType: unitType
-        );
-
-        bool failed = newPath.Count <= 1;
-        if (failed)
-            Debug.LogWarning($"UnitMover: no path found from {startCell} to {goalCell} (or already at goal).");
-
-        RegisterPlan(startCell, goalCell, newPath, null, totalCost, failed);
-
-        StartFollowingPath(newPath);
-    }
-
-    /// <summary>
-    /// Configure the mover and walk a route: from the unit's current cell, through
-    /// each avenue waypoint in order, ending at <paramref name="finalGoal"/>. A* runs
-    /// once per leg and the segments are concatenated into one path that's drawn upfront.
-    /// Falls back to a direct path to <paramref name="finalGoal"/> if any leg fails.
-    /// </summary>
-    public void InitializeWithRoute(TerrainDataStore tds, IReadOnlyList<Vector2Int> avenueWaypoints, Vector2Int finalGoal, UnitTypeSO type)
-    {
-        terrainDataStore = tds;
-        unitType         = type;
-        initialized      = true;
-
-        SetupLineRenderer();
-        SnapToTerrain();
-        GoToRoute(avenueWaypoints, finalGoal);
-    }
-
-    /// <summary>
-    /// Build a concatenated A* path through the avenue waypoints to <paramref name="finalGoal"/>
-    /// and start walking it. If any leg has no path, falls back to a direct route.
-    /// </summary>
-    public void GoToRoute(IReadOnlyList<Vector2Int> avenueWaypoints, Vector2Int finalGoal)
-    {
-        if (terrainDataStore == null || terrainDataStore.grid == null)
-        {
-            Debug.LogWarning("UnitMover.GoToRoute: TerrainDataStore is missing or grid not loaded.");
-            return;
-        }
-
-        currentGoal = finalGoal;
-        hasGoal     = true;
-
-        Vector2Int startCell = terrainDataStore.WorldToGrid(transform.position);
-        List<Vector2Int> combined = BuildRoutePath(startCell, avenueWaypoints, finalGoal, out float totalCost);
-
-        if (combined.Count <= 1)
-        {
-            Debug.LogWarning($"UnitMover.GoToRoute: route through {avenueWaypoints?.Count ?? 0} avenue waypoint(s) failed; falling back to direct path to {finalGoal}.");
-            // Register the route attempt as failed so the session reflects what was tried.
-            RegisterPlan(startCell, finalGoal, combined, avenueWaypoints, 0f, failed: true);
-            GoTo(finalGoal);
-            return;
-        }
-
-        RegisterPlan(startCell, finalGoal, combined, avenueWaypoints, totalCost, failed: false);
-
-        StartFollowingPath(combined);
-    }
-
-    List<Vector2Int> BuildRoutePath(Vector2Int startCell, IReadOnlyList<Vector2Int> avenueWaypoints, Vector2Int finalGoal, out float totalCost)
-    {
-        List<Vector2Int> combined = new List<Vector2Int>();
-        Vector2Int from = startCell;
-        totalCost = 0f;
-
-        int stops = avenueWaypoints?.Count ?? 0;
-        for (int i = 0; i <= stops; i++)
-        {
-            Vector2Int to = i < stops ? avenueWaypoints[i] : finalGoal;
-
-            List<Vector2Int> segment = AStarPathfinder.FindPath(
-                terrainDataStore.grid,
-                terrainDataStore.GridWidth,
-                terrainDataStore.GridHeight,
-                from, to,
-                out float legCost,
-                unitSize: unitSize,
-                unitType: unitType
-            );
-
-            // A* returns an empty list when no path exists — treat the whole route as failed.
-            if (segment.Count == 0)
-            {
-                totalCost = 0f;
-                return new List<Vector2Int>();
-            }
-
-            totalCost += legCost;
-
-            // First leg: keep every cell. Later legs: skip the first cell which duplicates the
-            // previous leg's last cell, otherwise the unit pauses on the join.
-            int startIdx = combined.Count == 0 ? 0 : 1;
-            for (int s = startIdx; s < segment.Count; s++)
-                combined.Add(segment[s]);
-
-            from = to;
-        }
-
-        return combined;
+        StartFollowingPath(precomputedPath ?? new List<Vector2Int>());
     }
 
     void StartFollowingPath(List<Vector2Int> newPath)
@@ -220,19 +106,6 @@ public class UnitMover : MonoBehaviour
 
         DrawPath();
     }
-
-    /// <summary>
-    /// Re-runs A* toward the last goal supplied to <see cref="GoTo"/> or <see cref="Initialize"/>.
-    /// Call this after the world changes (obstacle added, biome cost changed, etc.).
-    /// </summary>
-    public void RecomputePath()
-    {
-        if (!hasGoal) return;
-        GoTo(currentGoal);
-    }
-
-    /// <summary>Compat shim for older callers — same as <see cref="RecomputePath"/>.</summary>
-    public void RequestPath() => RecomputePath();
 
     void Start()
     {
@@ -383,40 +256,5 @@ public class UnitMover : MonoBehaviour
         Vector3 p = transform.position;
         p.y = y;
         transform.position = p;
-    }
-
-    void RegisterPlan(Vector2Int startCell, Vector2Int goalCell, List<Vector2Int> walkPath,
-                      IReadOnlyList<Vector2Int> requestedWaypoints, float totalCost, bool failed)
-    {
-        float seconds = failed
-            ? float.PositiveInfinity
-            : AStarPathfinder.CostToSeconds(totalCost, terrainDataStore.step, moveSpeed);
-
-        UnitPathPlan plan = new UnitPathPlan
-        {
-            unitId             = unitId,
-            startCell          = startCell,
-            goalCell           = goalCell,
-            path               = walkPath != null ? new List<Vector2Int>(walkPath) : new List<Vector2Int>(),
-            estimatedSeconds   = seconds,
-            failed             = failed,
-            recordedAt         = Time.time,
-        };
-
-        if (requestedWaypoints != null)
-            plan.requestedWaypoints = new List<Vector2Int>(requestedWaypoints);
-
-        // Track this plan so Update can fill in actualPath / actualSeconds as the unit walks.
-        // Each new plan resets tracking — actuals are scoped to the current walk.
-        _activePlan = failed ? null : plan;
-
-        // The unit owns the session lifecycle: this is the only place a MissionSession is created.
-        if (MissionSession.Instance == null)
-            new GameObject("MissionSession").AddComponent<MissionSession>();
-
-        if (terrainDataStore != null)
-            MissionSession.Instance.saveFileName = terrainDataStore.SaveFileName;
-
-        MissionSession.Instance.RegisterPlan(plan);
     }
 }
