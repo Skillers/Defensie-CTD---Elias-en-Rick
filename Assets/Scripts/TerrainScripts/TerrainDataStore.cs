@@ -302,7 +302,6 @@ public class TerrainDataStore : MonoBehaviour
                     {
                         rawHeight = c.rawHeight,
                         roundedHeight = c.roundedHeight,
-                        slopeOutgoing = c.slopeOutgoing,
                         biomeName = c.biome != null ? c.biome.biomeName : null,
                     };
                 }
@@ -349,13 +348,17 @@ public class TerrainDataStore : MonoBehaviour
                     {
                         rawHeight = dto?.rawHeight ?? 0f,
                         roundedHeight = dto?.roundedHeight ?? 0f,
-                        slopeOutgoing = dto?.slopeOutgoing,
                         biome = biome,
                     };
 
                     RegisterBiome(biome);
                 }
             }
+
+            // slopeOutgoing is fully derived from rawHeight, so it isn't serialized.
+            // Re-bake it (all CellData.Directions, incl. knight moves) before any
+            // consumer reads the grid.
+            SlopeMap.BakeSlopesIntoGrid(restored, data.gridWidth, data.gridHeight, step);
 
             SetGrid(restored);
         }

@@ -13,26 +13,38 @@ public struct CellData
     public float roundedHeight;
 
     /// <summary>
-    /// Signed slope in degrees for each of the 8 outgoing directions.
-    /// Positive = uphill, negative = downhill.
-    /// Index order: N(0), NE(1), E(2), SE(3), S(4), SW(5), W(6), NW(7).
-    /// Edge cells get 0 for out-of-bounds directions.
+    /// Signed slope in degrees for each outgoing direction in <see cref="Directions"/>
+    /// (same index order). Positive = uphill, negative = downhill.
+    /// Indices 0–7 are the cardinal/diagonal moves, 8–15 the knight (2:1) moves.
+    /// Edge cells get 0 for out-of-bounds directions. Derived from rawHeight — not
+    /// serialized; re-baked on load.
     /// </summary>
     public float[] slopeOutgoing;
 
     /// <summary>The biome assigned to this cell.</summary>
     public BiomeSO biome;
 
-    // Direction offsets matching the index order (dx, dz)
+    // Direction offsets, matching the slopeOutgoing index order (dx, dz).
+    // 0–7: 8-connected king moves. 8–15: knight moves (2 steps one axis, 1 the
+    // other) — opens up shallower routes; step cost is the Euclidean length √5.
     public static readonly Vector2Int[] Directions =
     {
-        new Vector2Int( 0,  1), // N
-        new Vector2Int( 1,  1), // NE
-        new Vector2Int( 1,  0), // E
-        new Vector2Int( 1, -1), // SE
-        new Vector2Int( 0, -1), // S
-        new Vector2Int(-1, -1), // SW
-        new Vector2Int(-1,  0), // W
-        new Vector2Int(-1,  1), // NW
+        new Vector2Int( 0,  1), // 0  N
+        new Vector2Int( 1,  1), // 1  NE
+        new Vector2Int( 1,  0), // 2  E
+        new Vector2Int( 1, -1), // 3  SE
+        new Vector2Int( 0, -1), // 4  S
+        new Vector2Int(-1, -1), // 5  SW
+        new Vector2Int(-1,  0), // 6  W
+        new Vector2Int(-1,  1), // 7  NW
+
+        new Vector2Int( 1,  2), // 8  NNE
+        new Vector2Int( 2,  1), // 9  ENE
+        new Vector2Int( 2, -1), // 10 ESE
+        new Vector2Int( 1, -2), // 11 SSE
+        new Vector2Int(-1, -2), // 12 SSW
+        new Vector2Int(-2, -1), // 13 WSW
+        new Vector2Int(-2,  1), // 14 WNW
+        new Vector2Int(-1,  2), // 15 NNW
     };
 }

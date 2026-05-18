@@ -3,8 +3,6 @@ using UnityEngine;
 
 public static class AStarPathfinder
 {
-    const float SQRT2 = 1.41421356f;
-
     class Node
     {
         public Vector2Int pos;
@@ -53,7 +51,7 @@ public static class AStarPathfinder
 
             CellData fromCell = grid[current.pos.x, current.pos.y];
 
-            foreach (var (neighbour, isDiagonal) in GetNeighbours(current.pos, gridWidth, gridHeight))
+            foreach (var (neighbour, stepDistance) in GetNeighbours(current.pos, gridWidth, gridHeight))
             {
                 if (closed.Contains(neighbour)) continue;
                 if (!CanFit(grid, gridWidth, gridHeight, neighbour, unitSize)) continue;
@@ -64,7 +62,7 @@ public static class AStarPathfinder
                 var cell = grid[neighbour.x, neighbour.y];
                 int moveCost = cell.biome != null ? cell.biome.GetMovementCost(unitType) : 3;
 
-                float stepCost = (isDiagonal ? SQRT2 * moveCost : moveCost) * slopeMultiplier;
+                float stepCost = stepDistance * moveCost * slopeMultiplier;
                 float newG     = current.gCost + stepCost;
 
                 Node existing = open.Find(n => n.pos == neighbour);
@@ -144,23 +142,28 @@ public static class AStarPathfinder
         return true;
     }
 
+    // Euclidean straight-line distance. Admissible for the full move set (every
+    // step's cost equals its Euclidean length × biome × slope, so no path can be
+    // shorter than this). Octile would over-estimate knight moves and break A*.
     static float Heuristic(Vector2Int a, Vector2Int b)
     {
-        float dx = Mathf.Abs(a.x - b.x);
-        float dy = Mathf.Abs(a.y - b.y);
-        return (dx + dy) + (SQRT2 - 2f) * Mathf.Min(dx, dy);
+        float dx = a.x - b.x;
+        float dy = a.y - b.y;
+        return Mathf.Sqrt(dx * dx + dy * dy);
     }
 
-    static IEnumerable<(Vector2Int pos, bool isDiagonal)> GetNeighbours(Vector2Int pos, int w, int h)
+    // Iterates CellData.Directions so the neighbour set and slopeOutgoing indices
+    // share one source of truth. stepDistance is the move's Euclidean length
+    // (1 / √2 / √5 for cardinal / diagonal / knight).
+    static IEnumerable<(Vector2Int pos, float stepDistance)> GetNeighbours(Vector2Int pos, int w, int h)
     {
-        for (int dx = -1; dx <= 1; dx++)
-        for (int dy = -1; dy <= 1; dy++)
+        var dirs = CellData.Directions;
+        for (int d = 0; d < dirs.Length; d++)
         {
-            if (dx == 0 && dy == 0) continue;
-
+            int dx = dirs[d].x, dy = dirs[d].y;
             var n = new Vector2Int(pos.x + dx, pos.y + dy);
             if (n.x >= 0 && n.x < w && n.y >= 0 && n.y < h)
-                yield return (n, dx != 0 && dy != 0);
+                yield return (n, Mathf.Sqrt(dx * dx + dy * dy));
         }
     }
 
