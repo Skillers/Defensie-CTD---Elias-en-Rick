@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using UnityEngine;
 
 /// <summary>
@@ -35,20 +36,15 @@ public class UnitMover : MonoBehaviour
     [Tooltip("Extra height above terrain at which the path line is drawn.")]
     public float pathLineLift  = 0.1f;
 
-    [Header("Ghost")]
-    [Tooltip("Spawn a floating blue orb that walks the main A* line. It slows / stops when it gets too far ahead of the unit.")]
-    public bool  ghostEnabled      = true;
-    public Color ghostColor        = new Color(0.25f, 0.55f, 1f, 1f);
-    [Tooltip("Diameter of the floating orb.")]
-    public float ghostOrbSize      = 1.2f;
-    [Tooltip("How high the orb floats above the main line.")]
-    public float ghostHoverHeight  = 4f;
-    [Tooltip("Width of the vertical stem drawn from the orb down to the line.")]
-    public float ghostStemWidth    = 0.12f;
-    [Tooltip("When the orb gets more than this far (world units, planar) ahead of the unit, it starts to slow down.")]
-    public float ghostSlowDistance = 8f;
-    [Tooltip("When the orb gets more than this far ahead of the unit, it stops entirely until the unit catches up.")]
-    public float ghostStopDistance = 20f;
+    [Header("Catch-up Path (unit → ghost)")]
+    [Tooltip("Live best A* path from the unit to the ghost. Recomputed asynchronously every refresh interval. Obeys the same biome / slope rules as the main A* line.")]
+    public bool  catchUpPathEnabled  = true;
+    public Color catchUpPathColor    = new Color(0.85f, 0.15f, 1f, 1f);
+    public float catchUpPathWidth    = 0.4f;
+    [Tooltip("Extra height above terrain at which the catch-up line is drawn. Keep slightly above the main path line so they don't z-fight.")]
+    public float catchUpPathLift     = 0.2f;
+    [Tooltip("Seconds between async re-computations.")]
+    public float catchUpPathInterval = 0.2f;
 
     [HideInInspector] public Vector3 moveDirection = Vector3.forward;
 
@@ -72,11 +68,12 @@ public class UnitMover : MonoBehaviour
     UnitPathPlan _activePlan;
     float        _planStartTime;
 
-    GameObject   ghostOrb;
-    LineRenderer ghostStem;
-    int          ghostSegmentIndex;
-    float        ghostSegmentT;
-    bool         ghostFinished;
+    UnitGhost               ghost;
+    GhostSettings           ghostSettings = new GhostSettings();
+
+    LineRenderer            catchUpLine;
+    Task<List<Vector2Int>>  catchUpTask;
+    float                   catchUpLastFireTime;
 
     /// <summary>
     /// Configure the mover and start walking <paramref name="precomputedPath"/> (built
@@ -181,6 +178,7 @@ public class UnitMover : MonoBehaviour
     void Update()
     {
         UpdateGhost(Time.deltaTime);
+        TickCatchUpPath();
         if (!moving) return;
 
         // Rotation runs once per frame using the current bearing — visual only,
@@ -239,6 +237,7 @@ public class UnitMover : MonoBehaviour
                     moving = false;
                     pathLine.positionCount = 0;
                     DestroyGhost();
+                    DestroyCatchUpLine();
 
                     if (_activePlan != null)
                     {
@@ -284,157 +283,180 @@ public class UnitMover : MonoBehaviour
 
     // --- Ghost ---------------------------------------------------------------
 
-    void InitGhostOnPath()
+    /// <summary>
+    /// Push the ghost configuration in from the spawner. Call before
+    /// <see cref="FollowPath"/> so InitGhostOnPath sees the right values.
+    /// Defaults are used if never called.
+    /// </summary>
+    public void ApplyGhostSettings(GhostSettings settings)
     {
-        if (!ghostEnabled || path == null || path.Count < 2) return;
-        SetupGhost();
-        ghostSegmentIndex = 0;
-        ghostSegmentT     = 0f;
-        ghostFinished     = false;
-        UpdateGhostVisual();
+        if (settings != null) ghostSettings = settings;
     }
 
-    void SetupGhost()
+    void InitGhostOnPath()
     {
-        if (ghostOrb != null) return;
+        if (!ghostSettings.enabled || path == null || path.Count < 2) return;
 
-        ghostOrb = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-        ghostOrb.name = $"Ghost_{unitId}";
-        var col = ghostOrb.GetComponent<Collider>();
-        if (col != null) Destroy(col);
-        ghostOrb.transform.localScale = Vector3.one * ghostOrbSize;
-
-        var orbMr = ghostOrb.GetComponent<MeshRenderer>();
-        var orbShader = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
-        var orbMat = new Material(orbShader);
-        orbMat.color = ghostColor;
-        if (orbMat.HasProperty("_BaseColor")) orbMat.SetColor("_BaseColor", ghostColor);
-        if (orbMat.HasProperty("_EmissionColor"))
+        if (ghost == null)
         {
-            orbMat.EnableKeyword("_EMISSION");
-            orbMat.SetColor("_EmissionColor", ghostColor * 1.5f);
+            if (ghostSettings.prefab != null)
+            {
+                ghost = Instantiate(ghostSettings.prefab);
+                ghost.name = $"Ghost_{unitId}";
+            }
+            else
+            {
+                var go = new GameObject($"Ghost_{unitId}");
+                ghost = go.AddComponent<UnitGhost>();
+            }
         }
-        orbMr.sharedMaterial = orbMat;
 
-        var stemGO = new GameObject("Stem");
-        stemGO.transform.SetParent(ghostOrb.transform, false);
-        ghostStem = stemGO.AddComponent<LineRenderer>();
-        ghostStem.useWorldSpace = true;
-        ghostStem.startWidth    = ghostStemWidth;
-        ghostStem.endWidth      = ghostStemWidth;
-        ghostStem.positionCount = 2;
+        ghost.Initialize(terrainDataStore, path, pathLineLift);
+    }
 
-        string[] stemCandidates =
+    void DestroyGhost()
+    {
+        if (ghost != null) Destroy(ghost.gameObject);
+        ghost = null;
+    }
+
+    void UpdateGhost(float dt)
+    {
+        if (!ghostSettings.enabled || ghost == null || !ghost.HasPath) return;
+
+        // 1) Leash floor: if the unit has closed inside the minimum, snap the
+        // ghost forward along its path until it sits at the minimum again.
+        // Iterates because one Advance can cross a corner and change the
+        // bearing back to the unit.
+        for (int i = 0; i < ghostSettings.maxStepsPerFrame; i++)
+        {
+            if (ghost.IsFinished) break;
+
+            Vector3 toUnit = ghost.GetFootPosition() - transform.position;
+            toUnit.y = 0f;
+            float dist = toUnit.magnitude;
+            if (dist >= ghostSettings.minDistance) break;
+
+            ghost.Advance(ghostSettings.minDistance - dist);
+        }
+
+        if (ghost.IsFinished) return;
+
+        // 2) Free-run: ghost moves at the unit's nominal moveSpeed (unaffected
+        // by terrain), so it pulls ahead while the unit is biome/slope-slowed.
+        // Scale by a slow/stop falloff once it gets uncomfortably far ahead.
+        Vector3 toUnitNow = ghost.GetFootPosition() - transform.position;
+        toUnitNow.y = 0f;
+        float distAhead = toUnitNow.magnitude;
+
+        float speedMul;
+        if (distAhead <= ghostSettings.slowDistance) speedMul = 1f;
+        else if (distAhead >= ghostSettings.stopDistance) speedMul = 0f;
+        else speedMul = 1f - (distAhead - ghostSettings.slowDistance) / Mathf.Max(0.0001f, ghostSettings.stopDistance - ghostSettings.slowDistance);
+
+        float advance = moveSpeed * speedMul * dt;
+        if (advance > 0f) ghost.Advance(advance);
+    }
+
+    void OnDestroy()
+    {
+        DestroyGhost();
+        DestroyCatchUpLine();
+    }
+
+    // --- Catch-up path (unit → ghost) ---------------------------------------
+
+    void TickCatchUpPath()
+    {
+        if (!catchUpPathEnabled) return;
+        if (terrainDataStore == null || terrainDataStore.grid == null) return;
+
+        // Apply finished work from the previous fire.
+        if (catchUpTask != null && catchUpTask.IsCompleted)
+        {
+            if (catchUpTask.Status == TaskStatus.RanToCompletion)
+                ApplyCatchUpPath(catchUpTask.Result);
+            else if (catchUpTask.IsFaulted)
+                Debug.LogWarning($"Catch-up A* failed: {catchUpTask.Exception?.GetBaseException().Message}");
+            catchUpTask = null;
+        }
+
+        // Only fire while there's something to chase.
+        if (ghost == null || !ghost.HasPath || !moving) return;
+
+        if (catchUpTask == null && Time.time - catchUpLastFireTime >= catchUpPathInterval)
+        {
+            catchUpLastFireTime = Time.time;
+
+            // Snapshot everything the worker needs on the main thread.
+            CellData[,] grid = terrainDataStore.grid;
+            int w = terrainDataStore.GridWidth;
+            int h = terrainDataStore.GridHeight;
+            Vector2Int start = terrainDataStore.WorldToGrid(transform.position);
+            Vector2Int goal  = terrainDataStore.WorldToGrid(ghost.GetFootPosition());
+            int        size  = unitSize;
+            UnitTypeSO type  = unitType;
+
+            catchUpTask = Task.Run(() =>
+            {
+                return AStarPathfinder.FindPath(grid, w, h, start, goal, out _, size, type);
+            });
+        }
+    }
+
+    void ApplyCatchUpPath(List<Vector2Int> cells)
+    {
+        EnsureCatchUpLine();
+        if (cells == null || cells.Count < 2)
+        {
+            catchUpLine.positionCount = 0;
+            return;
+        }
+        catchUpLine.positionCount = cells.Count;
+        for (int i = 0; i < cells.Count; i++)
+        {
+            Vector3 wp = terrainDataStore.GridToWorld(cells[i]);
+            wp.y = terrainDataStore.GetRoundedHeight(cells[i].x, cells[i].y) + catchUpPathLift;
+            catchUpLine.SetPosition(i, wp);
+        }
+    }
+
+    void EnsureCatchUpLine()
+    {
+        if (catchUpLine != null) return;
+
+        var go = new GameObject($"CatchUpLine_{unitId}");
+        go.transform.SetParent(transform, false);
+        catchUpLine = go.AddComponent<LineRenderer>();
+        catchUpLine.useWorldSpace = true;
+        catchUpLine.startWidth    = catchUpPathWidth;
+        catchUpLine.endWidth      = catchUpPathWidth;
+        catchUpLine.positionCount = 0;
+
+        string[] candidates =
         {
             "Universal Render Pipeline/Particles/Unlit",
             "Sprites/Default",
             "Legacy Shaders/Particles/Alpha Blended",
             "Unlit/Color",
         };
-        Shader stemShader = null;
-        foreach (var n in stemCandidates)
+        Shader shader = null;
+        foreach (var n in candidates)
         {
-            stemShader = Shader.Find(n);
-            if (stemShader != null) break;
+            shader = Shader.Find(n);
+            if (shader != null) break;
         }
-        var stemMat = stemShader != null ? new Material(stemShader) : new Material(Shader.Find("Standard"));
-        stemMat.color        = ghostColor;
-        ghostStem.material   = stemMat;
-        ghostStem.startColor = ghostColor;
-        ghostStem.endColor   = ghostColor;
+
+        var mat = shader != null ? new Material(shader) : new Material(Shader.Find("Standard"));
+        mat.color            = catchUpPathColor;
+        catchUpLine.material   = mat;
+        catchUpLine.startColor = catchUpPathColor;
+        catchUpLine.endColor   = catchUpPathColor;
     }
 
-    void DestroyGhost()
+    void DestroyCatchUpLine()
     {
-        if (ghostOrb != null) Destroy(ghostOrb);
-        ghostOrb      = null;
-        ghostStem     = null;
-        ghostFinished = true;
-    }
-
-    void UpdateGhost(float dt)
-    {
-        if (!ghostEnabled || ghostOrb == null || ghostFinished) return;
-        if (path == null || path.Count < 2) return;
-
-        // Slow / stop based on how far ahead of the unit the ghost has drifted.
-        Vector3 foot = GetGhostFootPosition();
-        Vector3 toUnit = foot - transform.position;
-        toUnit.y = 0f;
-        float distAhead = toUnit.magnitude;
-
-        float speedMul;
-        if (distAhead <= ghostSlowDistance) speedMul = 1f;
-        else if (distAhead >= ghostStopDistance) speedMul = 0f;
-        else speedMul = 1f - (distAhead - ghostSlowDistance) / Mathf.Max(0.0001f, ghostStopDistance - ghostSlowDistance);
-
-        float advance = moveSpeed * speedMul * dt;
-        if (advance > 0f) AdvanceGhost(advance);
-
-        UpdateGhostVisual();
-    }
-
-    void AdvanceGhost(float amount)
-    {
-        while (amount > 0f && !ghostFinished && ghostSegmentIndex + 1 < path.Count)
-        {
-            Vector3 a = GhostCellFoot(path[ghostSegmentIndex]);
-            Vector3 b = GhostCellFoot(path[ghostSegmentIndex + 1]);
-            float segLen = Vector3.Distance(a, b);
-            if (segLen <= 0f) { ghostSegmentIndex++; ghostSegmentT = 0f; continue; }
-
-            float remaining = (1f - ghostSegmentT) * segLen;
-            if (amount < remaining)
-            {
-                ghostSegmentT += amount / segLen;
-                amount = 0f;
-            }
-            else
-            {
-                amount -= remaining;
-                ghostSegmentIndex++;
-                ghostSegmentT = 0f;
-                if (ghostSegmentIndex + 1 >= path.Count)
-                {
-                    ghostSegmentIndex = path.Count - 2;
-                    ghostSegmentT     = 1f;
-                    ghostFinished     = true;
-                }
-            }
-        }
-    }
-
-    Vector3 GhostCellFoot(Vector2Int cell)
-    {
-        Vector3 p = terrainDataStore.GridToWorld(cell);
-        p.y = terrainDataStore.GetRoundedHeight(cell.x, cell.y) + pathLineLift;
-        return p;
-    }
-
-    Vector3 GetGhostFootPosition()
-    {
-        if (path == null || path.Count == 0) return transform.position;
-        if (path.Count == 1 || ghostSegmentIndex + 1 >= path.Count) return GhostCellFoot(path[path.Count - 1]);
-        Vector3 a = GhostCellFoot(path[ghostSegmentIndex]);
-        Vector3 b = GhostCellFoot(path[ghostSegmentIndex + 1]);
-        return Vector3.Lerp(a, b, ghostSegmentT);
-    }
-
-    void UpdateGhostVisual()
-    {
-        if (ghostOrb == null) return;
-        Vector3 foot = GetGhostFootPosition();
-        Vector3 orbPos = foot + Vector3.up * ghostHoverHeight;
-        ghostOrb.transform.position = orbPos;
-        if (ghostStem != null)
-        {
-            ghostStem.SetPosition(0, orbPos);
-            ghostStem.SetPosition(1, foot);
-        }
-    }
-
-    void OnDestroy()
-    {
-        DestroyGhost();
+        if (catchUpLine != null) Destroy(catchUpLine.gameObject);
+        catchUpLine = null;
     }
 }

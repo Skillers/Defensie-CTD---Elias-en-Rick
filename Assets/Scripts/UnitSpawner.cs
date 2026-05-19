@@ -35,6 +35,10 @@ public class UnitSpawner : MonoBehaviour
     [Tooltip("Seconds the on-screen warning is displayed before the unit starts moving along the chosen avenue.")]
     public float warningSeconds = 3f;
 
+    [Header("Ghost")]
+    [Tooltip("Behavioural settings for the unit's ghost orb. Pushed into UnitMover at spawn time. Visual fields (colour / size / hover / stem) live on the UnitGhost prefab.")]
+    public GhostSettings ghostSettings = new GhostSettings();
+
     GameObject _spawned;
 
     static int _nextUnitId = 1;
@@ -123,6 +127,7 @@ public class UnitSpawner : MonoBehaviour
         }
 
         mover.unitId = _nextUnitId++;
+        mover.ApplyGhostSettings(ghostSettings);
 
         AStarPathGeneration.GeneratedRoute route = pathGeneration.GetRoute(unitType);
         if (route == null)
