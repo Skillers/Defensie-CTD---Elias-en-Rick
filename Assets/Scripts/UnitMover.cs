@@ -35,6 +35,21 @@ public class UnitMover : MonoBehaviour
     [Tooltip("Extra height above terrain at which the path line is drawn.")]
     public float pathLineLift  = 0.1f;
 
+    [Header("Ghost")]
+    [Tooltip("Spawn a floating blue orb that walks the main A* line. It slows / stops when it gets too far ahead of the unit.")]
+    public bool  ghostEnabled      = true;
+    public Color ghostColor        = new Color(0.25f, 0.55f, 1f, 1f);
+    [Tooltip("Diameter of the floating orb.")]
+    public float ghostOrbSize      = 1.2f;
+    [Tooltip("How high the orb floats above the main line.")]
+    public float ghostHoverHeight  = 4f;
+    [Tooltip("Width of the vertical stem drawn from the orb down to the line.")]
+    public float ghostStemWidth    = 0.12f;
+    [Tooltip("When the orb gets more than this far (world units, planar) ahead of the unit, it starts to slow down.")]
+    public float ghostSlowDistance = 8f;
+    [Tooltip("When the orb gets more than this far ahead of the unit, it stops entirely until the unit catches up.")]
+    public float ghostStopDistance = 20f;
+
     [HideInInspector] public Vector3 moveDirection = Vector3.forward;
 
     /// <summary>Goal cell of the path this unit is following. Read by the scene path maker when re-routing.</summary>
@@ -56,6 +71,12 @@ public class UnitMover : MonoBehaviour
 
     UnitPathPlan _activePlan;
     float        _planStartTime;
+
+    GameObject   ghostOrb;
+    LineRenderer ghostStem;
+    int          ghostSegmentIndex;
+    float        ghostSegmentT;
+    bool         ghostFinished;
 
     /// <summary>
     /// Configure the mover and start walking <paramref name="precomputedPath"/> (built
@@ -105,6 +126,7 @@ public class UnitMover : MonoBehaviour
         }
 
         DrawPath();
+        InitGhostOnPath();
     }
 
     void Start()
@@ -158,6 +180,7 @@ public class UnitMover : MonoBehaviour
 
     void Update()
     {
+        UpdateGhost(Time.deltaTime);
         if (!moving) return;
 
         // Rotation runs once per frame using the current bearing — visual only,
@@ -215,6 +238,7 @@ public class UnitMover : MonoBehaviour
                 {
                     moving = false;
                     pathLine.positionCount = 0;
+                    DestroyGhost();
 
                     if (_activePlan != null)
                     {
@@ -256,5 +280,161 @@ public class UnitMover : MonoBehaviour
         Vector3 p = transform.position;
         p.y = y;
         transform.position = p;
+    }
+
+    // --- Ghost ---------------------------------------------------------------
+
+    void InitGhostOnPath()
+    {
+        if (!ghostEnabled || path == null || path.Count < 2) return;
+        SetupGhost();
+        ghostSegmentIndex = 0;
+        ghostSegmentT     = 0f;
+        ghostFinished     = false;
+        UpdateGhostVisual();
+    }
+
+    void SetupGhost()
+    {
+        if (ghostOrb != null) return;
+
+        ghostOrb = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        ghostOrb.name = $"Ghost_{unitId}";
+        var col = ghostOrb.GetComponent<Collider>();
+        if (col != null) Destroy(col);
+        ghostOrb.transform.localScale = Vector3.one * ghostOrbSize;
+
+        var orbMr = ghostOrb.GetComponent<MeshRenderer>();
+        var orbShader = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
+        var orbMat = new Material(orbShader);
+        orbMat.color = ghostColor;
+        if (orbMat.HasProperty("_BaseColor")) orbMat.SetColor("_BaseColor", ghostColor);
+        if (orbMat.HasProperty("_EmissionColor"))
+        {
+            orbMat.EnableKeyword("_EMISSION");
+            orbMat.SetColor("_EmissionColor", ghostColor * 1.5f);
+        }
+        orbMr.sharedMaterial = orbMat;
+
+        var stemGO = new GameObject("Stem");
+        stemGO.transform.SetParent(ghostOrb.transform, false);
+        ghostStem = stemGO.AddComponent<LineRenderer>();
+        ghostStem.useWorldSpace = true;
+        ghostStem.startWidth    = ghostStemWidth;
+        ghostStem.endWidth      = ghostStemWidth;
+        ghostStem.positionCount = 2;
+
+        string[] stemCandidates =
+        {
+            "Universal Render Pipeline/Particles/Unlit",
+            "Sprites/Default",
+            "Legacy Shaders/Particles/Alpha Blended",
+            "Unlit/Color",
+        };
+        Shader stemShader = null;
+        foreach (var n in stemCandidates)
+        {
+            stemShader = Shader.Find(n);
+            if (stemShader != null) break;
+        }
+        var stemMat = stemShader != null ? new Material(stemShader) : new Material(Shader.Find("Standard"));
+        stemMat.color        = ghostColor;
+        ghostStem.material   = stemMat;
+        ghostStem.startColor = ghostColor;
+        ghostStem.endColor   = ghostColor;
+    }
+
+    void DestroyGhost()
+    {
+        if (ghostOrb != null) Destroy(ghostOrb);
+        ghostOrb      = null;
+        ghostStem     = null;
+        ghostFinished = true;
+    }
+
+    void UpdateGhost(float dt)
+    {
+        if (!ghostEnabled || ghostOrb == null || ghostFinished) return;
+        if (path == null || path.Count < 2) return;
+
+        // Slow / stop based on how far ahead of the unit the ghost has drifted.
+        Vector3 foot = GetGhostFootPosition();
+        Vector3 toUnit = foot - transform.position;
+        toUnit.y = 0f;
+        float distAhead = toUnit.magnitude;
+
+        float speedMul;
+        if (distAhead <= ghostSlowDistance) speedMul = 1f;
+        else if (distAhead >= ghostStopDistance) speedMul = 0f;
+        else speedMul = 1f - (distAhead - ghostSlowDistance) / Mathf.Max(0.0001f, ghostStopDistance - ghostSlowDistance);
+
+        float advance = moveSpeed * speedMul * dt;
+        if (advance > 0f) AdvanceGhost(advance);
+
+        UpdateGhostVisual();
+    }
+
+    void AdvanceGhost(float amount)
+    {
+        while (amount > 0f && !ghostFinished && ghostSegmentIndex + 1 < path.Count)
+        {
+            Vector3 a = GhostCellFoot(path[ghostSegmentIndex]);
+            Vector3 b = GhostCellFoot(path[ghostSegmentIndex + 1]);
+            float segLen = Vector3.Distance(a, b);
+            if (segLen <= 0f) { ghostSegmentIndex++; ghostSegmentT = 0f; continue; }
+
+            float remaining = (1f - ghostSegmentT) * segLen;
+            if (amount < remaining)
+            {
+                ghostSegmentT += amount / segLen;
+                amount = 0f;
+            }
+            else
+            {
+                amount -= remaining;
+                ghostSegmentIndex++;
+                ghostSegmentT = 0f;
+                if (ghostSegmentIndex + 1 >= path.Count)
+                {
+                    ghostSegmentIndex = path.Count - 2;
+                    ghostSegmentT     = 1f;
+                    ghostFinished     = true;
+                }
+            }
+        }
+    }
+
+    Vector3 GhostCellFoot(Vector2Int cell)
+    {
+        Vector3 p = terrainDataStore.GridToWorld(cell);
+        p.y = terrainDataStore.GetRoundedHeight(cell.x, cell.y) + pathLineLift;
+        return p;
+    }
+
+    Vector3 GetGhostFootPosition()
+    {
+        if (path == null || path.Count == 0) return transform.position;
+        if (path.Count == 1 || ghostSegmentIndex + 1 >= path.Count) return GhostCellFoot(path[path.Count - 1]);
+        Vector3 a = GhostCellFoot(path[ghostSegmentIndex]);
+        Vector3 b = GhostCellFoot(path[ghostSegmentIndex + 1]);
+        return Vector3.Lerp(a, b, ghostSegmentT);
+    }
+
+    void UpdateGhostVisual()
+    {
+        if (ghostOrb == null) return;
+        Vector3 foot = GetGhostFootPosition();
+        Vector3 orbPos = foot + Vector3.up * ghostHoverHeight;
+        ghostOrb.transform.position = orbPos;
+        if (ghostStem != null)
+        {
+            ghostStem.SetPosition(0, orbPos);
+            ghostStem.SetPosition(1, foot);
+        }
+    }
+
+    void OnDestroy()
+    {
+        DestroyGhost();
     }
 }
