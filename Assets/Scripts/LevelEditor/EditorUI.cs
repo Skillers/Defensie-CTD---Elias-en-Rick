@@ -44,6 +44,22 @@ public class EditorUI : MonoBehaviour
     public GameObject radiusGroup;
     public GameObject strengthGroup;
 
+    [Header("Tool Settings Menu")]
+    [Tooltip("Root of the shared tool settings panel. Hidden when no tool is active.")]
+    public GameObject toolSettingsMenu;
+    [Tooltip("Title text at the top of the shared menu; rewritten per active tool.")]
+    public TMP_Text settingTitle;
+    [Tooltip("Biome dropdown group, shown only for the terrain paint tool.")]
+    public GameObject terrainTypeGroup;
+    [Tooltip("Avenue-navigation controls, shown only while the AoA tool is open.")]
+    public GameObject avenueNavGroup;
+    [Tooltip("Circle/Square brush-shape buttons, shown for the radius-based brushes.")]
+    public GameObject drawingModeGroup;
+    [Tooltip("Selects the circular brush footprint.")]
+    public Button circleButton;
+    [Tooltip("Selects the square brush footprint.")]
+    public Button squareButton;
+
     [Header("Status Labels")]
     public TMP_Text mainText;
     public TMP_Text subText;
@@ -55,6 +71,8 @@ public class EditorUI : MonoBehaviour
     Color _flattenNormal;
     Color _biomePaintNormal;
     Color _flagNormal;
+    Color _circleNormal;
+    Color _squareNormal;
 
     void Start()
     {
@@ -67,6 +85,10 @@ public class EditorUI : MonoBehaviour
             cancelButton.onClick.AddListener(OnCancelClicked);
         if (exitToMenuButton != null)
             exitToMenuButton.onClick.AddListener(OnExitToMenuClicked);
+        if (circleButton != null)
+            circleButton.onClick.AddListener(() => brushController.DrawingShape = BrushShape.Circle);
+        if (squareButton != null)
+            squareButton.onClick.AddListener(() => brushController.DrawingShape = BrushShape.Square);
 
         radiusSlider.onValueChanged.AddListener(v =>
         {
@@ -89,9 +111,12 @@ public class EditorUI : MonoBehaviour
         _flattenNormal    = flattenButton    != null ? flattenButton.colors.normalColor    : Color.white;
         _biomePaintNormal = biomePaintButton != null ? biomePaintButton.colors.normalColor : Color.white;
         _flagNormal       = flagButton       != null ? flagButton.colors.normalColor       : Color.white;
+        _circleNormal     = circleButton     != null ? circleButton.colors.normalColor     : Color.white;
+        _squareNormal     = squareButton     != null ? squareButton.colors.normalColor     : Color.white;
 
         brushController.OnToolChanged  += HandleBrushToolChanged;
         brushController.OnBiomeChanged += HandleBiomeChanged;
+        brushController.OnShapeChanged += HandleShapeChanged;
         if (flagPlacementTool != null)
             flagPlacementTool.OnStateChanged += RefreshUI;
         if (aoaHandler != null)
@@ -107,6 +132,7 @@ public class EditorUI : MonoBehaviour
         {
             brushController.OnToolChanged  -= HandleBrushToolChanged;
             brushController.OnBiomeChanged -= HandleBiomeChanged;
+            brushController.OnShapeChanged -= HandleShapeChanged;
         }
         if (flagPlacementTool != null)
             flagPlacementTool.OnStateChanged -= RefreshUI;
@@ -165,6 +191,7 @@ public class EditorUI : MonoBehaviour
 
     void HandleBrushToolChanged(BrushTool tool) => RefreshUI();
     void HandleBiomeChanged(BiomeSO biome)      => RefreshUI();
+    void HandleShapeChanged(BrushShape shape)   => RefreshUI();
 
     void HandleAoAStateChanged()
     {
@@ -182,22 +209,57 @@ public class EditorUI : MonoBehaviour
         if (strengthText != null) strengthText.text  = $"Strength: {brushController.BrushStrength:F2}";
     }
 
+    [System.Flags]
+    enum ToolSetting
+    {
+        None        = 0,
+        Radius      = 1 << 0,
+        Strength    = 1 << 1,
+        TerrainType = 1 << 2,
+        AvenueNav   = 1 << 3,
+        DrawingMode = 1 << 4,
+    }
+
+    readonly struct ToolView
+    {
+        public readonly bool PanelVisible;
+        public readonly string Title;
+        public readonly ToolSetting Settings;
+        public readonly string Sub; // null = hide the sub label
+
+        public ToolView(bool panelVisible, string title, ToolSetting settings, string sub)
+        {
+            PanelVisible = panelVisible;
+            Title        = title;
+            Settings     = settings;
+            Sub          = sub;
+        }
+    }
+
     void RefreshUI()
     {
-        BrushTool tool   = brushController.ActiveTool;
-        bool flagActive  = flagPlacementTool != null && flagPlacementTool.IsActive;
-        bool aoaActive   = aoaHandler != null && aoaHandler.IsSelected;
-        bool anyActive   = flagActive || aoaActive || tool != BrushTool.None;
+        BrushTool tool  = brushController.ActiveTool;
+        bool flagActive = flagPlacementTool != null && flagPlacementTool.IsActive;
+        bool aoaActive  = aoaHandler != null && aoaHandler.IsSelected;
+        bool anyActive  = flagActive || aoaActive || tool != BrushTool.None;
+
+        ToolView view = ResolveActiveTool(tool, flagActive);
+
+        if (toolSettingsMenu != null)
+            toolSettingsMenu.SetActive(view.PanelVisible);
+
+        if (settingTitle != null)
+            settingTitle.text = view.Title;
+
+        SetActive(radiusGroup,      (view.Settings & ToolSetting.Radius)      != 0);
+        SetActive(drawingModeGroup, (view.Settings & ToolSetting.DrawingMode) != 0);
+        SetActive(strengthGroup,    (view.Settings & ToolSetting.Strength)    != 0);
+        SetActive(terrainTypeGroup, (view.Settings & ToolSetting.TerrainType) != 0);
+        SetActive(avenueNavGroup,   (view.Settings & ToolSetting.AvenueNav)   != 0);
 
         // Cancel button visible whenever any tool is active
         if (cancelButton != null)
             cancelButton.gameObject.SetActive(anyActive);
-
-        // Sliders: only meaningful for brushes; hidden when flag tool or nothing is active
-        bool showRadius   = !flagActive && tool != BrushTool.None;
-        bool showStrength = showRadius && tool != BrushTool.BiomePaint;
-        SetGroupActive(radiusGroup,   radiusSlider,   radiusText,   showRadius);
-        SetGroupActive(strengthGroup, strengthSlider, strengthText, showStrength);
 
         // Highlight the active tool button (at most one is highlighted)
         SetButtonNormalColor(raiseLowerButton, tool == BrushTool.RaiseLower ? activeButtonColor : _raiseLowerNormal);
@@ -205,71 +267,78 @@ public class EditorUI : MonoBehaviour
         SetButtonNormalColor(biomePaintButton, tool == BrushTool.BiomePaint ? activeButtonColor : _biomePaintNormal);
         SetButtonNormalColor(flagButton,       flagActive                   ? activeButtonColor : _flagNormal);
 
-        RefreshStatusLabels(tool, flagActive, aoaActive);
-    }
+        // Drawing-shape buttons stay highlighted to show the current selection
+        SetButtonNormalColor(circleButton, brushController.DrawingShape == BrushShape.Circle ? activeButtonColor : _circleNormal);
+        SetButtonNormalColor(squareButton, brushController.DrawingShape == BrushShape.Square ? activeButtonColor : _squareNormal);
 
-    void RefreshStatusLabels(BrushTool tool, bool flagActive, bool aoaActive)
-    {
-        if (mainText != null)
-        {
-            if (aoaActive)
-            {
-                mainText.text = "Tool: Avenues of Approach Placer";
-            }
-            else if (flagActive)
-            {
-                mainText.text = "Tool: Start and Target";
-            }
-            else
-            {
-                mainText.text = tool switch
-                {
-                    BrushTool.RaiseLower => "Brush: Raise / Lower",
-                    BrushTool.Flatten    => "Brush: Flatten",
-                    BrushTool.BiomePaint => "Brush: Terrain",
-                    _                    => "No brush selected",
-                };
-            }
-        }
+        RefreshMainLabel(tool, flagActive, aoaActive);
 
-        string sub = GetSubLabel(tool, flagActive, aoaActive);
         if (subText != null)
         {
-            subText.gameObject.SetActive(sub != null);
-            if (sub != null) subText.text = sub;
+            subText.gameObject.SetActive(view.Sub != null);
+            if (view.Sub != null) subText.text = view.Sub;
         }
     }
 
-    string GetSubLabel(BrushTool tool, bool flagActive, bool aoaActive)
+    // Per-tool view config. Adding a future tool is one branch here — nothing
+    // else in the menu wiring needs to change.
+    ToolView ResolveActiveTool(BrushTool tool, bool flagActive)
     {
-        if (aoaActive) return null;
+        // AoA owns its own start/target warning gate. While selected but
+        // blocked (not open), hide the shared menu so the warning shows alone.
+        if (aoaHandler != null && aoaHandler.IsSelected)
+        {
+            return aoaHandler.IsOpen
+                ? new ToolView(true, "Avenues of Approach", ToolSetting.AvenueNav, null)
+                : new ToolView(false, string.Empty, ToolSetting.None, null);
+        }
 
         if (flagActive)
         {
-            return flagPlacementTool.CurrentPhase == FlagPhase.Start
+            string flagSub = flagPlacementTool.CurrentPhase == FlagPhase.Start
                 ? "Click to place START flag"
                 : "Click to place TARGET flag";
+            return new ToolView(true, "Start & Target", ToolSetting.None, flagSub);
         }
 
         switch (tool)
         {
+            case BrushTool.RaiseLower:
+                return new ToolView(true, "Raise / Lower", ToolSetting.Radius | ToolSetting.DrawingMode | ToolSetting.Strength, null);
+            case BrushTool.Flatten:
+                return new ToolView(true, "Flatten", ToolSetting.Radius | ToolSetting.DrawingMode | ToolSetting.Strength, null);
             case BrushTool.BiomePaint:
                 var b = brushController.paintBiome;
-                return b != null ? $"Terrain: {b.biomeName}" : "Terrain: (none)";
+                string biomeSub = b != null ? $"Terrain: {b.biomeName}" : "Terrain: (none)";
+                return new ToolView(true, "Paint Terrain", ToolSetting.Radius | ToolSetting.DrawingMode | ToolSetting.TerrainType, biomeSub);
             default:
-                return null; // null = hide the sub group
+                return new ToolView(false, string.Empty, ToolSetting.None, null);
         }
     }
 
-    static void SetGroupActive(GameObject group, Slider slider, TMP_Text label, bool active)
+    // Separate persistent status read-out, independent of the shared menu.
+    // Safe to delete the mainText object if it's redundant with settingTitle.
+    void RefreshMainLabel(BrushTool tool, bool flagActive, bool aoaActive)
     {
-        if (group != null)
-        {
-            group.SetActive(active);
-            return;
-        }
-        if (slider != null) slider.gameObject.SetActive(active);
-        if (label  != null) label.gameObject.SetActive(active);
+        if (mainText == null) return;
+
+        if (aoaActive)
+            mainText.text = "Tool: Avenues of Approach Placer";
+        else if (flagActive)
+            mainText.text = "Tool: Start and Target";
+        else
+            mainText.text = tool switch
+            {
+                BrushTool.RaiseLower => "Brush: Raise / Lower",
+                BrushTool.Flatten    => "Brush: Flatten",
+                BrushTool.BiomePaint => "Brush: Terrain",
+                _                    => "No brush selected",
+            };
+    }
+
+    static void SetActive(GameObject go, bool active)
+    {
+        if (go != null) go.SetActive(active);
     }
 
     static void SetButtonNormalColor(Button b, Color c)
