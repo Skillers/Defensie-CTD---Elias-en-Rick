@@ -605,6 +605,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: UnitSpawner
       objectReference: {fileID: 0}
+    - target: {fileID: 7724310995596432243, guid: 34f8a3d10a4a9a040ae0dc503f8ab6bf, type: 3}
+      propertyPath: m_IsActive
+      value: 1
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -2129,6 +2133,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: MissionEndWatcher
       objectReference: {fileID: 0}
+    - target: {fileID: 7230007437043925558, guid: 618f02e82130c7645baa7c1f3ffb5f93, type: 3}
+      propertyPath: m_IsActive
+      value: 1
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -3175,6 +3183,9 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 8
   previewMaterial: {fileID: 2100000, guid: f2a3b4c5d6e7f2a3b4c5d6e7f2a3b4c5, type: 2}
+  blockedPreviewMaterial: {fileID: 0}
+  collisionToleranceFactor: 0.8
+  rotationSpeed: 150
 --- !u!1 &1800273226
 GameObject:
   m_ObjectHideFlags: 0
