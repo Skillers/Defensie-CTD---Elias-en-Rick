@@ -65,8 +65,10 @@ public class TerrainDataStore : MonoBehaviour
     
     // TODO: Remove debugging code.
     readonly Dictionary<PlacedObstacle, List<Vector2Int>> _registeredObstacleCoordinates = new Dictionary<PlacedObstacle, List<Vector2Int>>();
-        
+
     public Vector2Int? EndCell => _endCell;
+
+    private ObstacleGridHelper ObstacleGridHelper { get; } = new();
 
 
     void Awake()
@@ -74,37 +76,41 @@ public class TerrainDataStore : MonoBehaviour
         RegisterBiome(baseBiome);
     }
     
-    void Update()
+    private void Update()
     {
-        // TODO: Remove debugging code.
-        foreach (var pair in _registeredObstacleCoordinates)
+        foreach (KeyValuePair<PlacedObstacle, List<Vector2Int>> pair in _registeredObstacleCoordinates)
         {
             List<Vector2Int> coords = pair.Value;
-            if (coords == null || coords.Count == 0) continue;
 
-            bool initialized = false;
-            Bounds combinedBounds = new Bounds();
+            if (coords == null) continue;
 
             foreach (Vector2Int cell in coords)
             {
-                Vector3 cellPos = GridToWorld(cell);
-                cellPos.y = GetRoundedHeight(cell.x, cell.y);
-                
-                Bounds cellBounds = new Bounds(cellPos, new Vector3(step, step, step));
-                if (!initialized)
-                {
-                    combinedBounds = cellBounds;
-                    initialized = true;
-                }
-                else
-                {
-                    combinedBounds.Encapsulate(cellBounds);
-                }
-            }
+                Vector3 worldPos = GridToWorld(cell);
+                float halfStep = step * 0.5f;
 
-            if (initialized)
-            {
-                DrawBounds(combinedBounds, Color.red);
+                // Calculate the 4 flat corners of this specific cell
+                Vector3 tl = worldPos + new Vector3(-halfStep, 0f, -halfStep);
+                tl.y = GetRoundedHeight(tl);
+
+                Vector3 tr = worldPos + new Vector3(halfStep, 0f, -halfStep);
+                tr.y = GetRoundedHeight(tr);
+
+                Vector3 bl = worldPos + new Vector3(-halfStep, 0f, halfStep);
+                bl.y = GetRoundedHeight(bl);
+
+                Vector3 br = worldPos + new Vector3(halfStep, 0f, halfStep);
+                br.y = GetRoundedHeight(br);
+
+                // Draw the cell's outer boundaries conforming to the slope
+                Debug.DrawLine(tl, tr, Color.red);
+                Debug.DrawLine(tr, br, Color.red);
+                Debug.DrawLine(br, bl, Color.red);
+                Debug.DrawLine(bl, tl, Color.red);
+
+                // Draw an inner diagonal cross "X" for high visibility
+                Debug.DrawLine(tl, br, Color.red);
+                Debug.DrawLine(tr, bl, Color.red);
             }
         }
     }
@@ -417,21 +423,72 @@ public class TerrainDataStore : MonoBehaviour
         }
         return map;
     }
-    
+
     public void RegisterObstacleCells(PlacedObstacle po)
     {
-        Bounds bounds = GetWorldBounds(po.gameObject);
-        Vector2Int min = WorldToGrid(bounds.min);
-        Vector2Int max = WorldToGrid(bounds.max);
-        
-        // TODO: Remove debugging code.
-        List<Vector2Int> coords = new List<Vector2Int>();
-        for (int x = min.x; x <= max.x; x++)
-        for (int z = min.y; z <= max.y; z++)
+        var coords = new List<Vector2Int>();
+
+        var partObjects = new HashSet<GameObject>();
+        foreach (Renderer r in po.GetComponentsInChildren<Renderer>()) partObjects.Add(r.gameObject);
+        foreach (Collider c in po.GetComponentsInChildren<Collider>()) partObjects.Add(c.gameObject);
+
+        foreach (GameObject part in partObjects)
         {
-            if (!InBounds(x, z)) continue;
-            grid[x, z].obstacle = po.obstacleSo;
-            coords.Add(new Vector2Int(x, z));
+            Vector3 refPosition = part.transform.position;
+            Quaternion refRotation = global::ObstacleGridHelper.ExtractYawRotation(part.transform.rotation);
+
+            Bounds localBounds = ObstacleGridHelper.GetPartLocalBounds(part, refPosition, refRotation);
+
+            if (localBounds.size == Vector3.zero) continue;
+
+            Vector3[] localCorners = global::ObstacleGridHelper.GetBoundsCorners(localBounds);
+            var worldAABB = new Bounds();
+            bool first = true;
+            foreach (Vector3 lc in localCorners)
+            {
+                Vector3 wc = refPosition + refRotation * lc;
+                if (first)
+                {
+                    worldAABB = new Bounds(wc, Vector3.zero);
+                    first = false;
+                }
+                else
+                {
+                    worldAABB.Encapsulate(wc);
+                }
+            }
+
+            Vector2Int min = WorldToGrid(worldAABB.min);
+            Vector2Int max = WorldToGrid(worldAABB.max);
+            Quaternion invRot = Quaternion.Inverse(refRotation);
+
+            for (int x = min.x; x <= max.x; x++)
+            for (int z = min.y; z <= max.y; z++)
+            {
+                if (!InBounds(x, z)) continue;
+
+                Vector3 worldPos = GridToWorld(new Vector2Int(x, z));
+                worldPos.y = refPosition.y;
+                Vector3 localPos = invRot * (worldPos - refPosition);
+
+                bool insideX = localPos.x >= localBounds.min.x && localPos.x <= localBounds.max.x;
+                bool insideZ = localPos.z >= localBounds.min.z && localPos.z <= localBounds.max.z;
+
+                if (!insideX || !insideZ)
+                {
+                    continue;
+                }
+                
+                var cell = new Vector2Int(x, z);
+
+                if (coords.Contains(cell))
+                {
+                    continue;
+                }
+                    
+                grid[x, z].obstacle = po.obstacleSo;
+                coords.Add(cell);
+            }
         }
 
         if (coords.Count > 0)
@@ -442,64 +499,17 @@ public class TerrainDataStore : MonoBehaviour
 
     public void UnregisterObstacleCells(PlacedObstacle po)
     {
-        if (_registeredObstacleCoordinates.TryGetValue(po, out List<Vector2Int> coords))
+        if (!_registeredObstacleCoordinates.TryGetValue(po, out List<Vector2Int> coords)) return;
+
+        foreach (Vector2Int cell in coords)
         {
-            foreach (Vector2Int cell in coords)
+            if (InBounds(cell.x, cell.y))
             {
-                if (InBounds(cell.x, cell.y))
-                {
-                    grid[cell.x, cell.y].obstacle = null;
-                }
+                grid[cell.x, cell.y].obstacle = null;
             }
-            // TODO: Remove debugging code.
-            _registeredObstacleCoordinates.Remove(po);
         }
-    }
 
-    public static Bounds GetWorldBounds(GameObject go)
-    {
-        var renderers = go.GetComponentsInChildren<Renderer>();
-        if (renderers.Length == 0) return new Bounds(go.transform.position, Vector3.zero);
-        var b = renderers[0].bounds;
-        for (int i = 1; i < renderers.Length; i++) b.Encapsulate(renderers[i].bounds);
-        return b;
-    }
-    
-    public static void DrawBounds(Bounds b, Color color, float duration = 0f)
-    {
-        Vector3 c = b.center;
-        Vector3 e = b.extents; // Half of the total size
-
-        // Calculate all 8 corners
-        Vector3[] corners = new Vector3[]
-        {
-            new Vector3(c.x + e.x, c.y + e.y, c.z + e.z),
-            new Vector3(c.x + e.x, c.y + e.y, c.z - e.z),
-            new Vector3(c.x + e.x, c.y - e.y, c.z + e.z),
-            new Vector3(c.x + e.x, c.y - e.y, c.z - e.z),
-            new Vector3(c.x - e.x, c.y + e.y, c.z + e.z),
-            new Vector3(c.x - e.x, c.y + e.y, c.z - e.z),
-            new Vector3(c.x - e.x, c.y - e.y, c.z + e.z),
-            new Vector3(c.x - e.x, c.y - e.y, c.z - e.z)
-        };
-
-        // Draw the 12 connecting lines
-        // Bottom face
-        Debug.DrawLine(corners[3], corners[2], color, duration);
-        Debug.DrawLine(corners[2], corners[6], color, duration);
-        Debug.DrawLine(corners[6], corners[7], color, duration);
-        Debug.DrawLine(corners[7], corners[3], color, duration);
-
-        // Top face
-        Debug.DrawLine(corners[1], corners[0], color, duration);
-        Debug.DrawLine(corners[0], corners[4], color, duration);
-        Debug.DrawLine(corners[4], corners[5], color, duration);
-        Debug.DrawLine(corners[5], corners[1], color, duration);
-
-        // Vertical pillars connecting top and bottom
-        Debug.DrawLine(corners[1], corners[3], color, duration);
-        Debug.DrawLine(corners[0], corners[2], color, duration);
-        Debug.DrawLine(corners[5], corners[7], color, duration);
-        Debug.DrawLine(corners[4], corners[6], color, duration);
+        // TODO: Remove debugging code.
+        _registeredObstacleCoordinates.Remove(po);
     }
 }
