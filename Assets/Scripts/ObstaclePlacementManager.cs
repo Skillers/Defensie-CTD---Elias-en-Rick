@@ -165,11 +165,10 @@ public class ObstaclePlacementManager : MonoBehaviour
             PreparePreviewChildren(1);
             var child = _previewObject.transform.GetChild(0);
             child.position = start;
-            child.rotation = _selected.prefab.transform.rotation;;
+            child.rotation = _selected.prefab.transform.rotation * Quaternion.Euler(0, _manualRotationAngle, 0);
             child.localScale = _selected.prefab.transform.localScale;
-
+            
             ConformChildrenToTerrain(child.gameObject, _selected.prefab);
-
             return;
         }
 
@@ -376,6 +375,7 @@ public class ObstaclePlacementManager : MonoBehaviour
     private Quaternion GetSegmentRotation(Vector3 start, Vector3 end)
     {
         Vector3 direction = (end - start).normalized;
+
         if (direction == Vector3.zero) return Quaternion.identity;
 
         Vector3 center = (start + end) * 0.5f;
@@ -428,9 +428,14 @@ public class ObstaclePlacementManager : MonoBehaviour
         if (Keyboard.current.rKey.isPressed)
         {
             float angleDelta = rotationSpeed * Time.deltaTime;
-            if (_selected != null && _selected.placementType == PlacementType.Point)
+            if (_selected != null)
             {
-                _manualRotationAngle = (_manualRotationAngle + angleDelta) % 360f;
+                // Allow rotation for point placements, or line placements when not actively dragging
+                if (_selected.placementType == PlacementType.Point || 
+                    (_selected.placementType == PlacementType.Line && !_isDraggingLine))
+                {
+                    _manualRotationAngle = (_manualRotationAngle + angleDelta) % 360f;
+                }
             }
             else if (_selected == null && _selectedObstacles.Count > 0)
             {
@@ -488,7 +493,7 @@ public class ObstaclePlacementManager : MonoBehaviour
                     PreparePreviewChildren(1);
                     var child = _previewObject.transform.GetChild(0);
                     child.position = hit.point;
-                    child.rotation = _selected.prefab.transform.rotation;
+                    child.rotation = _selected.prefab.transform.rotation * Quaternion.Euler(0, _manualRotationAngle, 0);
                     child.localScale = _selected.prefab.transform.localScale;
                     
                     ConformChildrenToTerrain(child.gameObject, _selected.prefab);
@@ -642,11 +647,10 @@ public class ObstaclePlacementManager : MonoBehaviour
 
         if (distance < MinLineLength)
         {
-            var singleGo = Instantiate(_selected.prefab, start, _selected.prefab.transform.rotation, rootGo.transform);
+            var singleGo = Instantiate(_selected.prefab, start, _selected.prefab.transform.rotation * Quaternion.Euler(0, _manualRotationAngle, 0), rootGo.transform);
             ConformChildrenToTerrain(singleGo, _selected.prefab);
             placedObstacle.Initialize();
             _placedObstacles.Add(placedObstacle);
-
             return;
         }
 
@@ -722,46 +726,96 @@ public class ObstaclePlacementManager : MonoBehaviour
         return false;
     }
 
+    private Bounds TransformBounds(Transform source, Transform target, Bounds sourceBounds)
+    {
+        Vector3 center = sourceBounds.center;
+        Vector3 extents = sourceBounds.extents;
+
+        Vector3 c0 = source.TransformPoint(center + new Vector3(-extents.x, -extents.y, -extents.z));
+        Vector3 c1 = source.TransformPoint(center + new Vector3(extents.x, -extents.y, -extents.z));
+        Vector3 c2 = source.TransformPoint(center + new Vector3(-extents.x, extents.y, -extents.z));
+        Vector3 c3 = source.TransformPoint(center + new Vector3(extents.x, extents.y, -extents.z));
+        Vector3 c4 = source.TransformPoint(center + new Vector3(-extents.x, -extents.y, extents.z));
+        Vector3 c5 = source.TransformPoint(center + new Vector3(extents.x, -extents.y, extents.z));
+        Vector3 c6 = source.TransformPoint(center + new Vector3(-extents.x, extents.y, extents.z));
+        Vector3 c7 = source.TransformPoint(center + new Vector3(extents.x, extents.y, extents.z));
+
+        Bounds b = new Bounds(target.InverseTransformPoint(c0), Vector3.zero);
+        b.Encapsulate(target.InverseTransformPoint(c1));
+        b.Encapsulate(target.InverseTransformPoint(c2));
+        b.Encapsulate(target.InverseTransformPoint(c3));
+        b.Encapsulate(target.InverseTransformPoint(c4));
+        b.Encapsulate(target.InverseTransformPoint(c5));
+        b.Encapsulate(target.InverseTransformPoint(c6));
+        b.Encapsulate(target.InverseTransformPoint(c7));
+
+        return b;
+    }
+
     private bool DoesHierarchyCollide(Transform t)
     {
-        _boxColliderCache.Clear();
-        t.GetComponentsInChildren<BoxCollider>(true, _boxColliderCache);
-
-        if (_boxColliderCache.Count > 0)
+        // 1. Check if the parent/root already has a manual collective BoxCollider
+        BoxCollider manualRootCollider = t.GetComponent<BoxCollider>();
+        if (manualRootCollider != null)
         {
+            return CheckBoxCollision(t, manualRootCollider.center, manualRootCollider.size);
+        }
+
+        // 2. Fallback: Dynamically calculate consolidated bounds if no manual collider is on the root
+        Bounds combinedLocalBounds = new Bounds();
+        bool boundsInitialized = false;
+
+        _meshFilterCache.Clear();
+        t.GetComponentsInChildren<MeshFilter>(true, _meshFilterCache);
+
+        for (int i = 0; i < _meshFilterCache.Count; i++)
+        {
+            MeshFilter mf = _meshFilterCache[i];
+
+            if (mf.sharedMesh == null) continue;
+
+            Bounds boundsInParentSpace = TransformBounds(mf.transform, t, mf.sharedMesh.bounds);
+
+            if (!boundsInitialized)
+            {
+                combinedLocalBounds = boundsInParentSpace;
+                boundsInitialized = true;
+            }
+            else
+            {
+                combinedLocalBounds.Encapsulate(boundsInParentSpace);
+            }
+        }
+
+        _meshFilterCache.Clear();
+
+        if (!boundsInitialized)
+        {
+            _boxColliderCache.Clear();
+            t.GetComponentsInChildren<BoxCollider>(true, _boxColliderCache);
+
             for (int i = 0; i < _boxColliderCache.Count; i++)
             {
                 BoxCollider box = _boxColliderCache[i];
-                if (CheckBoxCollision(box.transform, box.center, box.size))
-                {
-                    _boxColliderCache.Clear();
+                Bounds boundsInParentSpace = TransformBounds(box.transform, t, new Bounds(box.center, box.size));
 
-                    return true;
+                if (!boundsInitialized)
+                {
+                    combinedLocalBounds = boundsInParentSpace;
+                    boundsInitialized = true;
+                }
+                else
+                {
+                    combinedLocalBounds.Encapsulate(boundsInParentSpace);
                 }
             }
 
             _boxColliderCache.Clear();
         }
-        else
+
+        if (boundsInitialized)
         {
-            _meshFilterCache.Clear();
-            t.GetComponentsInChildren<MeshFilter>(true, _meshFilterCache);
-
-            for (int i = 0; i < _meshFilterCache.Count; i++)
-            {
-                MeshFilter mf = _meshFilterCache[i];
-
-                if (mf.sharedMesh == null) continue;
-
-                if (CheckBoxCollision(mf.transform, mf.sharedMesh.bounds.center, mf.sharedMesh.bounds.size))
-                {
-                    _meshFilterCache.Clear();
-
-                    return true;
-                }
-            }
-
-            _meshFilterCache.Clear();
+            return CheckBoxCollision(t, combinedLocalBounds.center, combinedLocalBounds.size);
         }
 
         return false;
