@@ -62,12 +62,51 @@ public class TerrainDataStore : MonoBehaviour
     public Vector2Int? StartCell => _startCell;
 
     Vector2Int? _endCell;
+    
+    // TODO: Remove debugging code.
+    readonly Dictionary<PlacedObstacle, List<Vector2Int>> _registeredObstacleCoordinates = new Dictionary<PlacedObstacle, List<Vector2Int>>();
+        
     public Vector2Int? EndCell => _endCell;
 
 
     void Awake()
     {
         RegisterBiome(baseBiome);
+    }
+    
+    void Update()
+    {
+        // TODO: Remove debugging code.
+        foreach (var pair in _registeredObstacleCoordinates)
+        {
+            List<Vector2Int> coords = pair.Value;
+            if (coords == null || coords.Count == 0) continue;
+
+            bool initialized = false;
+            Bounds combinedBounds = new Bounds();
+
+            foreach (Vector2Int cell in coords)
+            {
+                Vector3 cellPos = GridToWorld(cell);
+                cellPos.y = GetRoundedHeight(cell.x, cell.y);
+                
+                Bounds cellBounds = new Bounds(cellPos, new Vector3(step, step, step));
+                if (!initialized)
+                {
+                    combinedBounds = cellBounds;
+                    initialized = true;
+                }
+                else
+                {
+                    combinedBounds.Encapsulate(cellBounds);
+                }
+            }
+
+            if (initialized)
+            {
+                DrawBounds(combinedBounds, Color.red);
+            }
+        }
     }
 
     void Start()
@@ -377,5 +416,90 @@ public class TerrainDataStore : MonoBehaviour
                 map[b.biomeName] = b;
         }
         return map;
+    }
+    
+    public void RegisterObstacleCells(PlacedObstacle po)
+    {
+        Bounds bounds = GetWorldBounds(po.gameObject);
+        Vector2Int min = WorldToGrid(bounds.min);
+        Vector2Int max = WorldToGrid(bounds.max);
+        
+        // TODO: Remove debugging code.
+        List<Vector2Int> coords = new List<Vector2Int>();
+        for (int x = min.x; x <= max.x; x++)
+        for (int z = min.y; z <= max.y; z++)
+        {
+            if (!InBounds(x, z)) continue;
+            grid[x, z].obstacle = po.obstacleSo;
+            coords.Add(new Vector2Int(x, z));
+        }
+
+        if (coords.Count > 0)
+        {
+            _registeredObstacleCoordinates[po] = coords;
+        }
+    }
+
+    public void UnregisterObstacleCells(PlacedObstacle po)
+    {
+        if (_registeredObstacleCoordinates.TryGetValue(po, out List<Vector2Int> coords))
+        {
+            foreach (Vector2Int cell in coords)
+            {
+                if (InBounds(cell.x, cell.y))
+                {
+                    grid[cell.x, cell.y].obstacle = null;
+                }
+            }
+            // TODO: Remove debugging code.
+            _registeredObstacleCoordinates.Remove(po);
+        }
+    }
+
+    public static Bounds GetWorldBounds(GameObject go)
+    {
+        var renderers = go.GetComponentsInChildren<Renderer>();
+        if (renderers.Length == 0) return new Bounds(go.transform.position, Vector3.zero);
+        var b = renderers[0].bounds;
+        for (int i = 1; i < renderers.Length; i++) b.Encapsulate(renderers[i].bounds);
+        return b;
+    }
+    
+    public static void DrawBounds(Bounds b, Color color, float duration = 0f)
+    {
+        Vector3 c = b.center;
+        Vector3 e = b.extents; // Half of the total size
+
+        // Calculate all 8 corners
+        Vector3[] corners = new Vector3[]
+        {
+            new Vector3(c.x + e.x, c.y + e.y, c.z + e.z),
+            new Vector3(c.x + e.x, c.y + e.y, c.z - e.z),
+            new Vector3(c.x + e.x, c.y - e.y, c.z + e.z),
+            new Vector3(c.x + e.x, c.y - e.y, c.z - e.z),
+            new Vector3(c.x - e.x, c.y + e.y, c.z + e.z),
+            new Vector3(c.x - e.x, c.y + e.y, c.z - e.z),
+            new Vector3(c.x - e.x, c.y - e.y, c.z + e.z),
+            new Vector3(c.x - e.x, c.y - e.y, c.z - e.z)
+        };
+
+        // Draw the 12 connecting lines
+        // Bottom face
+        Debug.DrawLine(corners[3], corners[2], color, duration);
+        Debug.DrawLine(corners[2], corners[6], color, duration);
+        Debug.DrawLine(corners[6], corners[7], color, duration);
+        Debug.DrawLine(corners[7], corners[3], color, duration);
+
+        // Top face
+        Debug.DrawLine(corners[1], corners[0], color, duration);
+        Debug.DrawLine(corners[0], corners[4], color, duration);
+        Debug.DrawLine(corners[4], corners[5], color, duration);
+        Debug.DrawLine(corners[5], corners[1], color, duration);
+
+        // Vertical pillars connecting top and bottom
+        Debug.DrawLine(corners[1], corners[3], color, duration);
+        Debug.DrawLine(corners[0], corners[2], color, duration);
+        Debug.DrawLine(corners[5], corners[7], color, duration);
+        Debug.DrawLine(corners[4], corners[6], color, duration);
     }
 }

@@ -31,7 +31,13 @@ public class ObstaclePlacementManager : MonoBehaviour
     [Tooltip("Rotation speed in degrees per second while holding the R key.")]
     [SerializeField]
     private float rotationSpeed = 90f;
+    
+    [SerializeField]
+    TerrainDataStore terrainDataStore;
 
+    /// <summary>
+    /// The currently selected obstacle type for placement. Null if no selection.
+    /// </summary>
     private ObstacleSO _selected;
 
     private List<PlacedObstacle> _placedObstacles = new List<PlacedObstacle>();
@@ -408,6 +414,12 @@ public class ObstaclePlacementManager : MonoBehaviour
 
     private void Update()
     {
+        // foreach (var item in _placedObstacles)
+        // {
+        //     var bounds = TerrainDataStore.GetWorldBounds(item.gameObject);
+        //     TerrainDataStore.DrawBounds(bounds, Color.red);
+        // }
+        
         if (_selected == null && Mouse.current.leftButton.wasReleasedThisFrame)
         {
             if (_isDragging)
@@ -416,7 +428,9 @@ public class ObstaclePlacementManager : MonoBehaviour
         }
 
         if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
+        {
             return;
+        }
 
         if (Keyboard.current.escapeKey.wasPressedThisFrame)
         {
@@ -518,7 +532,7 @@ public class ObstaclePlacementManager : MonoBehaviour
                     _isDraggingLine = false;
                 }
             }
-
+            
             return;
         }
 
@@ -559,6 +573,7 @@ public class ObstaclePlacementManager : MonoBehaviour
             {
                 if (p == null) continue;
                 _placedObstacles.Remove(p);
+                terrainDataStore.UnregisterObstacleCells(p);
                 Destroy(p.gameObject);
             }
 
@@ -633,6 +648,7 @@ public class ObstaclePlacementManager : MonoBehaviour
         var placed = go.AddComponent<PlacedObstacle>();
         placed.obstacleSo = _selected;
         _placedObstacles.Add(placed);
+        terrainDataStore.RegisterObstacleCells(placed);
     }
 
     private void PlaceLine(Vector3 start, Vector3 end)
@@ -651,6 +667,7 @@ public class ObstaclePlacementManager : MonoBehaviour
             ConformChildrenToTerrain(singleGo, _selected.prefab);
             placedObstacle.Initialize();
             _placedObstacles.Add(placedObstacle);
+            terrainDataStore.RegisterObstacleCells(placedObstacle);
             return;
         }
 
@@ -681,6 +698,7 @@ public class ObstaclePlacementManager : MonoBehaviour
 
         placedObstacle.Initialize();
         _placedObstacles.Add(placedObstacle);
+        terrainDataStore.RegisterObstacleCells(placedObstacle);
     }
 
     private void SelectObstaclesInRect(Vector2 screenStart, Vector2 screenEnd)
