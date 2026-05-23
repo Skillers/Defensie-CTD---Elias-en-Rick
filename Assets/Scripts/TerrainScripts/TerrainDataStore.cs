@@ -64,7 +64,7 @@ public class TerrainDataStore : MonoBehaviour
     Vector2Int? _endCell;
     
     // TODO: Remove debugging code.
-    readonly Dictionary<PlacedObstacle, List<Vector2Int>> _registeredObstacleCoordinates = new Dictionary<PlacedObstacle, List<Vector2Int>>();
+    private readonly Dictionary<PlacedObstacle, List<Vector2Int>> _registeredObstacleCoordinates = new();
 
     public Vector2Int? EndCell => _endCell;
 
@@ -435,13 +435,13 @@ public class TerrainDataStore : MonoBehaviour
         foreach (GameObject part in partObjects)
         {
             Vector3 refPosition = part.transform.position;
-            Quaternion refRotation = global::ObstacleGridHelper.ExtractYawRotation(part.transform.rotation);
+            Quaternion refRotation = ObstacleGridHelper.ExtractYawRotation(part.transform.rotation);
 
             Bounds localBounds = ObstacleGridHelper.GetPartLocalBounds(part, refPosition, refRotation);
 
             if (localBounds.size == Vector3.zero) continue;
 
-            Vector3[] localCorners = global::ObstacleGridHelper.GetBoundsCorners(localBounds);
+            Vector3[] localCorners = ObstacleGridHelper.GetBoundsCorners(localBounds);
             var worldAABB = new Bounds();
             bool first = true;
             foreach (Vector3 lc in localCorners)

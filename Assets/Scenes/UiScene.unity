@@ -3186,6 +3186,7 @@ MonoBehaviour:
   blockedPreviewMaterial: {fileID: 0}
   collisionToleranceFactor: 0.8
   rotationSpeed: 150
+  terrainDataStore: {fileID: 87598852}
 --- !u!1 &1800273226
 GameObject:
   m_ObjectHideFlags: 0
