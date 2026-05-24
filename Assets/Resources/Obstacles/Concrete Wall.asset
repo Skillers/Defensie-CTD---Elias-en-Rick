@@ -10,14 +10,14 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 9cf1cc0a208d46a45a28d478e6b5c92c, type: 3}
-  m_Name: Concertina Wire
+  m_Name: Concrete Wall
   m_EditorClassIdentifier: Assembly-CSharp::ObstacleSO
-  obstacleName: Concertina Wire
-  icon: {fileID: 21300000, guid: 4fae79a1c03fcb3458ab05d5b30e1437, type: 3}
-  prefab: {fileID: 5780034516089840320, guid: b4b7339fb3082864b8444ec917d80cf4, type: 3}
+  obstacleName: Concrete Wall
+  icon: {fileID: 21300000, guid: 74f6b99ad87c9eb41871397e9d99f7a2, type: 3}
+  prefab: {fileID: 3647109984710332790, guid: 70c48be8697ff6140812ee8d2eccd1ef, type: 3}
   placementType: 1
   fillSegmentGaps: 1
   defaultEffect:
-    effect: 1
+    effect: 3
     costMultiplier: 20
   unitEffects: []
