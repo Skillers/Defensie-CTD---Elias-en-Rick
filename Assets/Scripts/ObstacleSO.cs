@@ -1,7 +1,6 @@
 using UnityEngine;
 
 public enum PlacementType { Point, Line }
-public enum ObstacleEffect { None, Slow, Disrupt, Block, Turn }
 
 [CreateAssetMenu(fileName = "NewObstacle", menuName = "CTD/Obstacle")]
 public class ObstacleSO : ScriptableObject
@@ -16,31 +15,25 @@ public class ObstacleSO : ScriptableObject
 
     [Header("Pathfinding")]
     [Tooltip("Effect applied when no per-unit-type override matches.")]
-    public ObstacleUnitEffect defaultEffect = new() { effect = ObstacleEffect.None, costMultiplier = 1f };
+    public CellEffectSpec defaultEffect = new() { effect = CellEffect.None, costMultiplier = 1f };
 
     [Tooltip("Per-unit-type overrides. First match wins; otherwise falls back to defaultEffect.")]
-    public ObstacleUnitEffect[] unitEffects;
+    public CellUnitEffect[] unitEffects;
 
-    public ObstacleUnitEffect ResolveEffect(UnitTypeSO unitType)
+    public CellEffectSpec ResolveEffect(UnitTypeSO unitType)
     {
         if (unitType != null && unitEffects != null)
         {
             for (int i = 0; i < unitEffects.Length; i++)
             {
                 if (unitEffects[i].unitType == unitType)
-                    return unitEffects[i];
+                    return new CellEffectSpec
+                    {
+                        effect         = unitEffects[i].effect,
+                        costMultiplier = unitEffects[i].costMultiplier,
+                    };
             }
         }
         return defaultEffect;
     }
-}
-
-[System.Serializable]
-public struct ObstacleUnitEffect
-{
-    public UnitTypeSO unitType;
-    public ObstacleEffect effect;
-
-    [Tooltip("Cost multiplier when effect is Slow. Ignored for Block / None / Disrupt / Turn.")]
-    public float costMultiplier;
 }

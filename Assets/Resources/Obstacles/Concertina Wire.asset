@@ -17,7 +17,6 @@ MonoBehaviour:
   prefab: {fileID: 5780034516089840320, guid: b4b7339fb3082864b8444ec917d80cf4, type: 3}
   placementType: 1
   defaultEffect:
-    unitType: {fileID: 0}
     effect: 1
-    costMultiplier: 2
+    costMultiplier: 20
   unitEffects: []

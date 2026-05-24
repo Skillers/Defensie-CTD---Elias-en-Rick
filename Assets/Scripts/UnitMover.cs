@@ -30,10 +30,8 @@ public class UnitMover : MonoBehaviour
     [Tooltip("Extra height added to the terrain surface when sticking the unit to the ground.")]
     public float groundOffset = 0f;
 
-    [Header("Path Visual")]
-    public Color pathColor     = Color.yellow;
-    public float pathLineWidth = 0.5f;
-    [Tooltip("Extra height above terrain at which the path line is drawn.")]
+    [Header("Ghost")]
+    [Tooltip("Height above terrain at which the ghost's foot (stem base and the ghost's own path line) sits.")]
     public float pathLineLift  = 0.1f;
 
     [Header("Catch-up Path (unit → ghost)")]
@@ -63,7 +61,6 @@ public class UnitMover : MonoBehaviour
 
     Vector2Int currentCell;
     Vector3    currentTarget;
-    LineRenderer pathLine;
 
     UnitPathPlan _activePlan;
     float        _planStartTime;
@@ -74,6 +71,7 @@ public class UnitMover : MonoBehaviour
     LineRenderer            catchUpLine;
     Task<List<Vector2Int>>  catchUpTask;
     float                   catchUpLastFireTime;
+    TerrainDataStore        _subscribedStore;
 
     /// <summary>
     /// Configure the mover and start walking <paramref name="precomputedPath"/> (built
@@ -89,7 +87,8 @@ public class UnitMover : MonoBehaviour
         HasPath          = true;
         initialized      = true;
 
-        SetupLineRenderer();
+        SubscribeToObstacleEvents(tds);
+
         SnapToTerrain();
 
         // Only track a plan that has a walkable path — a failed/empty path leaves
@@ -122,57 +121,7 @@ public class UnitMover : MonoBehaviour
             moving = false;
         }
 
-        DrawPath();
         InitGhostOnPath();
-    }
-
-    void Start()
-    {
-        if (initialized) return;
-        if (pathLine == null) SetupLineRenderer();
-    }
-
-    void SetupLineRenderer()
-    {
-        if (pathLine != null) return;
-
-        pathLine = gameObject.AddComponent<LineRenderer>();
-        pathLine.useWorldSpace  = true;
-        pathLine.startWidth     = pathLineWidth;
-        pathLine.endWidth       = pathLineWidth;
-        pathLine.positionCount  = 0;
-
-        string[] candidates =
-        {
-            "Universal Render Pipeline/Particles/Unlit",
-            "Sprites/Default",
-            "Legacy Shaders/Particles/Alpha Blended",
-            "Unlit/Color",
-        };
-        Shader shader = null;
-        foreach (var name in candidates)
-        {
-            shader = Shader.Find(name);
-            if (shader != null) break;
-        }
-
-        var mat = shader != null ? new Material(shader) : new Material(Shader.Find("Standard"));
-        mat.color           = pathColor;
-        pathLine.material   = mat;
-        pathLine.startColor = pathColor;
-        pathLine.endColor   = pathColor;
-    }
-
-    void DrawPath()
-    {
-        if (pathLine == null) return;
-        pathLine.positionCount = path.Count;
-        for (int i = 0; i < path.Count; i++)
-        {
-            Vector3 wp = terrainDataStore.GridToWorld(path[i]);
-            wp.y = terrainDataStore.GetRoundedHeight(path[i].x, path[i].y) + pathLineLift;
-            pathLine.SetPosition(i, wp);
-        }
     }
 
     void Update()
@@ -207,7 +156,14 @@ public class UnitMover : MonoBehaviour
             float dist = delta.magnitude;
 
             float effectiveSpeed = ResolveStepSpeed();
-            if (effectiveSpeed <= 0f) break;  // blocked / zero cost — can't make progress this frame
+            if (effectiveSpeed <= 0f)
+            {
+                // The current step is blocked by slope, biome or obstacle. Force the
+                // next TickCatchUpPath to dispatch a fresh A* instead of waiting out
+                // the interval, so the unit re-routes around whatever blocked it.
+                ForceCatchUpRefire();
+                break;
+            }
 
             float canMove = effectiveSpeed * remainingTime;
 
@@ -234,17 +190,24 @@ public class UnitMover : MonoBehaviour
 
                 if (waypointIndex >= path.Count)
                 {
+                    // Reached end of the current followed segment. The followed path is
+                    // now a per-tick catch-up to the ghost, so end-of-segment is normal:
+                    // only finalise the mission if this segment's end is the actual goal.
                     moving = false;
-                    pathLine.positionCount = 0;
-                    DestroyGhost();
-                    DestroyCatchUpLine();
-
-                    if (_activePlan != null)
+                    if (currentCell == GoalCell)
                     {
-                        _activePlan.actualSeconds = Time.time - _planStartTime;
-                        _activePlan.completed     = true;
-                        _activePlan               = null;
+                        DestroyGhost();
+                        DestroyCatchUpLine();
+
+                        if (_activePlan != null)
+                        {
+                            _activePlan.actualSeconds = Time.time - _planStartTime;
+                            _activePlan.completed     = true;
+                            _activePlan               = null;
+                        }
                     }
+                    // If not at goal, stay paused — TickCatchUpPath keeps firing and the
+                    // next arriving path swaps us back into motion via SwitchFollowedPath.
                     return;
                 }
 
@@ -254,8 +217,12 @@ public class UnitMover : MonoBehaviour
     }
 
     /// <summary>
-    /// Speed for the current step = moveSpeed / (biomeCost * slopeMultiplier).
-    /// Biome and slope come from the cell we're stepping FROM, in the direction of the next waypoint.
+    /// Speed for the current step. Mirrors <see cref="AStarPathfinder.FindPath"/>'s
+    /// per-step cost formula: walk every cell the step physically crosses (the
+    /// destination for cardinal/diagonal, the two intermediates + destination for
+    /// knight), combine biome * obstacle per cell weighted by the cell's portion of
+    /// the step, then divide moveSpeed by (weightedCellCost * slopeMul). Returns 0
+    /// if slope blocks the direction or any crossed cell blocks biome/obstacle.
     /// </summary>
     float ResolveStepSpeed()
     {
@@ -264,11 +231,36 @@ public class UnitMover : MonoBehaviour
         CellData fromCell = terrainDataStore.grid[currentCell.x, currentCell.y];
         Vector2Int delta  = path[waypointIndex] - currentCell;
 
-        int biomeCost = fromCell.biome != null ? fromCell.biome.GetMovementCost(unitType) : 3;
-        float slopeMul = AStarPathfinder.ResolveSlopeMultiplier(fromCell, delta, unitType, out bool blocked);
+        float slopeMul = AStarPathfinder.ResolveSlopeMultiplier(fromCell, delta, unitType, out bool slopeBlocked);
+        if (slopeBlocked) return 0f;
 
-        if (blocked || biomeCost <= 0) return 0f;
-        return moveSpeed / (biomeCost * slopeMul);
+        int dirIndex = AStarPathfinder.GetDirectionIndex(delta);
+        if (dirIndex < 0) return moveSpeed;  // off-grid delta (shouldn't happen on a valid path)
+
+        CellCrossing[] crossings = CellPathing.Crossings[dirIndex];
+        int w = terrainDataStore.GridWidth;
+        int h = terrainDataStore.GridHeight;
+
+        float weightedCellCost = 0f;
+        for (int c = 0; c < crossings.Length; c++)
+        {
+            Vector2Int pos = currentCell + crossings[c].offset;
+            if (pos.x < 0 || pos.x >= w || pos.y < 0 || pos.y >= h) return 0f;
+
+            CellData crossed = terrainDataStore.grid[pos.x, pos.y];
+
+            float biomeMul = AStarPathfinder.ResolveBiomeMultiplier(crossed, unitType, out bool biomeBlocked);
+            if (biomeBlocked) return 0f;
+
+            float obstacleMul = AStarPathfinder.ResolveObstacleMultiplier(crossed, unitType, out bool obstacleBlocked);
+            if (obstacleBlocked) return 0f;
+
+            weightedCellCost += crossings[c].portion * biomeMul * obstacleMul;
+        }
+
+        float effectiveCost = weightedCellCost * slopeMul;
+        if (effectiveCost <= 0f) return 0f;
+        return moveSpeed / effectiveCost;
     }
 
     void SnapToTerrain()
@@ -311,7 +303,7 @@ public class UnitMover : MonoBehaviour
             }
         }
 
-        ghost.Initialize(terrainDataStore, path, pathLineLift);
+        ghost.Initialize(terrainDataStore, unitType, path, pathLineLift);
     }
 
     void DestroyGhost()
@@ -360,8 +352,43 @@ public class UnitMover : MonoBehaviour
 
     void OnDestroy()
     {
+        UnsubscribeFromObstacleEvents();
         DestroyGhost();
         DestroyCatchUpLine();
+    }
+
+    // --- Obstacle event hookup ----------------------------------------------
+
+    void SubscribeToObstacleEvents(TerrainDataStore tds)
+    {
+        if (_subscribedStore == tds) return;
+        UnsubscribeFromObstacleEvents();
+        if (tds == null) return;
+
+        tds.OnObstacleRegistered   += HandleObstacleChange;
+        tds.OnObstacleUnregistered += HandleObstacleChange;
+        _subscribedStore = tds;
+    }
+
+    void UnsubscribeFromObstacleEvents()
+    {
+        if (_subscribedStore == null) return;
+        _subscribedStore.OnObstacleRegistered   -= HandleObstacleChange;
+        _subscribedStore.OnObstacleUnregistered -= HandleObstacleChange;
+        _subscribedStore = null;
+    }
+
+    void HandleObstacleChange(PlacedObstacle po) => ForceCatchUpRefire();
+
+    /// <summary>
+    /// Resets the catch-up throttle so the next <see cref="TickCatchUpPath"/> dispatches
+    /// a fresh A* immediately, instead of waiting for the interval to elapse. Used both
+    /// reactively (when a step is blocked) and proactively (when an obstacle change fires).
+    /// If a task is already in-flight, the request is satisfied as soon as it completes.
+    /// </summary>
+    void ForceCatchUpRefire()
+    {
+        catchUpLastFireTime = -float.MaxValue;
     }
 
     // --- Catch-up path (unit → ghost) ---------------------------------------
@@ -381,8 +408,10 @@ public class UnitMover : MonoBehaviour
             catchUpTask = null;
         }
 
-        // Only fire while there's something to chase.
-        if (ghost == null || !ghost.HasPath || !moving) return;
+        // Only fire while there's something to chase. Note: we fire even when paused
+        // (moving == false) because the unit pauses at the end of each catch-up segment
+        // and needs the next one to resume.
+        if (ghost == null || !ghost.HasPath) return;
 
         if (catchUpTask == null && Time.time - catchUpLastFireTime >= catchUpPathInterval)
         {
@@ -419,6 +448,41 @@ public class UnitMover : MonoBehaviour
             wp.y = terrainDataStore.GetRoundedHeight(cells[i].x, cells[i].y) + catchUpPathLift;
             catchUpLine.SetPosition(i, wp);
         }
+
+        // The catch-up path is what the unit actually walks now: hand it to the
+        // mover's follow state. Ghost still walks the original precomputed main
+        // path so the catch-up has a moving goal.
+        SwitchFollowedPath(cells);
+    }
+
+    /// <summary>
+    /// Mid-walk path swap. Replaces the followed path with <paramref name="newPath"/>
+    /// without touching the ghost, the plan, or timing state. Resumes from the cell
+    /// in newPath closest to the unit's current position so a stale catch-up snapshot
+    /// doesn't make the unit backtrack.
+    /// </summary>
+    void SwitchFollowedPath(List<Vector2Int> newPath)
+    {
+        if (newPath == null || newPath.Count < 2 || terrainDataStore == null) return;
+
+        path = newPath;
+
+        Vector3 here = transform.position;
+        int closestIdx = 0;
+        float closestSqr = float.MaxValue;
+        for (int i = 0; i < path.Count; i++)
+        {
+            Vector3 wp = terrainDataStore.GridToWorld(path[i]);
+            float dx = wp.x - here.x;
+            float dz = wp.z - here.z;
+            float sqr = dx * dx + dz * dz;
+            if (sqr < closestSqr) { closestSqr = sqr; closestIdx = i; }
+        }
+
+        currentCell   = path[closestIdx];
+        waypointIndex = Mathf.Min(closestIdx + 1, path.Count - 1);
+        currentTarget = terrainDataStore.GridToWorld(path[waypointIndex]);
+        moving        = waypointIndex < path.Count;
     }
 
     void EnsureCatchUpLine()

@@ -47,27 +47,42 @@ public class UnitGhost : MonoBehaviour
     [Tooltip("Width of the vertical stem drawn from the orb down to the line.")]
     public float stemWidth   = 0.12f;
 
+    [Header("Path Line")]
+    [Tooltip("Colour of the line showing the full precomputed path the ghost is walking.")]
+    public Color pathColor     = new Color(0.45f, 0.8f, 1f, 1f);
+    [Tooltip("Width of the ghost's path line.")]
+    public float pathLineWidth = 0.4f;
+
     public bool IsFinished => _finished;
     public bool HasPath    => _path != null && _path.Count >= 2;
 
     TerrainDataStore _tds;
+    UnitTypeSO       _unitType;
     List<Vector2Int> _path;
     float _pathLineLift;
     int   _segmentIndex;
     float _segmentT;
     bool  _finished;
+    bool  _subscribed;
 
     GameObject   _orb;
     LineRenderer _stem;
+    LineRenderer _pathLine;
 
     /// <summary>
     /// Pin the ghost to the start of <paramref name="path"/> and build its visuals.
     /// <paramref name="pathLineLift"/> is the same lift the main path line uses,
-    /// so the stem lands exactly on it.
+    /// so the stem lands exactly on it. <paramref name="unitType"/> is used to
+    /// resolve obstacle effects when checking whether the ghost is on a Block cell.
     /// </summary>
-    public void Initialize(TerrainDataStore tds, List<Vector2Int> path, float pathLineLift)
+    public void Initialize(TerrainDataStore tds, UnitTypeSO unitType, List<Vector2Int> path, float pathLineLift)
     {
+        // Resubscribe cleanly if Initialize is called more than once (e.g. on
+        // re-route): drop the previous tds binding before swapping.
+        Unsubscribe();
+
         _tds          = tds;
+        _unitType     = unitType;
         _path         = path;
         _pathLineLift = pathLineLift;
         _segmentIndex = 0;
@@ -75,7 +90,105 @@ public class UnitGhost : MonoBehaviour
         _finished     = (path == null || path.Count < 2);
 
         BuildVisuals();
+        DrawPathLine();
         UpdateVisuals();
+
+        Subscribe();
+        StepOffBlocked();
+    }
+
+    void OnDestroy() => Unsubscribe();
+
+    void Subscribe()
+    {
+        if (_subscribed || _tds == null) return;
+        _tds.OnObstacleRegistered += HandleObstacleRegistered;
+        _subscribed = true;
+    }
+
+    void Unsubscribe()
+    {
+        if (!_subscribed || _tds == null) return;
+        _tds.OnObstacleRegistered -= HandleObstacleRegistered;
+        _subscribed = false;
+    }
+
+    void HandleObstacleRegistered(PlacedObstacle po) => StepOffBlocked();
+
+    /// <summary>
+    /// Event-driven entry point. Bumps the ghost past any blocked cells it currently
+    /// sits on and refreshes visuals. Safe to call when nothing's blocked (no-op).
+    /// </summary>
+    void StepOffBlocked()
+    {
+        if (_finished || _path == null || _path.Count < 2) return;
+        BumpPastBlocked();
+        UpdateVisuals();
+    }
+
+    /// <summary>
+    /// Walks the ghost forward waypoint-by-waypoint while the current cell is
+    /// blocked for this unit type (obstacle Block, biome Block, or a slope-blocked
+    /// step forward). Caller is responsible for calling <see cref="UpdateVisuals"/>
+    /// after — done that way so <see cref="Advance"/> only repaints once per frame.
+    /// Capped at path length so a fully-blocked path can't infinite-loop.
+    /// </summary>
+    void BumpPastBlocked()
+    {
+        if (_finished || _path == null || _path.Count < 2) return;
+
+        int safety = _path.Count;
+        while (safety-- > 0 && !_finished && IsCurrentCellBlocked())
+            AdvanceWaypoint();
+    }
+
+    void AdvanceWaypoint()
+    {
+        _segmentIndex++;
+        _segmentT = 0f;
+        if (_segmentIndex + 1 >= _path.Count)
+        {
+            _segmentIndex = _path.Count - 2;
+            _segmentT     = 1f;
+            _finished     = true;
+        }
+    }
+
+    bool IsCurrentCellBlocked()
+    {
+        if (_tds == null || _tds.grid == null) return false;
+        if (_path == null || _path.Count < 2) return false;
+
+        // Current cell under the foot: obstacle Block or biome Block?
+        Vector2Int g = _tds.WorldToGrid(GetFootPosition());
+        if (_tds.InBounds(g.x, g.y))
+        {
+            CellData here = _tds.grid[g.x, g.y];
+
+            if (here.obstacle != null && here.obstacle.obstacleSo != null
+                && here.obstacle.obstacleSo.ResolveEffect(_unitType).effect == CellEffect.Block)
+                return true;
+
+            if (here.biome != null
+                && here.biome.ResolveEffect(_unitType).effect == CellEffect.Block)
+                return true;
+        }
+
+        // Slope: is the next step (from the current waypoint to the one after)
+        // slope-blocked for this unit type?
+        if (_segmentIndex >= 0 && _segmentIndex + 1 < _path.Count)
+        {
+            Vector2Int fromGrid = _path[_segmentIndex];
+            if (_tds.InBounds(fromGrid.x, fromGrid.y))
+            {
+                CellData fromCell = _tds.grid[fromGrid.x, fromGrid.y];
+                Vector2Int delta  = _path[_segmentIndex + 1] - fromGrid;
+                AStarPathfinder.ResolveSlopeMultiplier(fromCell, delta, _unitType, out bool slopeBlocked);
+                if (slopeBlocked) return true;
+            }
+        }
+
+        return false;
     }
 
     /// <summary>Advance the ghost <paramref name="distance"/> world units along the path.</summary>
@@ -99,16 +212,15 @@ public class UnitGhost : MonoBehaviour
             else
             {
                 distance -= remaining;
-                _segmentIndex++;
-                _segmentT = 0f;
-                if (_segmentIndex + 1 >= _path.Count)
-                {
-                    _segmentIndex = _path.Count - 2;
-                    _segmentT     = 1f;
-                    _finished     = true;
-                }
+                AdvanceWaypoint();
             }
         }
+
+        // After the requested distance is consumed, free-walk forward through any
+        // cells the ghost ended up on that are blocked for this unit type (obstacle
+        // Block, biome Block, or a blocked slope step forward). Per Rick: this is
+        // allowed to push the ghost past its normal leash.
+        BumpPastBlocked();
 
         UpdateVisuals();
     }
@@ -187,6 +299,53 @@ public class UnitGhost : MonoBehaviour
         }
         _stem.startWidth = stemWidth;
         _stem.endWidth   = stemWidth;
+
+        if (_pathLine == null)
+        {
+            var pathGO = new GameObject("PathLine");
+            pathGO.transform.SetParent(transform, false);
+            _pathLine = pathGO.AddComponent<LineRenderer>();
+            _pathLine.useWorldSpace = true;
+            _pathLine.positionCount = 0;
+
+            string[] pathCandidates =
+            {
+                "Universal Render Pipeline/Particles/Unlit",
+                "Sprites/Default",
+                "Legacy Shaders/Particles/Alpha Blended",
+                "Unlit/Color",
+            };
+            Shader pathShader = null;
+            foreach (var n in pathCandidates)
+            {
+                pathShader = Shader.Find(n);
+                if (pathShader != null) break;
+            }
+            var pathMat = pathShader != null ? new Material(pathShader) : new Material(Shader.Find("Standard"));
+            pathMat.color       = pathColor;
+            _pathLine.material   = pathMat;
+            _pathLine.startColor = pathColor;
+            _pathLine.endColor   = pathColor;
+        }
+        _pathLine.startWidth = pathLineWidth;
+        _pathLine.endWidth   = pathLineWidth;
+    }
+
+    /// <summary>
+    /// Redraws the full precomputed path. Called from Initialize whenever the
+    /// ghost is given a (possibly new) path; the line never changes mid-walk.
+    /// </summary>
+    void DrawPathLine()
+    {
+        if (_pathLine == null || _tds == null || _path == null || _path.Count == 0)
+        {
+            if (_pathLine != null) _pathLine.positionCount = 0;
+            return;
+        }
+
+        _pathLine.positionCount = _path.Count;
+        for (int i = 0; i < _path.Count; i++)
+            _pathLine.SetPosition(i, CellFoot(_path[i]));
     }
 
     void UpdateVisuals()

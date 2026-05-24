@@ -14,7 +14,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::BiomeSO
   biomeName: Dirt
   color: {r: 0.5377358, g: 0.23699512, b: 0, a: 1}
-  defaultMovementCost: 3
-  unitWeights:
+  defaultEffect:
+    effect: 1
+    costMultiplier: 3
+  unitEffects:
   - unitType: {fileID: 11400000, guid: a95043a850146a34a9eb4bba141aa8be, type: 2}
-    movementCost: 3
+    effect: 1
+    costMultiplier: 3

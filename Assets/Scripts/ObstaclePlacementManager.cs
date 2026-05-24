@@ -629,6 +629,10 @@ public class ObstaclePlacementManager : MonoBehaviour
 
             ConformChildrenToTerrain(placed.gameObject, placed.obstacleSo.prefab);
         }
+
+        // Footprint moved — re-register so cell.obstacle and affectedCells track
+        // the rotated geometry. RegisterObstacleCells clears the prior footprint first.
+        terrainDataStore.RegisterObstacleCells(placed);
     }
 
     private void PlaceObstacle(Vector3 position)

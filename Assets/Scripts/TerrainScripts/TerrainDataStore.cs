@@ -41,6 +41,12 @@ public class TerrainDataStore : MonoBehaviour
 
     public event System.Action OnGridReady;
 
+    // ── Obstacle events ──────────────────────────────────────────────────
+    // Fired by Register/UnregisterObstacleCells so change-driven listeners
+    // (e.g. the obstacle overlay) can refresh without polling.
+    public event System.Action<PlacedObstacle> OnObstacleRegistered;
+    public event System.Action<PlacedObstacle> OnObstacleUnregistered;
+
     // ── Save / Load events ───────────────────────────────────────────────
     public event System.Action OnSaveLoaded;
     public event System.Action OnSaveCreated;
@@ -386,7 +392,17 @@ public class TerrainDataStore : MonoBehaviour
 
     public void RegisterObstacleCells(PlacedObstacle po)
     {
-        po.affectedCells.Clear();
+        // Clear any prior footprint so re-registration (e.g. after rotation)
+        // doesn't leave stale grid[].obstacle entries from the old position.
+        if (po.affectedCells != null)
+        {
+            foreach (Vector2Int cell in po.affectedCells)
+            {
+                if (InBounds(cell.x, cell.y) && grid[cell.x, cell.y].obstacle == po)
+                    grid[cell.x, cell.y].obstacle = null;
+            }
+            po.affectedCells.Clear();
+        }
 
         var partObjects = new HashSet<GameObject>();
         foreach (Renderer r in po.GetComponentsInChildren<Renderer>()) partObjects.Add(r.gameObject);
@@ -455,6 +471,8 @@ public class TerrainDataStore : MonoBehaviour
         {
             po.OnRegistered(this);
         }
+
+        OnObstacleRegistered?.Invoke(po);
     }
 
     public void UnregisterObstacleCells(PlacedObstacle po)
@@ -470,5 +488,7 @@ public class TerrainDataStore : MonoBehaviour
         }
 
         po.affectedCells.Clear();
+
+        OnObstacleUnregistered?.Invoke(po);
     }
 }

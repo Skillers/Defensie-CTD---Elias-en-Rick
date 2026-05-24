@@ -65,24 +65,51 @@ public static class AStarPathfinder
 
             CellData fromCell = grid[current.pos.x, current.pos.y];
 
-            foreach ((Vector2Int neighbour, bool isDiagonal) in GetNeighbours(current.pos, gridWidth, gridHeight))
+            for (int d = 0; d < CellData.Directions.Length; d++)
             {
+                Vector2Int delta     = CellData.Directions[d];
+                Vector2Int neighbour = current.pos + delta;
+
+                if (neighbour.x < 0 || neighbour.x >= gridWidth ||
+                    neighbour.y < 0 || neighbour.y >= gridHeight) continue;
                 if (closed.Contains(neighbour)) continue;
-                if (!CanFit(grid, gridWidth, gridHeight, neighbour, unitSize)) continue;
+                if (!CanFit(grid, gridWidth, gridHeight, neighbour, unitSize, unitType)) continue;
 
                 float slopeMultiplier =
-                    ResolveSlopeMultiplier(fromCell, neighbour - current.pos, unitType, out bool blocked);
+                    ResolveSlopeMultiplier(fromCell, delta, unitType, out bool blocked);
 
                 if (blocked) continue;
 
-                CellData cell = grid[neighbour.x, neighbour.y];
-                int moveCost = cell.biome != null ? cell.biome.GetMovementCost(unitType) : 3;
+                // Walk every cell the step physically crosses (excluding the start).
+                // For cardinal / single-diagonal that's just the destination; for
+                // knight moves it's the two intermediates plus the destination,
+                // each charged 1/3 of the step. Any blocked crossing kills the move.
+                CellCrossing[] crossings = CellPathing.Crossings[d];
+                float weightedCellCost   = 0f;
+                bool  pathBlocked        = false;
+                for (int c = 0; c < crossings.Length; c++)
+                {
+                    Vector2Int crossedPos = current.pos + crossings[c].offset;
+                    if (crossedPos.x < 0 || crossedPos.x >= gridWidth ||
+                        crossedPos.y < 0 || crossedPos.y >= gridHeight)
+                    {
+                        pathBlocked = true;
+                        break;
+                    }
 
-                float obstacleMultiplier = ResolveObstacleMultiplier(cell, unitType, out bool obstacleBlocked);
-                if (obstacleBlocked) continue;
+                    CellData crossedCell = grid[crossedPos.x, crossedPos.y];
 
-                float effectiveCost = moveCost * obstacleMultiplier;
-                float stepCost = (isDiagonal ? SQRT2 * effectiveCost : effectiveCost) * slopeMultiplier;
+                    float biomeMultiplier = ResolveBiomeMultiplier(crossedCell, unitType, out bool biomeBlocked);
+                    if (biomeBlocked) { pathBlocked = true; break; }
+
+                    float obstacleMultiplier = ResolveObstacleMultiplier(crossedCell, unitType, out bool obstacleBlocked);
+                    if (obstacleBlocked) { pathBlocked = true; break; }
+
+                    weightedCellCost += crossings[c].portion * biomeMultiplier * obstacleMultiplier;
+                }
+                if (pathBlocked) continue;
+
+                float stepCost = CellPathing.StepLengths[d] * weightedCellCost * slopeMultiplier;
                 float newG = current.gCost + stepCost;
 
                 Node existing = open.Find(n => n.pos == neighbour);
@@ -121,6 +148,59 @@ public static class AStarPathfinder
     }
 
     /// <summary>
+    ///     Computes the total A* cost of walking an already-built <paramref name="path" />.
+    ///     Mirrors <see cref="FindPath" />'s per-step formula:
+    ///         stepCost = StepLengths[d] × Σ(portion × biomeMul × obstacleMul) × slopeMul
+    ///     summed across all crossed cells (cardinal/diagonal: destination only; knight:
+    ///     two intermediates + destination, each ⅓). Returns +infinity if any step is
+    ///     blocked (slope/biome/obstacle) or crosses off-grid. Useful for re-pricing a
+    ///     path that's been mutated by shortcut / bevel passes after the initial A* ran.
+    ///     Safe to call on a worker thread as long as the grid isn't being mutated.
+    /// </summary>
+    public static float ComputePathCost(CellData[,] grid, int gridWidth, int gridHeight,
+                                        List<Vector2Int> path, UnitTypeSO unitType)
+    {
+        if (path == null || path.Count < 2) return 0f;
+
+        float totalCost = 0f;
+        for (int i = 0; i < path.Count - 1; i++)
+        {
+            Vector2Int fromPos = path[i];
+            Vector2Int delta   = path[i + 1] - fromPos;
+
+            int dirIndex = GetDirectionIndex(delta);
+            if (dirIndex < 0) return float.PositiveInfinity;
+
+            if (fromPos.x < 0 || fromPos.x >= gridWidth ||
+                fromPos.y < 0 || fromPos.y >= gridHeight) return float.PositiveInfinity;
+
+            CellData fromCell = grid[fromPos.x, fromPos.y];
+
+            float slopeMul = ResolveSlopeMultiplier(fromCell, delta, unitType, out bool slopeBlocked);
+            if (slopeBlocked) return float.PositiveInfinity;
+
+            CellCrossing[] crossings = CellPathing.Crossings[dirIndex];
+            float weightedCellCost = 0f;
+            for (int c = 0; c < crossings.Length; c++)
+            {
+                Vector2Int pos = fromPos + crossings[c].offset;
+                if (pos.x < 0 || pos.x >= gridWidth ||
+                    pos.y < 0 || pos.y >= gridHeight) return float.PositiveInfinity;
+
+                CellData crossed = grid[pos.x, pos.y];
+                float biomeMul = ResolveBiomeMultiplier(crossed, unitType, out bool biomeBlocked);
+                if (biomeBlocked) return float.PositiveInfinity;
+                float obstacleMul = ResolveObstacleMultiplier(crossed, unitType, out bool obstacleBlocked);
+                if (obstacleBlocked) return float.PositiveInfinity;
+                weightedCellCost += crossings[c].portion * biomeMul * obstacleMul;
+            }
+
+            totalCost += CellPathing.StepLengths[dirIndex] * weightedCellCost * slopeMul;
+        }
+        return totalCost;
+    }
+
+    /// <summary>
     ///     Returns the slope multiplier for stepping from <paramref name="fromCell" /> in the given delta direction.
     ///     Sets <paramref name="blocked" /> to true if the unit cannot make this step.
     ///     Falls back to 1f when no unit type is supplied or slope data is missing.
@@ -146,6 +226,32 @@ public static class AStarPathfinder
     }
 
     /// <summary>
+    ///     Returns the biome cost multiplier for entering <paramref name="cell" /> as the given
+    ///     <paramref name="unitType" />. Sets <paramref name="blocked" /> to true if the resolved
+    ///     biome effect forbids entry. Returns 1f when the cell has no biome or the resolved
+    ///     effect has no cost impact.
+    /// </summary>
+    public static float ResolveBiomeMultiplier(CellData cell, UnitTypeSO unitType, out bool blocked)
+    {
+        blocked = false;
+
+        if (cell.biome == null) return 1f;
+
+        CellEffectSpec resolved = cell.biome.ResolveEffect(unitType);
+
+        switch (resolved.effect)
+        {
+            case CellEffect.Block:
+                blocked = true;
+                return 0f;
+            case CellEffect.Slow:
+                return Mathf.Max(0.0001f, resolved.costMultiplier);
+            default:
+                return 1f;
+        }
+    }
+
+    /// <summary>
     ///     Returns the obstacle cost multiplier for entering <paramref name="cell" /> as the given
     ///     <paramref name="unitType" />. Sets <paramref name="blocked" /> to true if the resolved
     ///     effect forbids entry. Returns 1f when no obstacle is registered or the resolved effect
@@ -160,14 +266,14 @@ public static class AStarPathfinder
         ObstacleSO obstacleSo = cell.obstacle.obstacleSo;
         if (obstacleSo == null) return 1f;
 
-        ObstacleUnitEffect resolved = obstacleSo.ResolveEffect(unitType);
+        CellEffectSpec resolved = obstacleSo.ResolveEffect(unitType);
 
         switch (resolved.effect)
         {
-            case ObstacleEffect.Block:
+            case CellEffect.Block:
                 blocked = true;
                 return 0f;
-            case ObstacleEffect.Slow:
+            case CellEffect.Slow:
                 return Mathf.Max(0.0001f, resolved.costMultiplier);
             default:
                 return 1f;
@@ -188,7 +294,7 @@ public static class AStarPathfinder
         return -1;
     }
 
-    private static bool CanFit(CellData[,] grid, int w, int h, Vector2Int pos, int unitSize)
+    private static bool CanFit(CellData[,] grid, int w, int h, Vector2Int pos, int unitSize, UnitTypeSO unitType)
     {
         int half = unitSize / 2;
         for (int dx = -half; dx <= half; dx++)
@@ -201,7 +307,7 @@ public static class AStarPathfinder
             CellData cell = grid[nx, ny];
 
             if (cell.biome == null) return false;
-            if (cell.biome.defaultMovementCost == int.MaxValue) return false;
+            if (cell.biome.ResolveEffect(unitType).effect == CellEffect.Block) return false;
         }
 
         return true;
@@ -213,20 +319,6 @@ public static class AStarPathfinder
         float dy = Mathf.Abs(a.y - b.y);
 
         return dx + dy + (SQRT2 - 2f) * Mathf.Min(dx, dy);
-    }
-
-    private static IEnumerable<(Vector2Int pos, bool isDiagonal)> GetNeighbours(Vector2Int pos, int w, int h)
-    {
-        var dirs = CellData.Directions;
-        for (int d = 0; d < dirs.Length; d++)
-        {
-            int dx = dirs[d].x, dy = dirs[d].y;
-            var n = new Vector2Int(pos.x + dx, pos.y + dy);
-            if (n.x >= 0 && n.x < w && n.y >= 0 && n.y < h)
-            {
-                yield return (n, dx != 0 && dy != 0);
-            }
-        }
     }
 
     private static List<Vector2Int> BuildPath(Node endNode)
