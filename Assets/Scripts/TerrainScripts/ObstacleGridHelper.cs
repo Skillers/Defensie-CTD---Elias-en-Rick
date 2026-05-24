@@ -166,4 +166,119 @@ public class ObstacleGridHelper
             new(c.x - e.x, c.y - e.y, c.z - e.z)
         };
     }
+
+    /// <summary>
+    /// Registers extra cells between a part and its nearest forward/backward neighbour
+    /// by stepping along the part's local Z-axis in grid-step increments.
+    /// Call this after the normal per-part registration pass.
+    /// </summary>
+    public static void FillSegmentGapCells(
+        GameObject part,
+        TerrainDataStore store,
+        PlacedObstacle po)
+    {
+        Transform parent = part.transform.parent;
+        if (parent == null) return;
+
+        Vector3 partPos = part.transform.position;
+        Vector3 forward = part.transform.forward;
+
+        // Collect siblings with their signed projection along local Z
+        var siblings = new System.Collections.Generic.List<(Transform t, float proj)>();
+        for (int i = 0; i < parent.childCount; i++)
+        {
+            Transform sibling = parent.GetChild(i);
+            if (sibling.gameObject == part) continue;
+            float proj = Vector3.Dot(sibling.position - partPos, forward);
+            siblings.Add((sibling, proj));
+        }
+
+        if (siblings.Count == 0) return;
+
+        // Closest forward neighbour
+        float closestFwdProj = float.MaxValue;
+        Transform fwdNeighbour = null;
+        // Closest backward neighbour
+        float closestBwdProj = float.MaxValue;
+        Transform bwdNeighbour = null;
+
+        foreach (var (t, proj) in siblings)
+        {
+            if (proj > 0f && proj < closestFwdProj) { closestFwdProj = proj; fwdNeighbour = t; }
+            if (proj < 0f && -proj < closestBwdProj) { closestBwdProj = -proj; bwdNeighbour = t; }
+        }
+
+        Vector2Int fromCell = store.WorldToGrid(partPos);
+
+        if (fwdNeighbour != null)
+        {
+            // Fill only up to the midpoint cell
+            Vector2Int toCell = store.WorldToGrid(
+                Vector3.Lerp(partPos, fwdNeighbour.position, 0.5f));
+            BresenhamFill(fromCell, toCell, store, po);
+        }
+
+        if (bwdNeighbour != null)
+        {
+            Vector2Int toCell = store.WorldToGrid(
+                Vector3.Lerp(partPos, bwdNeighbour.position, 0.5f));
+            BresenhamFill(fromCell, toCell, store, po);
+        }
+    }
+
+    private static void BresenhamFill(
+        Vector2Int from,
+        Vector2Int to,
+        TerrainDataStore store,
+        PlacedObstacle po)
+    {
+        // Integer Bresenham — visits every grid cell on the line, no gaps
+        int x = from.x, z = from.y;
+        int dx = Mathf.Abs(to.x - from.x), dz = Mathf.Abs(to.y - from.y);
+        int sx = from.x < to.x ? 1 : -1;
+        int sz = from.y < to.y ? 1 : -1;
+        int err = dx - dz;
+
+        while (true)
+        {
+            if (store.InBounds(x, z))
+            {
+                var cell = new Vector2Int(x, z);
+                if (!po.affectedCells.Contains(cell))
+                {
+                    store.grid[x, z].obstacle = po;
+                    po.affectedCells.Add(cell);
+                }
+            }
+
+            if (x == to.x && z == to.y) break;
+
+            int e2 = 2 * err;
+            if (e2 > -dz) { err -= dz; x += sx; }
+            if (e2 <  dx) { err += dx; z += sz; }
+        }
+    }
+
+    private static void FillAlongAxis(
+        Vector3 origin,
+        Vector3 dir,
+        float maxDist,
+        float gridStep,
+        TerrainDataStore store,
+        PlacedObstacle po)
+    {
+        if (maxDist <= 0f) return;
+
+        for (float d = gridStep; d <= maxDist + gridStep * 0.5f; d += gridStep)
+        {
+            Vector3 worldPos = origin + dir * d;
+            Vector2Int cell = store.WorldToGrid(worldPos);
+
+            if (!store.InBounds(cell.x, cell.y)) continue;
+            if (po.affectedCells.Contains(cell)) continue;
+
+            store.grid[cell.x, cell.y].obstacle = po;
+            po.affectedCells.Add(cell);
+        }
+    }
 }
