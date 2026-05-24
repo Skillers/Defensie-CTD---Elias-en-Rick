@@ -34,31 +34,42 @@ public class BiomeSOEditor : Editor
 
         if (allTypes.Count == 0) return;
 
-        // Build lookup of existing costs
-        var existing = new Dictionary<UnitTypeSO, int>();
-        if (biome.unitWeights != null)
+        // Build lookup of existing per-unit specs so the sync preserves any tuning
+        // already done in the inspector.
+        var existing = new Dictionary<UnitTypeSO, CellEffectSpec>();
+        if (biome.unitEffects != null)
         {
-            foreach (var w in biome.unitWeights)
+            foreach (var e in biome.unitEffects)
             {
-                if (w.unitType != null && !existing.ContainsKey(w.unitType))
-                    existing[w.unitType] = w.movementCost;
+                if (e.unitType != null && !existing.ContainsKey(e.unitType))
+                    existing[e.unitType] = new CellEffectSpec
+                    {
+                        effect         = e.effect,
+                        costMultiplier = e.costMultiplier,
+                    };
             }
         }
 
         // Check if already in sync
-        bool inSync = biome.unitWeights != null
-            && biome.unitWeights.Length == allTypes.Count
-            && biome.unitWeights.All(w => w.unitType != null && allTypes.Contains(w.unitType));
+        bool inSync = biome.unitEffects != null
+            && biome.unitEffects.Length == allTypes.Count
+            && biome.unitEffects.All(e => e.unitType != null && allTypes.Contains(e.unitType));
 
         if (inSync) return;
 
-        // Rebuild: keep existing costs, default new entries to defaultMovementCost
+        // Rebuild: keep existing specs, default new entries to the biome's defaultEffect
+        // so syncing is behaviour-neutral until the designer tweaks the new row.
         Undo.RecordObject(biome, "Sync Unit Types");
 
-        biome.unitWeights = allTypes.Select(ut => new UnitWeight
+        biome.unitEffects = allTypes.Select(ut =>
         {
-            unitType = ut,
-            movementCost = existing.TryGetValue(ut, out int cost) ? cost : biome.defaultMovementCost
+            CellEffectSpec spec = existing.TryGetValue(ut, out var e) ? e : biome.defaultEffect;
+            return new CellUnitEffect
+            {
+                unitType       = ut,
+                effect         = spec.effect,
+                costMultiplier = spec.costMultiplier,
+            };
         }).ToArray();
 
         EditorUtility.SetDirty(biome);

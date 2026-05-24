@@ -14,7 +14,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::BiomeSO
   biomeName: Rock
   color: {r: 0.4716981, g: 0.4716981, b: 0.4716981, a: 1}
-  defaultMovementCost: 5
-  unitWeights:
+  defaultEffect:
+    effect: 1
+    costMultiplier: 5
+  unitEffects:
   - unitType: {fileID: 11400000, guid: a95043a850146a34a9eb4bba141aa8be, type: 2}
-    movementCost: 4
+    effect: 1
+    costMultiplier: 4

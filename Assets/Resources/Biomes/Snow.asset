@@ -14,7 +14,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::BiomeSO
   biomeName: Snow
   color: {r: 1, g: 1, b: 1, a: 1}
-  defaultMovementCost: 3
-  unitWeights:
+  defaultEffect:
+    effect: 1
+    costMultiplier: 3
+  unitEffects:
   - unitType: {fileID: 11400000, guid: a95043a850146a34a9eb4bba141aa8be, type: 2}
-    movementCost: 2
+    effect: 1
+    costMultiplier: 2

@@ -13,5 +13,5 @@ MonoBehaviour:
   m_Name: ObstacleInventory
   m_EditorClassIdentifier: Assembly-CSharp::ObstacleInventorySO
   obstacles:
-  - {fileID: 11400000, guid: d0e1f2a3b4c5d0e1f2a3b4c5d0e1f2a3, type: 2}
+  - {fileID: 11400000, guid: bc70d1b0e5d71f9428a391b6b92670a3, type: 2}
   - {fileID: 11400000, guid: df72ec03acd43eb4ca3b03a4b0787bdd, type: 2}

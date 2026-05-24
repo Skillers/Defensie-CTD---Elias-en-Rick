@@ -41,6 +41,12 @@ public class TerrainDataStore : MonoBehaviour
 
     public event System.Action OnGridReady;
 
+    // ── Obstacle events ──────────────────────────────────────────────────
+    // Fired by Register/UnregisterObstacleCells so change-driven listeners
+    // (e.g. the obstacle overlay) can refresh without polling.
+    public event System.Action<PlacedObstacle> OnObstacleRegistered;
+    public event System.Action<PlacedObstacle> OnObstacleUnregistered;
+
     // ── Save / Load events ───────────────────────────────────────────────
     public event System.Action OnSaveLoaded;
     public event System.Action OnSaveCreated;
@@ -63,6 +69,8 @@ public class TerrainDataStore : MonoBehaviour
 
     Vector2Int? _endCell;
     public Vector2Int? EndCell => _endCell;
+
+    private ObstacleGridHelper ObstacleGridHelper { get; } = new();
 
 
     void Awake()
@@ -302,7 +310,6 @@ public class TerrainDataStore : MonoBehaviour
                     {
                         rawHeight = c.rawHeight,
                         roundedHeight = c.roundedHeight,
-                        slopeOutgoing = c.slopeOutgoing,
                         biomeName = c.biome != null ? c.biome.biomeName : null,
                     };
                 }
@@ -349,13 +356,17 @@ public class TerrainDataStore : MonoBehaviour
                     {
                         rawHeight = dto?.rawHeight ?? 0f,
                         roundedHeight = dto?.roundedHeight ?? 0f,
-                        slopeOutgoing = dto?.slopeOutgoing,
                         biome = biome,
                     };
 
                     RegisterBiome(biome);
                 }
             }
+
+            // slopeOutgoing is fully derived from rawHeight, so it isn't serialized.
+            // Re-bake it (all CellData.Directions, incl. knight moves) before any
+            // consumer reads the grid.
+            SlopeMap.BakeSlopesIntoGrid(restored, data.gridWidth, data.gridHeight, step);
 
             SetGrid(restored);
         }
@@ -377,5 +388,107 @@ public class TerrainDataStore : MonoBehaviour
                 map[b.biomeName] = b;
         }
         return map;
+    }
+
+    public void RegisterObstacleCells(PlacedObstacle po)
+    {
+        // Clear any prior footprint so re-registration (e.g. after rotation)
+        // doesn't leave stale grid[].obstacle entries from the old position.
+        if (po.affectedCells != null)
+        {
+            foreach (Vector2Int cell in po.affectedCells)
+            {
+                if (InBounds(cell.x, cell.y) && grid[cell.x, cell.y].obstacle == po)
+                    grid[cell.x, cell.y].obstacle = null;
+            }
+            po.affectedCells.Clear();
+        }
+
+        var partObjects = new HashSet<GameObject>();
+        foreach (Renderer r in po.GetComponentsInChildren<Renderer>()) partObjects.Add(r.gameObject);
+        foreach (Collider c in po.GetComponentsInChildren<Collider>()) partObjects.Add(c.gameObject);
+
+        foreach (GameObject part in partObjects)
+        {
+            Vector3 refPosition = part.transform.position;
+            Quaternion refRotation = ObstacleGridHelper.ExtractYawRotation(part.transform.rotation);
+
+            Bounds localBounds = ObstacleGridHelper.GetPartLocalBounds(part, refPosition, refRotation);
+
+            if (localBounds.size == Vector3.zero) continue;
+
+            Vector3[] localCorners = ObstacleGridHelper.GetBoundsCorners(localBounds);
+            var worldAABB = new Bounds();
+            bool first = true;
+            foreach (Vector3 lc in localCorners)
+            {
+                Vector3 wc = refPosition + refRotation * lc;
+                if (first)
+                {
+                    worldAABB = new Bounds(wc, Vector3.zero);
+                    first = false;
+                }
+                else
+                {
+                    worldAABB.Encapsulate(wc);
+                }
+            }
+
+            Vector2Int min = WorldToGrid(worldAABB.min);
+            Vector2Int max = WorldToGrid(worldAABB.max);
+            Quaternion invRot = Quaternion.Inverse(refRotation);
+
+            for (int x = min.x; x <= max.x; x++)
+            for (int z = min.y; z <= max.y; z++)
+            {
+                if (!InBounds(x, z)) continue;
+
+                Vector3 worldPos = GridToWorld(new Vector2Int(x, z));
+                worldPos.y = refPosition.y;
+                Vector3 localPos = invRot * (worldPos - refPosition);
+
+                bool insideX = localPos.x >= localBounds.min.x && localPos.x <= localBounds.max.x;
+                bool insideZ = localPos.z >= localBounds.min.z && localPos.z <= localBounds.max.z;
+
+                if (!insideX || !insideZ)
+                {
+                    continue;
+                }
+
+                var cell = new Vector2Int(x, z);
+
+                if (po.affectedCells.Contains(cell))
+                {
+                    continue;
+                }
+
+                grid[x, z].obstacle = po;
+                po.affectedCells.Add(cell);
+            }
+        }
+
+        if (po.affectedCells.Count > 0)
+        {
+            po.OnRegistered(this);
+        }
+
+        OnObstacleRegistered?.Invoke(po);
+    }
+
+    public void UnregisterObstacleCells(PlacedObstacle po)
+    {
+        if (po == null || po.affectedCells == null) return;
+
+        foreach (Vector2Int cell in po.affectedCells)
+        {
+            if (InBounds(cell.x, cell.y) && grid[cell.x, cell.y].obstacle == po)
+            {
+                grid[cell.x, cell.y].obstacle = null;
+            }
+        }
+
+        po.affectedCells.Clear();
+
+        OnObstacleUnregistered?.Invoke(po);
     }
 }

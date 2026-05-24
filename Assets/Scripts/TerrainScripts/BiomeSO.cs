@@ -5,28 +5,28 @@ public class BiomeSO : ScriptableObject
 {
     public string biomeName;
     public Color color = Color.white;
-    public int defaultMovementCost = 3;
 
-    [Tooltip("Optional per-unit-type movement cost overrides.")]
-    public UnitWeight[] unitWeights;
+    [Header("Pathfinding")]
+    [Tooltip("Effect applied when no per-unit-type override matches. Use Slow with costMultiplier >= 1 for slower terrain (e.g. swamp = 3), or Block for impassable terrain (e.g. water for infantry).")]
+    public CellEffectSpec defaultEffect = new() { effect = CellEffect.Slow, costMultiplier = 3f };
 
-    public int GetMovementCost(UnitTypeSO unitType)
+    [Tooltip("Per-unit-type overrides. First match wins; otherwise falls back to defaultEffect.")]
+    public CellUnitEffect[] unitEffects;
+
+    public CellEffectSpec ResolveEffect(UnitTypeSO unitType)
     {
-        if (unitType != null && unitWeights != null)
+        if (unitType != null && unitEffects != null)
         {
-            foreach (var w in unitWeights)
+            for (int i = 0; i < unitEffects.Length; i++)
             {
-                if (w.unitType == unitType)
-                    return w.movementCost;
+                if (unitEffects[i].unitType == unitType)
+                    return new CellEffectSpec
+                    {
+                        effect         = unitEffects[i].effect,
+                        costMultiplier = unitEffects[i].costMultiplier,
+                    };
             }
         }
-        return defaultMovementCost;
+        return defaultEffect;
     }
-}
-
-[System.Serializable]
-public struct UnitWeight
-{
-    public UnitTypeSO unitType;
-    public int movementCost;
 }

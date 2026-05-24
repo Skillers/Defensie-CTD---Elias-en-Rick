@@ -44,7 +44,7 @@ public class SlopeMap : MonoBehaviour
         Heights     = BuildHeightsFromGrid(grid);
         SlopeAngles = ComputeSlopes(Heights);
 
-        BakeSlopesIntoGrid(grid);
+        BakeSlopesIntoGrid(grid, width, height, terrainDataStore.step);
     }
 
     /// <summary>Build the visual mesh (call after TerrainDataStore has the grid).</summary>
@@ -62,30 +62,37 @@ public class SlopeMap : MonoBehaviour
         ApplySlopeTexture(SlopeAngles);
     }
 
-    private void BakeSlopesIntoGrid(CellData[,] grid)
+    /// <summary>
+    /// Bakes the signed outgoing slope (degrees) for every <see cref="CellData.Directions"/>
+    /// entry into each cell, from rawHeight. Static so the load path can re-derive
+    /// slopes without a SlopeMap instance. The run length per step is its Euclidean
+    /// magnitude × step (1 / √2 / √5 for cardinal / diagonal / knight).
+    /// </summary>
+    public static void BakeSlopesIntoGrid(CellData[,] grid, int width, int height, float step)
     {
-        float stp = terrainDataStore.step;
+        int dirCount = CellData.Directions.Length;
 
-        for (int x = 0; x < VertsX; x++)
-        for (int z = 0; z < VertsZ; z++)
+        for (int x = 0; x < width; x++)
+        for (int z = 0; z < height; z++)
         {
-            grid[x, z].slopeOutgoing = new float[8];
+            grid[x, z].slopeOutgoing = new float[dirCount];
             float h = grid[x, z].rawHeight;
 
-            for (int d = 0; d < 8; d++)
+            for (int d = 0; d < dirCount; d++)
             {
-                int nx = x + CellData.Directions[d].x;
-                int nz = z + CellData.Directions[d].y;
+                int dirX = CellData.Directions[d].x;
+                int dirZ = CellData.Directions[d].y;
+                int nx = x + dirX;
+                int nz = z + dirZ;
 
-                if (nx < 0 || nx >= VertsX || nz < 0 || nz >= VertsZ)
+                if (nx < 0 || nx >= width || nz < 0 || nz >= height)
                 {
                     grid[x, z].slopeOutgoing[d] = 0f;
                     continue;
                 }
 
-                float nh = grid[nx, nz].rawHeight;
-                bool isDiagonal = CellData.Directions[d].x != 0 && CellData.Directions[d].y != 0;
-                float dist = isDiagonal ? stp * 1.41421356f : stp;
+                float nh   = grid[nx, nz].rawHeight;
+                float dist = step * Mathf.Sqrt(dirX * dirX + dirZ * dirZ);
                 grid[x, z].slopeOutgoing[d] = Mathf.Atan2(nh - h, dist) * Mathf.Rad2Deg;
             }
         }
