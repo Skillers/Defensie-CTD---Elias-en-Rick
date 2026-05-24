@@ -49,7 +49,6 @@ public class CellDataDto
 {
     public float rawHeight;
     public float roundedHeight;
-    public float[] slopeOutgoing;
     public string biomeName;
 }
 

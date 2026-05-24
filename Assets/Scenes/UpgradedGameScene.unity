@@ -629,10 +629,6 @@ PrefabInstance:
       propertyPath: m_Name
       value: UnitSpawner
       objectReference: {fileID: 0}
-    - target: {fileID: 7724310995596432243, guid: 34f8a3d10a4a9a040ae0dc503f8ab6bf, type: 3}
-      propertyPath: m_IsActive
-      value: 1
-      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -1162,11 +1158,11 @@ MonoBehaviour:
   terrainDataStore: {fileID: 87598852}
   unitSpawner: {fileID: 1959012459}
   avenueStore: {fileID: 1407791791}
-  drawRawPath: 1
+  drawRawPath: 0
   rawPathColor: {r: 1, g: 0.25, b: 0.2, a: 1}
   rawPathLineWidth: 0.5
   rawPathLineLift: 2
-  drawProximityMarkers: 1
+  drawProximityMarkers: 0
   proximityWorldDistance: 4
   proximityLookaheadSteps: 10
   proximityWindowSteps: 10
@@ -1179,12 +1175,13 @@ MonoBehaviour:
   shortcutLineColor: {r: 0.6, g: 0.2, b: 1, a: 1}
   shortcutLineWidth: 0.5
   shortcutLineLift: 4
-  drawCornerMarkers: 1
+  drawCornerMarkers: 0
   cornerAngleThresholdDeg: 50
   cornerMarkerColor: {r: 1, g: 0.5, b: 0, a: 1}
   cornerMarkerSize: 1.2
   cornerMarkerLift: 0.25
-  drawBeveledPath: 1
+  drawBeveledPath: 0
+  useBeveledPathForUnit: 1
   bevelStepsPerSide: 6
   bevelSegments: 8
   bevelLineColor: {r: 0.2, g: 1, b: 0.55, a: 1}
@@ -2232,10 +2229,6 @@ PrefabInstance:
       propertyPath: m_Name
       value: MissionEndWatcher
       objectReference: {fileID: 0}
-    - target: {fileID: 7230007437043925558, guid: 618f02e82130c7645baa7c1f3ffb5f93, type: 3}
-      propertyPath: m_IsActive
-      value: 1
-      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -3282,10 +3275,6 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 8
   previewMaterial: {fileID: 2100000, guid: f2a3b4c5d6e7f2a3b4c5d6e7f2a3b4c5, type: 2}
-  blockedPreviewMaterial: {fileID: 0}
-  collisionToleranceFactor: 0.8
-  rotationSpeed: 150
-  terrainDataStore: {fileID: 87598852}
 --- !u!1 &1800273226
 GameObject:
   m_ObjectHideFlags: 0

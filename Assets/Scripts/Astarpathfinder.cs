@@ -217,11 +217,10 @@ public static class AStarPathfinder
 
     private static IEnumerable<(Vector2Int pos, bool isDiagonal)> GetNeighbours(Vector2Int pos, int w, int h)
     {
-        for (int dx = -1; dx <= 1; dx++)
-        for (int dy = -1; dy <= 1; dy++)
+        var dirs = CellData.Directions;
+        for (int d = 0; d < dirs.Length; d++)
         {
-            if (dx == 0 && dy == 0) continue;
-
+            int dx = dirs[d].x, dy = dirs[d].y;
             var n = new Vector2Int(pos.x + dx, pos.y + dy);
             if (n.x >= 0 && n.x < w && n.y >= 0 && n.y < h)
             {
