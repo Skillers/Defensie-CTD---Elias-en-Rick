@@ -10,6 +10,11 @@ public class PlacedObstacle : MonoBehaviour
     [FormerlySerializedAs("obstacleSO")]
     public ObstacleSO obstacleSo;
 
+    /// <summary>Grid cells this obstacle currently occupies. Owned by this instance; written by TerrainDataStore.RegisterObstacleCells.</summary>
+    [System.NonSerialized] public List<Vector2Int> affectedCells = new List<Vector2Int>();
+
+    private TerrainDataStore _registeredStore;
+
     private List<Renderer> _renderers = new List<Renderer>();
     private List<Material> _materialInstances = new List<Material>();
     private List<Color> _originalEmissions = new List<Color>();
@@ -79,6 +84,20 @@ public class PlacedObstacle : MonoBehaviour
                     mat.SetColor(EmissionColor, _originalEmissions[i]);
                 }
             }
+        }
+    }
+
+    /// <summary>Called by TerrainDataStore.RegisterObstacleCells so this obstacle can call back on destroy.</summary>
+    public void OnRegistered(TerrainDataStore store)
+    {
+        _registeredStore = store;
+    }
+
+    private void OnDestroy()
+    {
+        if (_registeredStore != null)
+        {
+            _registeredStore.UnregisterObstacleCells(this);
         }
     }
 }

@@ -78,18 +78,11 @@ public static class AStarPathfinder
                 CellData cell = grid[neighbour.x, neighbour.y];
                 int moveCost = cell.biome != null ? cell.biome.GetMovementCost(unitType) : 3;
 
-                if (cell.obstacle != null)
-                {
-                    if (cell.obstacle.obstacleEffects.Contains(ObstacleEffect.Block))
-                    {
-                        continue;
-                    }
+                float obstacleMultiplier = ResolveObstacleMultiplier(cell, unitType, out bool obstacleBlocked);
+                if (obstacleBlocked) continue;
 
-                    const float fixMultiplier = 2f;
-                    moveCost = Mathf.RoundToInt(moveCost * fixMultiplier);
-                }
-
-                float stepCost = (isDiagonal ? SQRT2 * moveCost : moveCost) * slopeMultiplier;
+                float effectiveCost = moveCost * obstacleMultiplier;
+                float stepCost = (isDiagonal ? SQRT2 * effectiveCost : effectiveCost) * slopeMultiplier;
                 float newG = current.gCost + stepCost;
 
                 Node existing = open.Find(n => n.pos == neighbour);
@@ -150,6 +143,35 @@ public static class AStarPathfinder
         float slope = fromCell.slopeOutgoing[dirIndex];
 
         return unitType.EvaluateSlope(slope, out blocked);
+    }
+
+    /// <summary>
+    ///     Returns the obstacle cost multiplier for entering <paramref name="cell" /> as the given
+    ///     <paramref name="unitType" />. Sets <paramref name="blocked" /> to true if the resolved
+    ///     effect forbids entry. Returns 1f when no obstacle is registered or the resolved effect
+    ///     has no cost impact.
+    /// </summary>
+    public static float ResolveObstacleMultiplier(CellData cell, UnitTypeSO unitType, out bool blocked)
+    {
+        blocked = false;
+
+        if (cell.obstacle == null) return 1f;
+
+        ObstacleSO obstacleSo = cell.obstacle.obstacleSo;
+        if (obstacleSo == null) return 1f;
+
+        ObstacleUnitEffect resolved = obstacleSo.ResolveEffect(unitType);
+
+        switch (resolved.effect)
+        {
+            case ObstacleEffect.Block:
+                blocked = true;
+                return 0f;
+            case ObstacleEffect.Slow:
+                return Mathf.Max(0.0001f, resolved.costMultiplier);
+            default:
+                return 1f;
+        }
     }
 
     /// <summary>

@@ -16,3 +16,8 @@ MonoBehaviour:
   icon: {fileID: 0}
   prefab: {fileID: 1000000001, guid: 78b24c0e099817148b511d980c9961c8, type: 3}
   placementType: 0
+  defaultEffect:
+    unitType: {fileID: 0}
+    effect: 1
+    costMultiplier: 2
+  unitEffects: []

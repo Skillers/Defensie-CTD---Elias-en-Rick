@@ -22,8 +22,9 @@ public struct CellData
 
     /// <summary>The biome assigned to this cell.</summary>
     public BiomeSO biome;
-    
-    public ObstacleSO obstacle;
+
+    /// <summary>The placed obstacle (if any) registered on this cell. Owner: PlacedObstacle.affectedCells.</summary>
+    public PlacedObstacle obstacle;
 
     // Direction offsets matching the index order (dx, dz)
     public static readonly Vector2Int[] Directions =
