@@ -169,6 +169,17 @@ public class UnitGhost : MonoBehaviour
                 && here.obstacle.obstacleSo.ResolveEffect(_unitType).effect == CellEffect.Block)
                 return true;
 
+            if (here.radiusObstacles != null)
+            {
+                for (int i = 0; i < here.radiusObstacles.Count; i++)
+                {
+                    PlacedObstacle src = here.radiusObstacles[i];
+                    if (src == null || src.obstacleSo == null) continue;
+                    if (src.obstacleSo.ResolveRadiusEffect(_unitType).effect == CellEffect.Block)
+                        return true;
+                }
+            }
+
             if (here.biome != null
                 && here.biome.ResolveEffect(_unitType).effect == CellEffect.Block)
                 return true;

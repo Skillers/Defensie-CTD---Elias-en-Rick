@@ -1,6 +1,7 @@
 using UnityEngine;
 
 public enum PlacementType { Point, Line }
+public enum RadiusShape { None, Square, Circle }
 
 [CreateAssetMenu(fileName = "NewObstacle", menuName = "CTD/Obstacle")]
 public class ObstacleSO : ScriptableObject
@@ -27,6 +28,19 @@ public class ObstacleSO : ScriptableObject
     [Tooltip("Per-unit-type overrides. First match wins; otherwise falls back to defaultEffect.")]
     public CellUnitEffect[] unitEffects;
 
+    [Header("Radius Effect")]
+    [Tooltip("Shape of the area around the footprint that receives the radius effect. None disables the radius layer entirely.")]
+    public RadiusShape radiusShape = RadiusShape.None;
+
+    [Tooltip("Radius in grid cells, measured outward from each footprint cell.")]
+    [Min(0)] public int radiusCells = 0;
+
+    [Tooltip("Radius effect applied when no per-unit-type radius override matches.")]
+    public CellEffectSpec defaultRadiusEffect = new() { effect = CellEffect.None, costMultiplier = 1f };
+
+    [Tooltip("Per-unit-type radius overrides. First match wins; otherwise falls back to defaultRadiusEffect.")]
+    public CellUnitEffect[] radiusUnitEffects;
+
     public CellEffectSpec ResolveEffect(UnitTypeSO unitType)
     {
         if (unitType != null && unitEffects != null)
@@ -42,5 +56,22 @@ public class ObstacleSO : ScriptableObject
             }
         }
         return defaultEffect;
+    }
+
+    public CellEffectSpec ResolveRadiusEffect(UnitTypeSO unitType)
+    {
+        if (unitType != null && radiusUnitEffects != null)
+        {
+            for (int i = 0; i < radiusUnitEffects.Length; i++)
+            {
+                if (radiusUnitEffects[i].unitType == unitType)
+                    return new CellEffectSpec
+                    {
+                        effect         = radiusUnitEffects[i].effect,
+                        costMultiplier = radiusUnitEffects[i].costMultiplier,
+                    };
+            }
+        }
+        return defaultRadiusEffect;
     }
 }

@@ -1853,8 +1853,10 @@ MonoBehaviour:
   terrainDataStore: {fileID: 905604710}
   marchingCubes: {fileID: 1903033984}
   editorCamera: {fileID: 871929912}
-  BrushRadius: 3
-  BrushStrength: 0.1
+  BrushRadius: 5
+  BrushStrength: 2
+  MaxBrushRadius: 20
+  MaxBrushStrength: 20
   _paintBiome: {fileID: 11400000, guid: e35d7d062aae37844a44b1005badb684, type: 2}
   _drawingShape: 0
   indicatorColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
@@ -4861,6 +4863,7 @@ MonoBehaviour:
   recenterDeadZone: 0.5
   yAlignedDistanceFactor: 2
   terrainDataStore: {fileID: 905604710}
+  brushController: {fileID: 299803899}
 --- !u!1 &905604708
 GameObject:
   m_ObjectHideFlags: 0

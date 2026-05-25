@@ -38,7 +38,8 @@ public static class AStarPathfinder
         Vector2Int goal,
         out float totalCost,
         int unitSize = 5,
-        UnitTypeSO unitType = null)
+        UnitTypeSO unitType = null,
+        bool ignoreObstacles = false)
     {
         var open = new List<Node>();
         var closed = new HashSet<Vector2Int>();
@@ -102,7 +103,7 @@ public static class AStarPathfinder
                     float biomeMultiplier = ResolveBiomeMultiplier(crossedCell, unitType, out bool biomeBlocked);
                     if (biomeBlocked) { pathBlocked = true; break; }
 
-                    float obstacleMultiplier = ResolveObstacleMultiplier(crossedCell, unitType, out bool obstacleBlocked);
+                    float obstacleMultiplier = ResolveObstacleMultiplier(crossedCell, unitType, out bool obstacleBlocked, ignoreObstacles);
                     if (obstacleBlocked) { pathBlocked = true; break; }
 
                     weightedCellCost += crossings[c].portion * biomeMultiplier * obstacleMultiplier;
@@ -158,7 +159,8 @@ public static class AStarPathfinder
     ///     Safe to call on a worker thread as long as the grid isn't being mutated.
     /// </summary>
     public static float ComputePathCost(CellData[,] grid, int gridWidth, int gridHeight,
-                                        List<Vector2Int> path, UnitTypeSO unitType)
+                                        List<Vector2Int> path, UnitTypeSO unitType,
+                                        bool ignoreObstacles = false)
     {
         if (path == null || path.Count < 2) return 0f;
 
@@ -190,7 +192,7 @@ public static class AStarPathfinder
                 CellData crossed = grid[pos.x, pos.y];
                 float biomeMul = ResolveBiomeMultiplier(crossed, unitType, out bool biomeBlocked);
                 if (biomeBlocked) return float.PositiveInfinity;
-                float obstacleMul = ResolveObstacleMultiplier(crossed, unitType, out bool obstacleBlocked);
+                float obstacleMul = ResolveObstacleMultiplier(crossed, unitType, out bool obstacleBlocked, ignoreObstacles);
                 if (obstacleBlocked) return float.PositiveInfinity;
                 weightedCellCost += crossings[c].portion * biomeMul * obstacleMul;
             }
@@ -255,28 +257,82 @@ public static class AStarPathfinder
     ///     Returns the obstacle cost multiplier for entering <paramref name="cell" /> as the given
     ///     <paramref name="unitType" />. Sets <paramref name="blocked" /> to true if the resolved
     ///     effect forbids entry. Returns 1f when no obstacle is registered or the resolved effect
-    ///     has no cost impact.
+    ///     has no cost impact. Composes footprint and radius layers multiplicatively; among
+    ///     overlapping radius sources, the strongest single effect contributes.
+    ///     When <paramref name="ignoreObstacles" /> is true, the entire obstacle layer (footprint
+    ///     and radius) is skipped: returns 1f with blocked=false. Used to derive the obstacle-free
+    ///     time estimate that catch-up A* rerouting approximates at runtime.
     /// </summary>
-    public static float ResolveObstacleMultiplier(CellData cell, UnitTypeSO unitType, out bool blocked)
+    public static float ResolveObstacleMultiplier(CellData cell, UnitTypeSO unitType, out bool blocked, bool ignoreObstacles = false)
     {
         blocked = false;
+        if (ignoreObstacles) return 1f;
 
-        if (cell.obstacle == null) return 1f;
+        float multiplier = 1f;
 
-        ObstacleSO obstacleSo = cell.obstacle.obstacleSo;
-        if (obstacleSo == null) return 1f;
-
-        CellEffectSpec resolved = obstacleSo.ResolveEffect(unitType);
-
-        switch (resolved.effect)
+        if (cell.obstacle != null && cell.obstacle.obstacleSo != null)
         {
-            case CellEffect.Block:
-                blocked = true;
-                return 0f;
-            case CellEffect.Slow:
-                return Mathf.Max(0.0001f, resolved.costMultiplier);
-            default:
-                return 1f;
+            CellEffectSpec resolved = cell.obstacle.obstacleSo.ResolveEffect(unitType);
+            switch (resolved.effect)
+            {
+                case CellEffect.Block:
+                    blocked = true;
+                    return 0f;
+                case CellEffect.Slow:
+                    multiplier *= Mathf.Max(0.0001f, resolved.costMultiplier);
+                    break;
+            }
+        }
+
+        if (cell.radiusObstacles != null && cell.radiusObstacles.Count > 0)
+        {
+            CellEffectSpec strongest = default;
+            bool hasAny = false;
+            for (int i = 0; i < cell.radiusObstacles.Count; i++)
+            {
+                PlacedObstacle src = cell.radiusObstacles[i];
+                if (src == null || src.obstacleSo == null) continue;
+                CellEffectSpec spec = src.obstacleSo.ResolveRadiusEffect(unitType);
+                if (!hasAny || IsStronger(spec, strongest))
+                {
+                    strongest = spec;
+                    hasAny = true;
+                }
+            }
+
+            if (hasAny)
+            {
+                switch (strongest.effect)
+                {
+                    case CellEffect.Block:
+                        blocked = true;
+                        return 0f;
+                    case CellEffect.Slow:
+                        multiplier *= Mathf.Max(0.0001f, strongest.costMultiplier);
+                        break;
+                }
+            }
+        }
+
+        return multiplier;
+    }
+
+    private static bool IsStronger(CellEffectSpec a, CellEffectSpec b)
+    {
+        int rankA = EffectRank(a.effect);
+        int rankB = EffectRank(b.effect);
+        if (rankA != rankB) return rankA > rankB;
+        if (a.effect == CellEffect.Slow) return a.costMultiplier > b.costMultiplier;
+        return false;
+    }
+
+    private static int EffectRank(CellEffect e)
+    {
+        switch (e)
+        {
+            case CellEffect.Block: return 2;
+            case CellEffect.Slow:  return 1;
+            default:               return 0;
         }
     }
 

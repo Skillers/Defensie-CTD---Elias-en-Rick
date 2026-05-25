@@ -22,3 +22,9 @@ MonoBehaviour:
     effect: 3
     costMultiplier: 2
   unitEffects: []
+  radiusShape: 2
+  radiusCells: 3
+  defaultRadiusEffect:
+    effect: 1
+    costMultiplier: 2
+  radiusUnitEffects: []

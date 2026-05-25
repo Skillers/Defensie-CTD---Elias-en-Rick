@@ -13,6 +13,9 @@ public class PlacedObstacle : MonoBehaviour
     /// <summary>Grid cells this obstacle currently occupies. Owned by this instance; written by TerrainDataStore.RegisterObstacleCells.</summary>
     [System.NonSerialized] public List<Vector2Int> affectedCells = new();
 
+    /// <summary>Grid cells this obstacle's radius effect covers (outside its own footprint). Owned by this instance; written by TerrainDataStore.RegisterObstacleCells.</summary>
+    [System.NonSerialized] public List<Vector2Int> affectedRadiusCells = new();
+
     /// <summary>Number of cost-bearing segments this placement represents. 1 for point obstacles and short line drags; N for multi-segment lines. Read by MissionSession when (un)registering cost.</summary>
     [System.NonSerialized] public int segmentCount = 1;
 

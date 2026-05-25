@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
@@ -26,6 +27,9 @@ public struct CellData
 
     /// <summary>The placed obstacle (if any) registered on this cell. Owner: PlacedObstacle.affectedCells.</summary>
     public PlacedObstacle obstacle;
+
+    /// <summary>Obstacles whose radius covers this cell. Lazy-allocated and dropped back to null when emptied. Owner: PlacedObstacle.affectedRadiusCells.</summary>
+    public List<PlacedObstacle> radiusObstacles;
 
     // Direction offsets matching the index order (dx, dz)
     public static readonly Vector2Int[] Directions =
