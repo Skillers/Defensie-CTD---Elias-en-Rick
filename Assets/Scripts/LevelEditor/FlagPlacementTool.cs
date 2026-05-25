@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 
 public enum FlagPhase { Start, End }
@@ -98,9 +99,13 @@ public class FlagPlacementTool : MonoBehaviour
         var mouse = Mouse.current;
         if (mouse == null) return;
 
+        // Block press-onset while the cursor is over UI so clicking tool
+        // buttons or panels doesn't drop a flag / flip phase behind the panel.
+        bool overUI = EventSystem.current != null && EventSystem.current.IsPointerOverGameObject();
+
         // ── Left click: place the current flag ──
         bool leftPressed = mouse.leftButton.isPressed;
-        if (leftPressed && !_leftDown)
+        if (leftPressed && !_leftDown && !overUI)
         {
             _leftDown = true;
             TryPlaceAtCursor(mouse.position.ReadValue());
@@ -112,7 +117,7 @@ public class FlagPlacementTool : MonoBehaviour
 
         // ── Right click: switch between Start / End phase ──
         bool rightPressed = mouse.rightButton.isPressed;
-        if (rightPressed && !_rightDown)
+        if (rightPressed && !_rightDown && !overUI)
         {
             _rightDown = true;
             _phase = _phase == FlagPhase.Start ? FlagPhase.End : FlagPhase.Start;
