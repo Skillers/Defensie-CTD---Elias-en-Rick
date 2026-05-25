@@ -255,28 +255,78 @@ public static class AStarPathfinder
     ///     Returns the obstacle cost multiplier for entering <paramref name="cell" /> as the given
     ///     <paramref name="unitType" />. Sets <paramref name="blocked" /> to true if the resolved
     ///     effect forbids entry. Returns 1f when no obstacle is registered or the resolved effect
-    ///     has no cost impact.
+    ///     has no cost impact. Composes footprint and radius layers multiplicatively; among
+    ///     overlapping radius sources, the strongest single effect contributes.
     /// </summary>
     public static float ResolveObstacleMultiplier(CellData cell, UnitTypeSO unitType, out bool blocked)
     {
         blocked = false;
 
-        if (cell.obstacle == null) return 1f;
+        float multiplier = 1f;
 
-        ObstacleSO obstacleSo = cell.obstacle.obstacleSo;
-        if (obstacleSo == null) return 1f;
-
-        CellEffectSpec resolved = obstacleSo.ResolveEffect(unitType);
-
-        switch (resolved.effect)
+        if (cell.obstacle != null && cell.obstacle.obstacleSo != null)
         {
-            case CellEffect.Block:
-                blocked = true;
-                return 0f;
-            case CellEffect.Slow:
-                return Mathf.Max(0.0001f, resolved.costMultiplier);
-            default:
-                return 1f;
+            CellEffectSpec resolved = cell.obstacle.obstacleSo.ResolveEffect(unitType);
+            switch (resolved.effect)
+            {
+                case CellEffect.Block:
+                    blocked = true;
+                    return 0f;
+                case CellEffect.Slow:
+                    multiplier *= Mathf.Max(0.0001f, resolved.costMultiplier);
+                    break;
+            }
+        }
+
+        if (cell.radiusObstacles != null && cell.radiusObstacles.Count > 0)
+        {
+            CellEffectSpec strongest = default;
+            bool hasAny = false;
+            for (int i = 0; i < cell.radiusObstacles.Count; i++)
+            {
+                PlacedObstacle src = cell.radiusObstacles[i];
+                if (src == null || src.obstacleSo == null) continue;
+                CellEffectSpec spec = src.obstacleSo.ResolveRadiusEffect(unitType);
+                if (!hasAny || IsStronger(spec, strongest))
+                {
+                    strongest = spec;
+                    hasAny = true;
+                }
+            }
+
+            if (hasAny)
+            {
+                switch (strongest.effect)
+                {
+                    case CellEffect.Block:
+                        blocked = true;
+                        return 0f;
+                    case CellEffect.Slow:
+                        multiplier *= Mathf.Max(0.0001f, strongest.costMultiplier);
+                        break;
+                }
+            }
+        }
+
+        return multiplier;
+    }
+
+    private static bool IsStronger(CellEffectSpec a, CellEffectSpec b)
+    {
+        int rankA = EffectRank(a.effect);
+        int rankB = EffectRank(b.effect);
+        if (rankA != rankB) return rankA > rankB;
+        if (a.effect == CellEffect.Slow) return a.costMultiplier > b.costMultiplier;
+        return false;
+    }
+
+    private static int EffectRank(CellEffect e)
+    {
+        switch (e)
+        {
+            case CellEffect.Block: return 2;
+            case CellEffect.Slow:  return 1;
+            default:               return 0;
         }
     }
 

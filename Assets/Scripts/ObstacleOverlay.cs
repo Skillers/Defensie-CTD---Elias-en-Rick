@@ -19,8 +19,14 @@ public class ObstacleOverlay : MonoBehaviour
     public TerrainDataStore terrainDataStore;
 
     [Header("Visual")]
-    [Tooltip("Extra height above each cell's terrain surface at which the quad is drawn.")]
+    [Tooltip("Extra height above each cell's terrain surface at which the footprint quad is drawn.")]
     public float liftAboveTerrain = 0.05f;
+
+    [Tooltip("Extra height for radius-effect quads. Keep below liftAboveTerrain so footprint cells draw on top where they overlap a radius cell.")]
+    public float radiusLiftAboveTerrain = 0.03f;
+
+    [Tooltip("Alpha multiplier applied to radius cells (reuses the same colour set as footprints, just dimmer so the primary effect stays readable).")]
+    [Range(0f, 1f)] public float radiusAlphaScale = 0.5f;
 
     [Header("Colours by ObstacleSO.defaultEffect")]
     public Color blockColor   = new Color(1f,   0.1f, 0.1f, 0.55f);
@@ -83,9 +89,26 @@ public class ObstacleOverlay : MonoBehaviour
         _mesh.Clear();
         if (terrainDataStore == null || terrainDataStore.grid == null) return;
 
-        int cellCount = 0;
+        int footprintCount = 0;
         foreach (PlacedObstacle po in _obstacles)
-            if (po != null && po.affectedCells != null) cellCount += po.affectedCells.Count;
+            if (po != null && po.affectedCells != null) footprintCount += po.affectedCells.Count;
+
+        // Dedupe radius cells across obstacles: a cell can be in several mines'
+        // radii at once, but the overlay only paints one quad per cell. The
+        // strongest effect wins, matching how the pathfinder reads the cell.
+        var radiusCells = new Dictionary<Vector2Int, CellEffect>();
+        foreach (PlacedObstacle po in _obstacles)
+        {
+            if (po == null || po.obstacleSo == null || po.affectedRadiusCells == null) continue;
+            CellEffect re = po.obstacleSo.defaultRadiusEffect.effect;
+            foreach (Vector2Int rc in po.affectedRadiusCells)
+            {
+                if (!radiusCells.TryGetValue(rc, out CellEffect existing) || EffectRank(re) > EffectRank(existing))
+                    radiusCells[rc] = re;
+            }
+        }
+
+        int cellCount = footprintCount + radiusCells.Count;
         if (cellCount == 0) return;
 
         var verts = new Vector3[cellCount * 4];
@@ -94,6 +117,30 @@ public class ObstacleOverlay : MonoBehaviour
 
         float halfStep = terrainDataStore.step * 0.5f;
         int v = 0, t = 0;
+
+        // Radius pass first so footprint quads draw on top via the higher lift.
+        foreach (KeyValuePair<Vector2Int, CellEffect> kv in radiusCells)
+        {
+            Vector2Int cell = kv.Key;
+            Color c = ResolveColorForEffect(kv.Value);
+            c.a *= radiusAlphaScale;
+
+            Vector3 center = terrainDataStore.GridToWorld(cell);
+            float y = terrainDataStore.GetRoundedHeight(cell.x, cell.y) + radiusLiftAboveTerrain;
+
+            verts[v + 0] = new Vector3(center.x - halfStep, y, center.z - halfStep);
+            verts[v + 1] = new Vector3(center.x - halfStep, y, center.z + halfStep);
+            verts[v + 2] = new Vector3(center.x + halfStep, y, center.z + halfStep);
+            verts[v + 3] = new Vector3(center.x + halfStep, y, center.z - halfStep);
+
+            cols[v + 0] = c; cols[v + 1] = c; cols[v + 2] = c; cols[v + 3] = c;
+
+            tris[t + 0] = v + 0; tris[t + 1] = v + 1; tris[t + 2] = v + 2;
+            tris[t + 3] = v + 0; tris[t + 4] = v + 2; tris[t + 5] = v + 3;
+
+            v += 4;
+            t += 6;
+        }
 
         foreach (PlacedObstacle po in _obstacles)
         {
@@ -130,13 +177,28 @@ public class ObstacleOverlay : MonoBehaviour
     Color ResolveColor(PlacedObstacle po)
     {
         if (po.obstacleSo == null) return noneColor;
-        switch (po.obstacleSo.defaultEffect.effect)
+        return ResolveColorForEffect(po.obstacleSo.defaultEffect.effect);
+    }
+
+    Color ResolveColorForEffect(CellEffect effect)
+    {
+        switch (effect)
         {
             case CellEffect.Block:   return blockColor;
             case CellEffect.Slow:    return slowColor;
             case CellEffect.Disrupt: return disruptColor;
             case CellEffect.Turn:    return turnColor;
-            default:                     return noneColor;
+            default:                 return noneColor;
+        }
+    }
+
+    static int EffectRank(CellEffect e)
+    {
+        switch (e)
+        {
+            case CellEffect.Block: return 2;
+            case CellEffect.Slow:  return 1;
+            default:               return 0;
         }
     }
 

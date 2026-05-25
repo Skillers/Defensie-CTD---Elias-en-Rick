@@ -432,6 +432,20 @@ public class TerrainDataStore : MonoBehaviour
             }
             po.affectedCells.Clear();
         }
+
+        // Same for the prior radius footprint.
+        if (po.affectedRadiusCells != null)
+        {
+            foreach (Vector2Int cell in po.affectedRadiusCells)
+            {
+                if (!InBounds(cell.x, cell.y)) continue;
+                List<PlacedObstacle> list = grid[cell.x, cell.y].radiusObstacles;
+                if (list == null) continue;
+                list.Remove(po);
+                if (list.Count == 0) grid[cell.x, cell.y].radiusObstacles = null;
+            }
+            po.affectedRadiusCells.Clear();
+        }
         
         // Rent lists from Unity pool
         List<Renderer> renderers = ListPool<Renderer>.Get();
@@ -525,7 +539,48 @@ public class TerrainDataStore : MonoBehaviour
                 ObstacleGridHelper.FillSegmentGapCells(part, this, po);
             }
         }
-        
+
+        // Radius pass: stamp every cell within radiusCells of each footprint cell
+        // (in the configured shape). Skip the obstacle's own footprint cells —
+        // they already carry the primary effect. Other obstacles' footprints are
+        // included, so radius bleeds across them.
+        if (po.obstacleSo != null
+            && po.obstacleSo.radiusShape != RadiusShape.None
+            && po.obstacleSo.radiusCells > 0
+            && po.affectedCells.Count > 0)
+        {
+            int r = po.obstacleSo.radiusCells;
+            RadiusShape shape = po.obstacleSo.radiusShape;
+            HashSet<Vector2Int> footprint = new HashSet<Vector2Int>(po.affectedCells);
+            HashSet<Vector2Int> radiusCells = new HashSet<Vector2Int>();
+
+            foreach (Vector2Int fp in po.affectedCells)
+            {
+                for (int dx = -r; dx <= r; dx++)
+                for (int dz = -r; dz <= r; dz++)
+                {
+                    if (dx == 0 && dz == 0) continue;
+                    if (shape == RadiusShape.Circle && dx * dx + dz * dz > r * r) continue;
+
+                    int x = fp.x + dx;
+                    int z = fp.y + dz;
+                    if (!InBounds(x, z)) continue;
+
+                    Vector2Int rc = new Vector2Int(x, z);
+                    if (footprint.Contains(rc)) continue;
+                    radiusCells.Add(rc);
+                }
+            }
+
+            foreach (Vector2Int rc in radiusCells)
+            {
+                if (grid[rc.x, rc.y].radiusObstacles == null)
+                    grid[rc.x, rc.y].radiusObstacles = new List<PlacedObstacle>();
+                grid[rc.x, rc.y].radiusObstacles.Add(po);
+                po.affectedRadiusCells.Add(rc);
+            }
+        }
+
         if (po.affectedCells.Count > 0)
         {
             po.OnRegistered(this);
@@ -536,17 +591,34 @@ public class TerrainDataStore : MonoBehaviour
 
     public void UnregisterObstacleCells(PlacedObstacle po)
     {
-        if (po == null || po.affectedCells == null) return;
+        if (po == null) return;
 
-        foreach (Vector2Int cell in po.affectedCells)
+        if (po.affectedCells != null)
         {
-            if (InBounds(cell.x, cell.y) && grid[cell.x, cell.y].obstacle == po)
+            foreach (Vector2Int cell in po.affectedCells)
             {
-                grid[cell.x, cell.y].obstacle = null;
+                if (InBounds(cell.x, cell.y) && grid[cell.x, cell.y].obstacle == po)
+                {
+                    grid[cell.x, cell.y].obstacle = null;
+                }
             }
+
+            po.affectedCells.Clear();
         }
 
-        po.affectedCells.Clear();
+        if (po.affectedRadiusCells != null)
+        {
+            foreach (Vector2Int cell in po.affectedRadiusCells)
+            {
+                if (!InBounds(cell.x, cell.y)) continue;
+                List<PlacedObstacle> list = grid[cell.x, cell.y].radiusObstacles;
+                if (list == null) continue;
+                list.Remove(po);
+                if (list.Count == 0) grid[cell.x, cell.y].radiusObstacles = null;
+            }
+
+            po.affectedRadiusCells.Clear();
+        }
 
         OnObstacleUnregistered?.Invoke(po);
     }
