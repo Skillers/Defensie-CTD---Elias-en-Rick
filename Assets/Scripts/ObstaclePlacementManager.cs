@@ -575,7 +575,7 @@ public class ObstaclePlacementManager : MonoBehaviour
                 _placedObstacles.Remove(p);
                 terrainDataStore.UnregisterObstacleCells(p);
                 if (MissionSession.Instance != null)
-                    MissionSession.Instance.UnregisterObstaclePlacement(p.obstacleSo);
+                    MissionSession.Instance.UnregisterObstaclePlacement(p.obstacleSo, p.segmentCount);
                 Destroy(p.gameObject);
             }
 
@@ -653,10 +653,11 @@ public class ObstaclePlacementManager : MonoBehaviour
 
         var placed = go.AddComponent<PlacedObstacle>();
         placed.obstacleSo = _selected;
+        placed.segmentCount = 1;
         _placedObstacles.Add(placed);
         terrainDataStore.RegisterObstacleCells(placed);
         EnsureMissionSession();
-        MissionSession.Instance.RegisterObstaclePlacement(_selected);
+        MissionSession.Instance.RegisterObstaclePlacement(_selected, placed.segmentCount);
     }
 
     private void PlaceLine(Vector3 start, Vector3 end)
@@ -674,10 +675,11 @@ public class ObstaclePlacementManager : MonoBehaviour
             var singleGo = Instantiate(_selected.prefab, start, _selected.prefab.transform.rotation * Quaternion.Euler(0, _manualRotationAngle, 0), rootGo.transform);
             ConformChildrenToTerrain(singleGo, _selected.prefab);
             placedObstacle.Initialize();
+            placedObstacle.segmentCount = 1;
             _placedObstacles.Add(placedObstacle);
             terrainDataStore.RegisterObstacleCells(placedObstacle);
             EnsureMissionSession();
-            MissionSession.Instance.RegisterObstaclePlacement(_selected);
+            MissionSession.Instance.RegisterObstaclePlacement(_selected, placedObstacle.segmentCount);
             return;
         }
 
@@ -707,10 +709,11 @@ public class ObstaclePlacementManager : MonoBehaviour
         }
 
         placedObstacle.Initialize();
+        placedObstacle.segmentCount = segmentCount;
         _placedObstacles.Add(placedObstacle);
         terrainDataStore.RegisterObstacleCells(placedObstacle);
         EnsureMissionSession();
-        MissionSession.Instance.RegisterObstaclePlacement(_selected);
+        MissionSession.Instance.RegisterObstaclePlacement(_selected, placedObstacle.segmentCount);
     }
 
     /// <summary>

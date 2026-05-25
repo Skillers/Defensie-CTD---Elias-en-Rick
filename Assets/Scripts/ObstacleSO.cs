@@ -17,7 +17,7 @@ public class ObstacleSO : ScriptableObject
     public bool fillSegmentGaps = false;
 
     [Header("Cost")]
-    [Tooltip("Budget points consumed per placement. Aggregated per type and totaled in the AAR.")]
+    [Tooltip("Budget points consumed per segment. Point obstacles always count as one segment; line obstacles charge once per generated segment. Aggregated per type and totaled in the AAR.")]
     public int cost;
 
     [Header("Pathfinding")]

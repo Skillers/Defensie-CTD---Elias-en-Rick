@@ -81,28 +81,29 @@ public class MissionSession : MonoBehaviour
     public UnitPathPlan GetPlan(int unitId) => _plans.Find(p => p.unitId == unitId);
 
     /// <summary>
-    /// Increments the count for <paramref name="type"/> in the obstacle summary, creating an
-    /// entry if this is the first placement of that type. Called by ObstaclePlacementManager
-    /// each time an obstacle is placed.
+    /// Adds <paramref name="segments"/> to the segment count for <paramref name="type"/> in the
+    /// obstacle summary, creating an entry on first placement. Line obstacles pass their generated
+    /// segment count so each segment is charged individually; point obstacles pass 1.
     /// </summary>
-    public void RegisterObstaclePlacement(ObstacleSO type)
+    public void RegisterObstaclePlacement(ObstacleSO type, int segments)
     {
-        if (type == null) return;
+        if (type == null || segments <= 0) return;
         var entry = _obstacleSummary.Find(e => e.obstacleType == type);
-        if (entry != null) entry.count++;
-        else _obstacleSummary.Add(new ObstacleCostEntry { obstacleType = type, count = 1 });
+        if (entry != null) entry.count += segments;
+        else _obstacleSummary.Add(new ObstacleCostEntry { obstacleType = type, count = segments });
     }
 
     /// <summary>
-    /// Decrements the count for <paramref name="type"/>, removing the entry when it reaches zero.
-    /// Called by ObstaclePlacementManager when a placed obstacle is deleted.
+    /// Subtracts <paramref name="segments"/> from the entry for <paramref name="type"/>, removing it
+    /// when the count reaches zero. Callers pass the same segment count they registered with so a
+    /// deleted line refunds every one of its segments.
     /// </summary>
-    public void UnregisterObstaclePlacement(ObstacleSO type)
+    public void UnregisterObstaclePlacement(ObstacleSO type, int segments)
     {
-        if (type == null) return;
+        if (type == null || segments <= 0) return;
         int idx = _obstacleSummary.FindIndex(e => e.obstacleType == type);
         if (idx < 0) return;
-        _obstacleSummary[idx].count--;
+        _obstacleSummary[idx].count -= segments;
         if (_obstacleSummary[idx].count <= 0) _obstacleSummary.RemoveAt(idx);
     }
 
@@ -147,16 +148,19 @@ public class UnitPathPlan
 }
 
 /// <summary>
-/// One row of the obstacle cost summary: a placed obstacle type and how many of it are
-/// currently on the map. Cost is derived from <see cref="ObstacleSO.cost"/> so the SO
-/// stays the single source of truth.
+/// One row of the obstacle cost summary: a placed obstacle type and the total number of
+/// segments currently on the map. Point placements contribute 1 segment; line placements
+/// contribute one per generated segment. Cost is derived from <see cref="ObstacleSO.cost"/>
+/// so the SO stays the single source of truth.
 /// </summary>
 [System.Serializable]
 public class ObstacleCostEntry
 {
     public ObstacleSO obstacleType;
+
+    /// <summary>Total cost-bearing segments of this type currently placed (sum across all placements).</summary>
     public int count;
 
-    /// <summary>Cost contribution of this type: unit cost from the SO multiplied by <see cref="count"/>.</summary>
+    /// <summary>Cost contribution of this type: per-segment cost from the SO multiplied by <see cref="count"/>.</summary>
     public int CostPerType => obstacleType != null ? obstacleType.cost * count : 0;
 }
