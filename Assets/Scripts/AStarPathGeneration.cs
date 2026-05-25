@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Threading.Tasks;
 using UnityEngine;
 
 /// <summary>
@@ -76,7 +75,6 @@ public class AStarPathGeneration : MonoBehaviour
     }
 
     readonly Dictionary<UnitTypeSO, GeneratedRoute> _routes = new Dictionary<UnitTypeSO, GeneratedRoute>();
-    readonly Dictionary<UnitTypeSO, Task<float>>    _costRecomputeTasks = new Dictionary<UnitTypeSO, Task<float>>();
     bool _generated;
 
     void Awake()
@@ -152,92 +150,6 @@ public class AStarPathGeneration : MonoBehaviour
             kv.Value.basePath = new List<Vector2Int>(kv.Value.path);
 
         ApplyBevel();
-
-        RecomputePostBevelCostsAsync();
-    }
-
-    /// <summary>
-    /// Fires off a worker-thread cost recompute per route. The initial route
-    /// totalCost came from A*'s pre-shortcut, pre-bevel cells; ApplyShortcuts and
-    /// ApplyBevel both mutate route.path, so the stored cost (and the
-    /// estimatedSeconds derived from it) underestimates / overestimates by the
-    /// length and per-cell weight delta. The recompute uses the same per-step
-    /// formula as A* on the final path, then Update() applies the result. Async
-    /// because the estimate isn't load-bearing for spawning — a freshly-spawned
-    /// unit just shows the old estimate for a frame or two until the task lands.
-    /// </summary>
-    void RecomputePostBevelCostsAsync()
-    {
-        _costRecomputeTasks.Clear();
-
-        if (terrainDataStore == null || terrainDataStore.grid == null) return;
-
-        CellData[,] grid = terrainDataStore.grid;
-        int w = terrainDataStore.GridWidth;
-        int h = terrainDataStore.GridHeight;
-
-        foreach (var kv in _routes)
-        {
-            GeneratedRoute route = kv.Value;
-            if (route.failed || route.path == null || route.path.Count < 2) continue;
-
-            UnitTypeSO       type     = kv.Key;
-            List<Vector2Int> pathCopy = new List<Vector2Int>(route.path);
-
-            _costRecomputeTasks[type] = Task.Run(() =>
-                AStarPathfinder.ComputePathCost(grid, w, h, pathCopy, type));
-        }
-    }
-
-    void Update()
-    {
-        if (_costRecomputeTasks.Count == 0) return;
-
-        List<UnitTypeSO> finished = null;
-        foreach (var kv in _costRecomputeTasks)
-        {
-            Task<float> task = kv.Value;
-            if (!task.IsCompleted) continue;
-
-            if (task.Status == TaskStatus.RanToCompletion)
-            {
-                if (_routes.TryGetValue(kv.Key, out var route))
-                {
-                    route.totalCost = task.Result;
-                    UpdateLivePlansForType(kv.Key, task.Result, route.moveSpeed);
-                }
-            }
-            else if (task.IsFaulted)
-            {
-                Debug.LogWarning($"Post-bevel cost recompute failed for '{kv.Key?.typeName}': {task.Exception?.GetBaseException().Message}");
-            }
-
-            (finished ??= new List<UnitTypeSO>()).Add(kv.Key);
-        }
-        if (finished != null)
-            foreach (var k in finished) _costRecomputeTasks.Remove(k);
-    }
-
-    /// <summary>
-    /// Patches the estimatedSeconds of every live unit's registered plan whose
-    /// unitType matches <paramref name="type"/>. If RecomputeForLiveUnits has
-    /// already replaced a unit's plan with a re-routed one, the patch overwrites
-    /// it briefly; the next re-route restores a correct estimate. Acceptable
-    /// trade-off vs. tracking which plan derives from which route.
-    /// </summary>
-    void UpdateLivePlansForType(UnitTypeSO type, float newCost, float moveSpeed)
-    {
-        if (MissionSession.Instance == null || terrainDataStore == null) return;
-
-        float newSeconds = AStarPathfinder.CostToSeconds(newCost, terrainDataStore.step, moveSpeed);
-
-        foreach (var mover in FindObjectsByType<UnitMover>(FindObjectsSortMode.None))
-        {
-            if (mover.unitType != type) continue;
-            UnitPathPlan plan = MissionSession.Instance.GetPlan(mover.unitId);
-            if (plan == null) continue;
-            plan.estimatedSeconds = newSeconds;
-        }
     }
 
     /// <summary>
@@ -291,7 +203,7 @@ public class AStarPathGeneration : MonoBehaviour
                 terrainDataStore.GridWidth,
                 terrainDataStore.GridHeight,
                 from, goal,
-                out float totalCost,
+                out _,
                 unitSize: mover.unitSize,
                 unitType: mover.unitType);
 
@@ -299,15 +211,31 @@ public class AStarPathGeneration : MonoBehaviour
             if (failed)
                 Debug.LogWarning($"AStarPathGeneration: recompute found no path from {from} to {goal}.");
 
+            // Estimate uses obstacle-free A* from the current position to the goal.
+            // The catch-up A* the mover runs at runtime reroutes around obstacles when
+            // it can, so its walked time approximates this cost.
+            float estimateSeconds = float.PositiveInfinity;
+            if (!failed)
+            {
+                AStarPathfinder.FindPath(
+                    terrainDataStore.grid,
+                    terrainDataStore.GridWidth,
+                    terrainDataStore.GridHeight,
+                    from, goal,
+                    out float estimateCost,
+                    unitSize: mover.unitSize,
+                    unitType: mover.unitType,
+                    ignoreObstacles: true);
+                estimateSeconds = AStarPathfinder.CostToSeconds(estimateCost, terrainDataStore.step, mover.moveSpeed);
+            }
+
             UnitPathPlan plan = new UnitPathPlan
             {
                 unitId           = mover.unitId,
                 startCell        = from,
                 goalCell         = goal,
                 path             = new List<Vector2Int>(newPath),
-                estimatedSeconds = failed
-                    ? float.PositiveInfinity
-                    : AStarPathfinder.CostToSeconds(totalCost, terrainDataStore.step, mover.moveSpeed),
+                estimatedSeconds = estimateSeconds,
                 failed           = failed,
                 recordedAt       = Time.time,
             };
@@ -336,14 +264,20 @@ public class AStarPathGeneration : MonoBehaviour
         }
 
         List<Vector2Int> combined = BuildRoutePath(
-            start, route.requestedWaypoints, end, type, unitSize, out float routeCost);
+            start, route.requestedWaypoints, end, type, unitSize, out _);
 
         combined = RemoveLoops(combined);
 
         if (combined.Count > 1)
         {
-            route.path      = combined;
-            route.totalCost = routeCost;
+            route.path = combined;
+            // Estimate uses the obstacle-free A* cost through the same waypoints. The
+            // real unit's catch-up A* reroutes around obstacles when avoidable, so its
+            // walked time approximates this number rather than the obstacle-aware cost
+            // of the bevel-mutated path.
+            BuildRoutePath(start, route.requestedWaypoints, end, type, unitSize,
+                           out float estimateCost, ignoreObstacles: true);
+            route.totalCost = estimateCost;
             route.failed    = false;
             return route;
         }
@@ -358,15 +292,30 @@ public class AStarPathGeneration : MonoBehaviour
             terrainDataStore.GridWidth,
             terrainDataStore.GridHeight,
             start, end,
-            out float directCost,
+            out _,
             unitSize: unitSize,
             unitType: type);
 
-        route.path      = direct;
-        route.totalCost = directCost;
-        route.failed    = direct.Count <= 1;
+        route.path   = direct;
+        route.failed = direct.Count <= 1;
         if (route.failed)
+        {
+            route.totalCost = 0f;
             Debug.LogWarning($"AStarPathGeneration: no path found from {start} to {end} for '{type?.typeName}'.");
+        }
+        else
+        {
+            AStarPathfinder.FindPath(
+                terrainDataStore.grid,
+                terrainDataStore.GridWidth,
+                terrainDataStore.GridHeight,
+                start, end,
+                out float directEstimateCost,
+                unitSize: unitSize,
+                unitType: type,
+                ignoreObstacles: true);
+            route.totalCost = directEstimateCost;
+        }
         return route;
     }
 
@@ -414,9 +363,13 @@ public class AStarPathGeneration : MonoBehaviour
     /// <summary>
     /// Runs A* once per leg (start → each waypoint → finalGoal) and concatenates
     /// the segments into one path. Returns an empty list if any leg has no path.
+    /// When <paramref name="ignoreObstacles"/> is true the legs ignore the obstacle
+    /// cost layer entirely (biome and slope only), so the returned totalCost is
+    /// the obstacle-free A* cost used to derive estimatedSeconds.
     /// </summary>
     List<Vector2Int> BuildRoutePath(Vector2Int startCell, IReadOnlyList<Vector2Int> avenueWaypoints,
-                                    Vector2Int finalGoal, UnitTypeSO unitType, int unitSize, out float totalCost)
+                                    Vector2Int finalGoal, UnitTypeSO unitType, int unitSize, out float totalCost,
+                                    bool ignoreObstacles = false)
     {
         List<Vector2Int> combined = new List<Vector2Int>();
         Vector2Int from = startCell;
@@ -434,7 +387,8 @@ public class AStarPathGeneration : MonoBehaviour
                 from, to,
                 out float legCost,
                 unitSize: unitSize,
-                unitType: unitType);
+                unitType: unitType,
+                ignoreObstacles: ignoreObstacles);
 
             // A* returns an empty list when no path exists — treat the whole route as failed.
             if (segment.Count == 0)
