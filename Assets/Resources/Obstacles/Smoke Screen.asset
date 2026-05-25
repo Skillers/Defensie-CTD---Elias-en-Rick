@@ -17,7 +17,7 @@ MonoBehaviour:
   prefab: {fileID: 5377286303468425186, guid: 7fe46e7f1c75262449ed4075b490620e, type: 3}
   placementType: 1
   fillSegmentGaps: 1
-  placementCollision: 1
+  cost: 30
   defaultEffect:
     effect: 4
     costMultiplier: 20

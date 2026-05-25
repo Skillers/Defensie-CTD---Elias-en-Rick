@@ -1,4 +1,6 @@
 using System.Collections.Generic;
+using System.Text;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -32,6 +34,12 @@ public class ResultsSceneController : MonoBehaviour
     [SerializeField] Transform     cardParent;
     [SerializeField] UnitDataCard  cardPrefab;
 
+    [Header("Obstacle Cost Summary")]
+    [Tooltip("Optional. Shows the total budget points spent on placed obstacles.")]
+    [SerializeField] TMP_Text totalCostText;
+    [Tooltip("Optional. One line per obstacle type with count and per-type cost.")]
+    [SerializeField] TMP_Text obstacleBreakdownText;
+
     [Header("Fallback")]
     [Tooltip("Save file used if MissionSession has no saveFileName when this scene loads (e.g. testing this scene directly).")]
     [SerializeField] string fallbackSaveFileName = "level.json";
@@ -56,6 +64,34 @@ public class ResultsSceneController : MonoBehaviour
 
         BuildMap(save, biomeLookup, plans);
         BuildCards(plans);
+        BuildObstacleCostDisplay();
+    }
+
+    void BuildObstacleCostDisplay()
+    {
+        if (MissionSession.Instance == null) return;
+
+        if (totalCostText != null)
+            totalCostText.text = $"Total Obstacle Cost: {MissionSession.Instance.TotalObstacleCost}";
+
+        if (obstacleBreakdownText != null)
+        {
+            var summary = MissionSession.Instance.ObstacleSummary;
+            if (summary.Count == 0)
+            {
+                obstacleBreakdownText.text = "No obstacles placed.";
+                return;
+            }
+
+            var sb = new StringBuilder();
+            for (int i = 0; i < summary.Count; i++)
+            {
+                var entry = summary[i];
+                string name = entry.obstacleType != null ? entry.obstacleType.obstacleName : "(unknown)";
+                sb.AppendLine($"{name} x{entry.count}: {entry.CostPerType}");
+            }
+            obstacleBreakdownText.text = sb.ToString().TrimEnd();
+        }
     }
 
     void BuildMap(SaveData save, IReadOnlyDictionary<string, BiomeSO> biomeLookup, IReadOnlyList<UnitPathPlan> plans)

@@ -23,6 +23,22 @@ public class MissionSession : MonoBehaviour
     /// <summary>Read-only view of every plan registered this session.</summary>
     public IReadOnlyList<UnitPathPlan> Plans => _plans;
 
+    [SerializeField] List<ObstacleCostEntry> _obstacleSummary = new List<ObstacleCostEntry>();
+
+    /// <summary>One entry per <see cref="ObstacleSO"/> currently placed. Updated live as obstacles are placed and deleted.</summary>
+    public IReadOnlyList<ObstacleCostEntry> ObstacleSummary => _obstacleSummary;
+
+    /// <summary>Sum of <see cref="ObstacleCostEntry.CostPerType"/> across every entry.</summary>
+    public int TotalObstacleCost
+    {
+        get
+        {
+            int total = 0;
+            for (int i = 0; i < _obstacleSummary.Count; i++) total += _obstacleSummary[i].CostPerType;
+            return total;
+        }
+    }
+
     void Awake()
     {
         if (Instance != null && Instance != this)
@@ -65,6 +81,33 @@ public class MissionSession : MonoBehaviour
     public UnitPathPlan GetPlan(int unitId) => _plans.Find(p => p.unitId == unitId);
 
     /// <summary>
+    /// Adds <paramref name="segments"/> to the segment count for <paramref name="type"/> in the
+    /// obstacle summary, creating an entry on first placement. Line obstacles pass their generated
+    /// segment count so each segment is charged individually; point obstacles pass 1.
+    /// </summary>
+    public void RegisterObstaclePlacement(ObstacleSO type, int segments)
+    {
+        if (type == null || segments <= 0) return;
+        var entry = _obstacleSummary.Find(e => e.obstacleType == type);
+        if (entry != null) entry.count += segments;
+        else _obstacleSummary.Add(new ObstacleCostEntry { obstacleType = type, count = segments });
+    }
+
+    /// <summary>
+    /// Subtracts <paramref name="segments"/> from the entry for <paramref name="type"/>, removing it
+    /// when the count reaches zero. Callers pass the same segment count they registered with so a
+    /// deleted line refunds every one of its segments.
+    /// </summary>
+    public void UnregisterObstaclePlacement(ObstacleSO type, int segments)
+    {
+        if (type == null || segments <= 0) return;
+        int idx = _obstacleSummary.FindIndex(e => e.obstacleType == type);
+        if (idx < 0) return;
+        _obstacleSummary[idx].count -= segments;
+        if (_obstacleSummary[idx].count <= 0) _obstacleSummary.RemoveAt(idx);
+    }
+
+    /// <summary>
     /// True when at least one plan exists AND every registered plan has either arrived
     /// (<see cref="UnitPathPlan.completed"/>) or been marked unreachable
     /// (<see cref="UnitPathPlan.failed"/>). Failed plans count as "finished" so the
@@ -102,4 +145,22 @@ public class UnitPathPlan
     public List<Vector2Int> actualPath = new List<Vector2Int>();
     public float actualSeconds;
     public bool completed;
+}
+
+/// <summary>
+/// One row of the obstacle cost summary: a placed obstacle type and the total number of
+/// segments currently on the map. Point placements contribute 1 segment; line placements
+/// contribute one per generated segment. Cost is derived from <see cref="ObstacleSO.cost"/>
+/// so the SO stays the single source of truth.
+/// </summary>
+[System.Serializable]
+public class ObstacleCostEntry
+{
+    public ObstacleSO obstacleType;
+
+    /// <summary>Total cost-bearing segments of this type currently placed (sum across all placements).</summary>
+    public int count;
+
+    /// <summary>Cost contribution of this type: per-segment cost from the SO multiplied by <see cref="count"/>.</summary>
+    public int CostPerType => obstacleType != null ? obstacleType.cost * count : 0;
 }
