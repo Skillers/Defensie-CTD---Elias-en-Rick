@@ -35,6 +35,9 @@ public class SimulationCameraController : MonoBehaviour
     [SerializeField] float yAlignedDistanceFactor = 2f;
     [SerializeField] private TerrainDataStore terrainDataStore;
 
+    [Tooltip("Optional. When set, right-drag pan is suppressed while a brush tool that consumes right-mouse-hold is active (Raise/Lower, Flatten). Leave null in gameplay scenes.")]
+    [SerializeField] private BrushController brushController;
+
     private Camera _cam;
     private Vector3 _grabWorld;
     private bool _grabbing;
@@ -392,7 +395,11 @@ public class SimulationCameraController : MonoBehaviour
         
         var mouse = Mouse.current;
 
-        if (!mouse.middleButton.isPressed)
+        // Mute right-drag pan while the editor's terrain-shaping brushes own
+        // right-button-hold, so the camera doesn't fight the brush input.
+        bool suppressRightPan = brushController != null && brushController.UsesRightButtonHold;
+
+        if (!mouse.middleButton.isPressed && !suppressRightPan)
         {
             if (mouse.rightButton.wasPressedThisFrame)
             {

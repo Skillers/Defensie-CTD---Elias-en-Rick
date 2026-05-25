@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 using UnityEngine.Serialization;
 
@@ -16,6 +17,11 @@ public class BrushController : MonoBehaviour
     [Header("Brush Settings")]
     public float BrushRadius   = 3f;
     public float BrushStrength = 0.1f;
+
+    [Tooltip("Upper bound applied to the radius slider in the editor UI.")]
+    public float MaxBrushRadius   = 20f;
+    [Tooltip("Upper bound applied to the strength slider in the editor UI.")]
+    public float MaxBrushStrength = 5f;
 
     [Header("Biome Paint")]
     [FormerlySerializedAs("paintBiome")]
@@ -53,6 +59,12 @@ public class BrushController : MonoBehaviour
 
     BrushTool _activeTool = BrushTool.None;
     public BrushTool ActiveTool => _activeTool;
+
+    /// <summary>True while a tool that reads right-mouse-hold is active
+    /// (Raise/Lower, Flatten). Lets the camera controller mute its right-drag
+    /// pan so the brush doesn't compete with camera input.</summary>
+    public bool UsesRightButtonHold =>
+        _activeTool == BrushTool.RaiseLower || _activeTool == BrushTool.Flatten;
 
     public event Action<BrushTool> OnToolChanged;
     public event Action<BiomeSO>   OnBiomeChanged;
@@ -171,6 +183,20 @@ public class BrushController : MonoBehaviour
 
         var mouse = Mouse.current;
         if (mouse == null) return;
+
+        // Suppress new strokes while the cursor is over UI so clicking sliders
+        // or tool buttons doesn't paint the terrain behind the panel. A stroke
+        // already in progress keeps flowing — once down began over the world,
+        // drifting the cursor over UI shouldn't interrupt the drag.
+        if (EventSystem.current != null
+            && EventSystem.current.IsPointerOverGameObject()
+            && !_leftDown
+            && !_rightDown)
+        {
+            _indicator.SetActive(false);
+            _centerDot.SetActive(false);
+            return;
+        }
 
         var ray = editorCamera.ScreenPointToRay(mouse.position.ReadValue());
         if (Physics.Raycast(ray, out RaycastHit hit))
@@ -381,7 +407,12 @@ public class BrushController : MonoBehaviour
 
             float current = terrainDataStore.grid[gx, gz].rawHeight;
             float diff = targetHeight - current;
-            terrainDataStore.grid[gx, gz].rawHeight += diff * BrushStrength * falloff * BrushInterval;
+            // Clamp to [0,1] so the cell can move at most all the way to target
+            // in one tick. Without this, BrushStrength * BrushInterval > 1 makes
+            // the center cell shoot past target each tick and the next tick
+            // overcorrects further — runaway oscillation, the "nuke" spike.
+            float moveFactor = Mathf.Clamp01(BrushStrength * falloff * BrushInterval);
+            terrainDataStore.grid[gx, gz].rawHeight += diff * moveFactor;
 
             if (gx < gxMin) gxMin = gx;
             if (gx > gxMax) gxMax = gx;

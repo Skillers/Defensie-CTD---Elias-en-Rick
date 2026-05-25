@@ -102,6 +102,11 @@ public class EditorUI : MonoBehaviour
             UpdateLabels();
         });
 
+        // Drive slider ranges from BrushController so tuning lives in one place.
+        // Must run before assigning .value or the value would clamp to the old max.
+        radiusSlider.maxValue   = brushController.MaxBrushRadius;
+        strengthSlider.maxValue = brushController.MaxBrushStrength;
+
         // Sync sliders to BrushController defaults
         radiusSlider.value   = brushController.BrushRadius;
         strengthSlider.value = brushController.BrushStrength;
