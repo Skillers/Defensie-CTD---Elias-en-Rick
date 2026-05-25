@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Text;
 using TMPro;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 /// <summary>
@@ -44,8 +45,25 @@ public class ResultsSceneController : MonoBehaviour
     [Tooltip("Save file used if MissionSession has no saveFileName when this scene loads (e.g. testing this scene directly).")]
     [SerializeField] string fallbackSaveFileName = "level.json";
 
+    [Header("Navigation")]
+    [SerializeField] Button backToMainMenuButton;
+#if UNITY_EDITOR
+    [SerializeField] UnityEditor.SceneAsset mainMenuScene;
+#endif
+    [SerializeField, HideInInspector] string mainMenuSceneName = "UiScene";
+
+#if UNITY_EDITOR
+    void OnValidate()
+    {
+        if (mainMenuScene != null) mainMenuSceneName = mainMenuScene.name;
+    }
+#endif
+
     void Start()
     {
+        if (backToMainMenuButton != null)
+            backToMainMenuButton.onClick.AddListener(() => SceneManager.LoadScene(mainMenuSceneName));
+
         string fileName = (MissionSession.Instance != null && !string.IsNullOrEmpty(MissionSession.Instance.saveFileName))
             ? MissionSession.Instance.saveFileName
             : fallbackSaveFileName;

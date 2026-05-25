@@ -123,11 +123,16 @@ public class SimulationCameraController : MonoBehaviour
         transform.position = new Vector3(0f, Mathf.Sin(rad) * startDistance, -Mathf.Cos(rad) * startDistance);
         transform.rotation = Quaternion.Euler(startAngle, 0f, 0f);
 
+#if UNITY_EDITOR
+        // Debug orbs are editor-only visuals (camera focal point, terrain
+        // edge crossings, etc). In builds the fields stay null and the
+        // existing null-checks turn all orb code into no-ops.
         CreateOrbVisual();
         CreateFocalOrb();
         CreateLastTerrainOrb();
         CreateFocalEdgeOrb();
         CreateYAlignedOrb();
+#endif
     }
 
     private void OnDestroy()

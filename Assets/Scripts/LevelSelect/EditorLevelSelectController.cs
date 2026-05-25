@@ -66,6 +66,10 @@ public class EditorLevelSelectController : MonoBehaviour
         _toggleGroup = _contentRoot != null ? _contentRoot.GetComponent<ToggleGroup>() : null;
         if (_toggleGroup == null)
             Debug.LogWarning("EditorLevelSelectController: no ToggleGroup found on the resolved content root — entries won't be mutually exclusive.");
+        else
+            // Without this, Toggle.Set force-reactivates a switched-off toggle when no
+            // other toggle in the group is on, so the last entry to Bind ends up stuck on.
+            _toggleGroup.allowSwitchOff = true;
 
         PopulateList();
     }
