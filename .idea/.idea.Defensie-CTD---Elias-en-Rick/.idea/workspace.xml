@@ -6,7 +6,10 @@
   <component name="ChangeListManager">
     <list default="true" id="2719ef14-fe85-4389-85f2-34cbfe22855b" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/.idea.Defensie-CTD---Elias-en-Rick/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.Defensie-CTD---Elias-en-Rick/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/SimulationCameraController.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/SimulationCameraController.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/UnitGhost.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/UnitGhost.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/UnitMover.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/UnitMover.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/UnitSpawner.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/UnitSpawner.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Soldier.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Soldier.prefab" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -123,6 +126,7 @@
       <workItem from="1778664129273" duration="3767000" />
       <workItem from="1778840480575" duration="2575000" />
       <workItem from="1779121795486" duration="1000" />
+      <workItem from="1779721415391" duration="616000" />
     </task>
     <servers />
   </component>

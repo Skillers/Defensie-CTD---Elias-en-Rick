@@ -135,9 +135,13 @@ MonoBehaviour:
   moveSpeed: 6
   turnSpeed: 90
   groundOffset: 0
-  pathColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
-  pathLineWidth: 0.5
   pathLineLift: 0.1
+  catchUpPathEnabled: 1
+  catchUpPathVisible: 0
+  catchUpPathColor: {r: 0.85, g: 0.15, b: 1, a: 1}
+  catchUpPathWidth: 0.4
+  catchUpPathLift: 0.2
+  catchUpPathInterval: 0.2
   moveDirection: {x: 0, y: 0, z: 1}
 --- !u!1 &1679168738314430647
 GameObject:

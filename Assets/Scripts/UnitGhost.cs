@@ -46,6 +46,8 @@ public class UnitGhost : MonoBehaviour
     public float hoverHeight = 4f;
     [Tooltip("Width of the vertical stem drawn from the orb down to the line.")]
     public float stemWidth   = 0.12f;
+    [Tooltip("Show the floating orb and its stem. Runtime-toggleable: flipping this off hides the orb without touching the path line.")]
+    public bool  orbVisible  = true;
 
     [Header("Path Line")]
     [Tooltip("Colour of the line showing the full precomputed path the ghost is walking.")]
@@ -98,6 +100,21 @@ public class UnitGhost : MonoBehaviour
     }
 
     void OnDestroy() => Unsubscribe();
+
+    void Update()
+    {
+        // Sync visibility with the toggle so runtime flips take effect after the
+        // ghost has stopped moving (Advance/UpdateVisuals stop firing once arrived).
+        SyncOrbVisibility();
+    }
+
+    void SyncOrbVisibility()
+    {
+        if (_orb != null && _orb.activeSelf != orbVisible)
+            _orb.SetActive(orbVisible);
+        if (_stem != null && _stem.gameObject.activeSelf != orbVisible)
+            _stem.gameObject.SetActive(orbVisible);
+    }
 
     void Subscribe()
     {
@@ -340,6 +357,10 @@ public class UnitGhost : MonoBehaviour
         }
         _pathLine.startWidth = pathLineWidth;
         _pathLine.endWidth   = pathLineWidth;
+
+        // Apply the initial visibility so the orb doesn't flash for one frame
+        // before Update's first sync hides it.
+        SyncOrbVisibility();
     }
 
     /// <summary>

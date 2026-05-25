@@ -35,8 +35,10 @@ public class UnitMover : MonoBehaviour
     public float pathLineLift  = 0.1f;
 
     [Header("Catch-up Path (unit → ghost)")]
-    [Tooltip("Live best A* path from the unit to the ghost. Recomputed asynchronously every refresh interval. Obeys the same biome / slope rules as the main A* line.")]
+    [Tooltip("Live best A* path from the unit to the ghost. Recomputed asynchronously every refresh interval. Obeys the same biome / slope rules as the main A* line. Disabling this stops the recompute AND the obstacle reroute — for visual-only hiding use catchUpPathVisible instead.")]
     public bool  catchUpPathEnabled  = true;
+    [Tooltip("Show the purple catch-up line. Runtime-toggleable: flipping this off hides the line without touching the underlying A* / reroute logic.")]
+    public bool  catchUpPathVisible  = true;
     public Color catchUpPathColor    = new Color(0.85f, 0.15f, 1f, 1f);
     public float catchUpPathWidth    = 0.4f;
     [Tooltip("Extra height above terrain at which the catch-up line is drawn. Keep slightly above the main path line so they don't z-fight.")]
@@ -395,6 +397,11 @@ public class UnitMover : MonoBehaviour
 
     void TickCatchUpPath()
     {
+        // Sync line visibility with the visual-only toggle so flipping catchUpPathVisible
+        // at runtime hides/reveals the purple line without touching the A* recompute below.
+        if (catchUpLine != null && catchUpLine.gameObject.activeSelf != catchUpPathVisible)
+            catchUpLine.gameObject.SetActive(catchUpPathVisible);
+
         if (!catchUpPathEnabled) return;
         if (terrainDataStore == null || terrainDataStore.grid == null) return;
 
