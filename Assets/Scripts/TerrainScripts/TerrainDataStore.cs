@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
+using UnityEngine.Pool;
 
 /// <summary>
 /// Central data holder for the pre-computed CellData grid.
@@ -71,7 +72,6 @@ public class TerrainDataStore : MonoBehaviour
     public Vector2Int? EndCell => _endCell;
 
     private ObstacleGridHelper ObstacleGridHelper { get; } = new();
-
 
     void Awake()
     {
@@ -403,10 +403,31 @@ public class TerrainDataStore : MonoBehaviour
             }
             po.affectedCells.Clear();
         }
+        
+        // Rent lists from Unity pool
+        List<Renderer> renderers = ListPool<Renderer>.Get();
+        List<Collider> colliders = ListPool<Collider>.Get();
+
+        po.GetComponentsInChildren(renderers);
+        po.GetComponentsInChildren(colliders);
 
         var partObjects = new HashSet<GameObject>();
-        foreach (Renderer r in po.GetComponentsInChildren<Renderer>()) partObjects.Add(r.gameObject);
-        foreach (Collider c in po.GetComponentsInChildren<Collider>()) partObjects.Add(c.gameObject);
+
+        for (int i = 0; i < renderers.Count; i++)
+        {
+            Renderer r = renderers[i];
+            if (r.enabled) partObjects.Add(r.gameObject);
+        }
+
+        for (int i = 0; i < colliders.Count; i++)
+        {
+            Collider c = colliders[i];
+            if (c.enabled) partObjects.Add(c.gameObject);
+        }
+
+        // Release lists back to pool
+        ListPool<Renderer>.Release(renderers);
+        ListPool<Collider>.Release(colliders);
 
         foreach (GameObject part in partObjects)
         {
@@ -467,6 +488,15 @@ public class TerrainDataStore : MonoBehaviour
             }
         }
 
+        // Fill gaps between line-obstacle segments (e.g. concertina wire)
+        if (po.obstacleSo != null && po.obstacleSo.fillSegmentGaps)
+        {
+            foreach (GameObject part in partObjects)
+            {
+                ObstacleGridHelper.FillSegmentGapCells(part, this, po);
+            }
+        }
+        
         if (po.affectedCells.Count > 0)
         {
             po.OnRegistered(this);

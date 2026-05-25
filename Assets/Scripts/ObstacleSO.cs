@@ -13,6 +13,9 @@ public class ObstacleSO : ScriptableObject
     [Header("Placement")]
     public PlacementType placementType;
 
+    [Tooltip("Fill grid cells between child segments along their local Z-axis (use for line obstacles like wire).")]
+    public bool fillSegmentGaps = false;
+
     [Header("Pathfinding")]
     [Tooltip("Effect applied when no per-unit-type override matches.")]
     public CellEffectSpec defaultEffect = new() { effect = CellEffect.None, costMultiplier = 1f };

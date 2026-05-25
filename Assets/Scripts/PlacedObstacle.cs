@@ -11,7 +11,7 @@ public class PlacedObstacle : MonoBehaviour
     public ObstacleSO obstacleSo;
 
     /// <summary>Grid cells this obstacle currently occupies. Owned by this instance; written by TerrainDataStore.RegisterObstacleCells.</summary>
-    [System.NonSerialized] public List<Vector2Int> affectedCells = new List<Vector2Int>();
+    [System.NonSerialized] public List<Vector2Int> affectedCells = new();
 
     private TerrainDataStore _registeredStore;
 

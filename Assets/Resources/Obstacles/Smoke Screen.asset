@@ -10,14 +10,15 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 9cf1cc0a208d46a45a28d478e6b5c92c, type: 3}
-  m_Name: Concertina Wire
+  m_Name: Smoke Screen
   m_EditorClassIdentifier: Assembly-CSharp::ObstacleSO
-  obstacleName: Concertina Wire
-  icon: {fileID: 21300000, guid: 4fae79a1c03fcb3458ab05d5b30e1437, type: 3}
-  prefab: {fileID: 5780034516089840320, guid: b4b7339fb3082864b8444ec917d80cf4, type: 3}
+  obstacleName: Smoke Screen
+  icon: {fileID: 21300000, guid: 87b6608d3e11b804d9b546b1936948be, type: 3}
+  prefab: {fileID: 5377286303468425186, guid: 7fe46e7f1c75262449ed4075b490620e, type: 3}
   placementType: 1
   fillSegmentGaps: 1
+  placementCollision: 1
   defaultEffect:
-    effect: 1
+    effect: 4
     costMultiplier: 20
   unitEffects: []
