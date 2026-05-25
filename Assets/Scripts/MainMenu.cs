@@ -6,17 +6,17 @@ public class MainMenu : MonoBehaviour
 {
     [Header("Scenes")]
 #if UNITY_EDITOR
-    [SerializeField] private UnityEditor.SceneAsset levelEditorScene;
-    [SerializeField] private UnityEditor.SceneAsset gameScene;
+    [SerializeField] private UnityEditor.SceneAsset editorLevelSelectScene;
+    [SerializeField] private UnityEditor.SceneAsset gameLevelSelectScene;
 #endif
-    [SerializeField, HideInInspector] private string levelEditorSceneName = "MainSceneRD";
-    [SerializeField, HideInInspector] private string gameSceneName = "SampleScene";
+    [SerializeField, HideInInspector] private string editorLevelSelectSceneName = "EditorLevelSelect";
+    [SerializeField, HideInInspector] private string gameLevelSelectSceneName = "GameLevelSelect";
 
 #if UNITY_EDITOR
     private void OnValidate()
     {
-        if (levelEditorScene != null) levelEditorSceneName = levelEditorScene.name;
-        if (gameScene != null) gameSceneName = gameScene.name;
+        if (editorLevelSelectScene != null) editorLevelSelectSceneName = editorLevelSelectScene.name;
+        if (gameLevelSelectScene != null) gameLevelSelectSceneName = gameLevelSelectScene.name;
     }
 #endif
 
@@ -58,12 +58,12 @@ public class MainMenu : MonoBehaviour
 
     public void LoadLevelEditor()
     {
-        SceneManager.LoadScene(levelEditorSceneName);
+        SceneManager.LoadScene(editorLevelSelectSceneName);
     }
 
     public void LoadGame()
     {
-        SceneManager.LoadScene(gameSceneName);
+        SceneManager.LoadScene(gameLevelSelectSceneName);
     }
 
     public void ShowNotReadyPopup()

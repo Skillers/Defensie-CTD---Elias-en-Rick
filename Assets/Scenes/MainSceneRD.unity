@@ -495,9 +495,17 @@ PrefabInstance:
       value: Craters Research
       objectReference: {fileID: 0}
     - target: {fileID: 8676854176338600894, guid: 2c44d9fae5fa44846b4ad9d272791d04, type: 3}
+      propertyPath: m_fontAsset
+      value: 
+      objectReference: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+    - target: {fileID: 8676854176338600894, guid: 2c44d9fae5fa44846b4ad9d272791d04, type: 3}
       propertyPath: m_fontSizeBase
       value: 36
       objectReference: {fileID: 0}
+    - target: {fileID: 8676854176338600894, guid: 2c44d9fae5fa44846b4ad9d272791d04, type: 3}
+      propertyPath: m_sharedMaterial
+      value: 
+      objectReference: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
     - target: {fileID: 8676854176338600894, guid: 2c44d9fae5fa44846b4ad9d272791d04, type: 3}
       propertyPath: m_fontColor32.rgba
       value: 4292601046
@@ -571,8 +579,8 @@ MonoBehaviour:
 
 '
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: 0da6f3a2109e30841b084e5a5060a64a, type: 2}
-  m_sharedMaterial: {fileID: 2130222893574730568, guid: 0da6f3a2109e30841b084e5a5060a64a, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+  m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -596,7 +604,7 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 75
+  m_fontSize: 74.25
   m_fontSizeBase: 36
   m_fontWeight: 400
   m_enableAutoSizing: 1
@@ -809,9 +817,17 @@ PrefabInstance:
       value: Start Game
       objectReference: {fileID: 0}
     - target: {fileID: 8676854176338600894, guid: 2c44d9fae5fa44846b4ad9d272791d04, type: 3}
+      propertyPath: m_fontAsset
+      value: 
+      objectReference: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+    - target: {fileID: 8676854176338600894, guid: 2c44d9fae5fa44846b4ad9d272791d04, type: 3}
       propertyPath: m_fontSizeBase
       value: 36
       objectReference: {fileID: 0}
+    - target: {fileID: 8676854176338600894, guid: 2c44d9fae5fa44846b4ad9d272791d04, type: 3}
+      propertyPath: m_sharedMaterial
+      value: 
+      objectReference: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
     - target: {fileID: 8676854176338600894, guid: 2c44d9fae5fa44846b4ad9d272791d04, type: 3}
       propertyPath: m_fontColor32.rgba
       value: 4292601046
@@ -1286,9 +1302,17 @@ PrefabInstance:
       value: Settings
       objectReference: {fileID: 0}
     - target: {fileID: 8676854176338600894, guid: 2c44d9fae5fa44846b4ad9d272791d04, type: 3}
+      propertyPath: m_fontAsset
+      value: 
+      objectReference: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+    - target: {fileID: 8676854176338600894, guid: 2c44d9fae5fa44846b4ad9d272791d04, type: 3}
       propertyPath: m_fontSizeBase
       value: 36
       objectReference: {fileID: 0}
+    - target: {fileID: 8676854176338600894, guid: 2c44d9fae5fa44846b4ad9d272791d04, type: 3}
+      propertyPath: m_sharedMaterial
+      value: 
+      objectReference: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
     - target: {fileID: 8676854176338600894, guid: 2c44d9fae5fa44846b4ad9d272791d04, type: 3}
       propertyPath: m_fontColor32.rgba
       value: 4292601046
@@ -2479,8 +2503,12 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8676854176338600894, guid: 2c44d9fae5fa44846b4ad9d272791d04, type: 3}
       propertyPath: m_fontSize
-      value: 40.2
+      value: 38.35
       objectReference: {fileID: 0}
+    - target: {fileID: 8676854176338600894, guid: 2c44d9fae5fa44846b4ad9d272791d04, type: 3}
+      propertyPath: m_fontAsset
+      value: 
+      objectReference: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
     - target: {fileID: 8676854176338600894, guid: 2c44d9fae5fa44846b4ad9d272791d04, type: 3}
       propertyPath: m_fontSizeMax
       value: 40.2
@@ -2493,6 +2521,10 @@ PrefabInstance:
       propertyPath: m_fontSizeBase
       value: 36
       objectReference: {fileID: 0}
+    - target: {fileID: 8676854176338600894, guid: 2c44d9fae5fa44846b4ad9d272791d04, type: 3}
+      propertyPath: m_sharedMaterial
+      value: 
+      objectReference: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
     - target: {fileID: 8676854176338600894, guid: 2c44d9fae5fa44846b4ad9d272791d04, type: 3}
       propertyPath: m_enableAutoSizing
       value: 1
@@ -2781,9 +2813,17 @@ PrefabInstance:
       value: Level Editor
       objectReference: {fileID: 0}
     - target: {fileID: 8676854176338600894, guid: 2c44d9fae5fa44846b4ad9d272791d04, type: 3}
+      propertyPath: m_fontAsset
+      value: 
+      objectReference: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+    - target: {fileID: 8676854176338600894, guid: 2c44d9fae5fa44846b4ad9d272791d04, type: 3}
       propertyPath: m_fontSizeBase
       value: 36
       objectReference: {fileID: 0}
+    - target: {fileID: 8676854176338600894, guid: 2c44d9fae5fa44846b4ad9d272791d04, type: 3}
+      propertyPath: m_sharedMaterial
+      value: 
+      objectReference: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
     - target: {fileID: 8676854176338600894, guid: 2c44d9fae5fa44846b4ad9d272791d04, type: 3}
       propertyPath: m_fontColor32.rgba
       value: 4292601046
@@ -2900,10 +2940,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6c52783c89002ed4092c6e11f7c386ac, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MainMenu
-  levelEditorScene: {fileID: 102900000, guid: 0ea4656887d959c4882cc39fbb0da428, type: 3}
-  gameScene: {fileID: 102900000, guid: 9f0cf5ecf1ed4674a906b8ea129bcb98, type: 3}
-  levelEditorSceneName: TerrainTestExpanded
-  gameSceneName: UiScene
+  editorLevelSelectScene: {fileID: 102900000, guid: 682e7375dfb601748b66a87e9617d8a8, type: 3}
+  gameLevelSelectScene: {fileID: 102900000, guid: 647618cb22f8332439fb96455b8d8fae, type: 3}
+  editorLevelSelectSceneName: LevelSelectEditor
+  gameLevelSelectSceneName: LevelSelectGame
   levelEditorButton: {fileID: 1341155124}
   gameButton: {fileID: 1088015060}
   notReadyButton1: {fileID: 1694068530}
