@@ -76,6 +76,35 @@ public class TerrainDataStore : MonoBehaviour
     void Awake()
     {
         RegisterBiome(baseBiome);
+        ApplyLevelSelection();
+    }
+
+    // If a LevelSelection singleton is present (player entered through the
+    // selector scene), override the serialized fallback name and derive a
+    // starting seed from it so brand-new levels generate unique terrain.
+    // For existing saves the persisted seed wins, because the load path
+    // overwrites this field with data.seed after Awake.
+    void ApplyLevelSelection()
+    {
+        if (LevelSelection.Instance == null) return;
+        string selected = LevelSelection.Instance.SelectedLevelFileName;
+        if (string.IsNullOrEmpty(selected)) return;
+        saveFileName = selected;
+        seed = DeterministicHash(selected);
+    }
+
+    // System.String.GetHashCode is randomized per-process in modern .NET,
+    // which would give different terrain each Unity session for the same
+    // level name. This stable variant keeps the name-to-seed mapping
+    // reproducible across runs.
+    static int DeterministicHash(string s)
+    {
+        unchecked
+        {
+            int hash = 23;
+            foreach (char c in s) hash = hash * 31 + c;
+            return hash;
+        }
     }
 
     void Start()

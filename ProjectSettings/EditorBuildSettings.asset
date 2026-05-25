@@ -26,6 +26,12 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Scenes/AAR.unity
     guid: c00b19419aa7103478b81573721e275d
+  - enabled: 1
+    path: Assets/Scenes/LevelSelectGame.unity
+    guid: 647618cb22f8332439fb96455b8d8fae
+  - enabled: 1
+    path: Assets/Scenes/LevelSelectEditor.unity
+    guid: 682e7375dfb601748b66a87e9617d8a8
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}
   m_UseUCBPForAssetBundles: 0
