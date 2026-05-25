@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 
 [RequireComponent(typeof(Camera))]
@@ -384,6 +385,11 @@ public class SimulationCameraController : MonoBehaviour
 
     private void Update()
     {
+        if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
+        {
+            return;
+        }
+        
         var mouse = Mouse.current;
 
         if (!mouse.middleButton.isPressed)
