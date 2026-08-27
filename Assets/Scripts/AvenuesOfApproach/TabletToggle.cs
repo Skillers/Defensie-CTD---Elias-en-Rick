@@ -1,31 +1,25 @@
 using UnityEngine;
 using UnityEngine.UI;
-
-/// <summary>
-/// Swaps between a small "mini" tablet (always visible, acts as the open button)
-/// and a full-size "big" tablet (visible when the player wants to use it).
-/// Clicking the mini opens the big and hides the mini; clicking the close button
-/// (if wired) returns to the mini.
-/// </summary>
+    
+///<summary>Swaps between the mini tablet (closed state) and the big tablet (open state).</summary>
 public class TabletToggle : MonoBehaviour
 {
-    [Header("Roots")]
-    [Tooltip("Small thumbnail tablet that's visible while the big tablet is closed. Hidden when the big tablet is open.")]
+    [Header("GameObjects")]
+    [Tooltip("The Small Button like Ui Tablet.")]
     [SerializeField] GameObject miniTablet;
 
-    [Tooltip("Full-size tablet shown while the tool is open.")]
+    [Tooltip("Full-size information Tablet.")]
     [SerializeField] GameObject bigTablet;
 
-    [Header("Buttons")]
-    [Tooltip("Button on the mini tablet. Clicking it opens the big tablet.")]
+ 
+    [Tooltip("Button Component on the mini tablet. Clicking it opens the big tablet.")]
     [SerializeField] Button openButton;
 
-    [Tooltip("Buttons that close the big tablet back to the mini. Wire as many as you want — e.g. an X button on the panel and a transparent backdrop button for click-outside-to-close.")]
+    [Tooltip("Buttons that close the big tablet.")]
     [SerializeField] Button[] closeButtons;
-
-    [Header("Initial State")]
+    
     [SerializeField] bool startOpen = false;
-
+    
     public bool IsOpen { get; private set; }
 
     void Start()

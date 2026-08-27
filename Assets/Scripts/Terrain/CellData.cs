@@ -14,11 +14,8 @@ public struct CellData
     public float roundedHeight;
 
     /// <summary>
-    /// Signed slope in degrees for each outgoing direction in <see cref="Directions"/>
-    /// (same index order). Positive = uphill, negative = downhill.
-    /// Indices 0–7 are the cardinal/diagonal moves, 8–15 the knight (2:1) moves.
-    /// Edge cells get 0 for out-of-bounds directions. Derived from rawHeight — not
-    /// serialized; re-baked on load.
+    /// Signed slope in degrees per outgoing direction, same index order as <see cref="Directions"/>.
+    /// Positive = uphill. Derived from rawHeight, not serialized; re-baked on load.
     /// </summary>
     public float[] slopeOutgoing;
 

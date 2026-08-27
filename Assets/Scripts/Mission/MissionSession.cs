@@ -2,33 +2,23 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
-/// <summary>
-/// Single, persistent-for-one-scene-transition session carrier. Created by the first
-/// <see cref="UnitMover"/> that registers a plan — that is the only spawn path. Marked
-/// DontDestroyOnLoad so it survives the gameplay → results transition, then re-parented
-/// into the next loaded scene on the first sceneLoaded event so it dies naturally with
-/// the scene change after that. Carries the save file name (set by the creating unit
-/// from its <see cref="TerrainDataStore"/>) into the results scene and collects per-unit
-/// <see cref="UnitPathPlan"/> records as units pathfind.
-/// </summary>
+/// <summary>Session carrier that survives exactly one scene transition (gameplay → results). Holds the unit path plans and the obstacle cost summary.</summary>
 public class MissionSession : MonoBehaviour
 {
     public static MissionSession Instance { get; private set; }
 
-    /// <summary>Save file the unit's TerrainDataStore loaded — read by the results scene.</summary>
+    /// <summary>Loaded save file name, read by the results scene.</summary>
     public string saveFileName;
 
     [SerializeField] List<UnitPathPlan> _plans = new List<UnitPathPlan>();
 
-    /// <summary>Read-only view of every plan registered this session.</summary>
     public IReadOnlyList<UnitPathPlan> Plans => _plans;
 
     [SerializeField] List<ObstacleCostEntry> _obstacleSummary = new List<ObstacleCostEntry>();
 
-    /// <summary>One entry per <see cref="ObstacleSO"/> currently placed. Updated live as obstacles are placed and deleted.</summary>
+    /// <summary>One entry per placed ObstacleSO, updated live on place and delete.</summary>
     public IReadOnlyList<ObstacleCostEntry> ObstacleSummary => _obstacleSummary;
 
-    /// <summary>Sum of <see cref="ObstacleCostEntry.CostPerType"/> across every entry.</summary>
     public int TotalObstacleCost
     {
         get
@@ -59,16 +49,12 @@ public class MissionSession : MonoBehaviour
 
     void OnSceneLoaded(Scene scene, LoadSceneMode mode)
     {
-        // First load after creation: re-parent into that scene so the persistent flag
-        // is effectively dropped — the next scene change will destroy us normally.
+        // Re-parent into the newly loaded scene so the next scene change destroys us normally.
         SceneManager.MoveGameObjectToScene(gameObject, scene);
         SceneManager.sceneLoaded -= OnSceneLoaded;
     }
 
-    /// <summary>
-    /// Adds a plan or overwrites the existing one for the same <see cref="UnitPathPlan.unitId"/>.
-    /// Latest-only semantics: recomputed paths replace earlier ones.
-    /// </summary>
+    /// <summary>Adds a plan, or overwrites the existing one for the same unitId.</summary>
     public void RegisterPlan(UnitPathPlan plan)
     {
         if (plan == null) return;
@@ -77,14 +63,9 @@ public class MissionSession : MonoBehaviour
         else _plans.Add(plan);
     }
 
-    /// <summary>Returns the plan registered for <paramref name="unitId"/>, or null if none.</summary>
     public UnitPathPlan GetPlan(int unitId) => _plans.Find(p => p.unitId == unitId);
 
-    /// <summary>
-    /// Adds <paramref name="segments"/> to the segment count for <paramref name="type"/> in the
-    /// obstacle summary, creating an entry on first placement. Line obstacles pass their generated
-    /// segment count so each segment is charged individually; point obstacles pass 1.
-    /// </summary>
+    /// <summary>Adds segments to the type's summary entry. Line obstacles pass their segment count, point obstacles pass 1.</summary>
     public void RegisterObstaclePlacement(ObstacleSO type, int segments)
     {
         if (type == null || segments <= 0) return;
@@ -93,11 +74,7 @@ public class MissionSession : MonoBehaviour
         else _obstacleSummary.Add(new ObstacleCostEntry { obstacleType = type, count = segments });
     }
 
-    /// <summary>
-    /// Subtracts <paramref name="segments"/> from the entry for <paramref name="type"/>, removing it
-    /// when the count reaches zero. Callers pass the same segment count they registered with so a
-    /// deleted line refunds every one of its segments.
-    /// </summary>
+    /// <summary>Subtracts segments from the type's entry, removing it at zero. Pass the same count used to register.</summary>
     public void UnregisterObstaclePlacement(ObstacleSO type, int segments)
     {
         if (type == null || segments <= 0) return;
@@ -107,12 +84,7 @@ public class MissionSession : MonoBehaviour
         if (_obstacleSummary[idx].count <= 0) _obstacleSummary.RemoveAt(idx);
     }
 
-    /// <summary>
-    /// True when at least one plan exists AND every registered plan has either arrived
-    /// (<see cref="UnitPathPlan.completed"/>) or been marked unreachable
-    /// (<see cref="UnitPathPlan.failed"/>). Failed plans count as "finished" so the
-    /// mission doesn't hang forever on an unreachable unit.
-    /// </summary>
+    /// <summary>True when at least one plan exists and every plan has completed or failed.</summary>
     public bool AllPlansFinished
     {
         get
@@ -125,10 +97,7 @@ public class MissionSession : MonoBehaviour
     }
 }
 
-/// <summary>
-/// Snapshot of a single unit's A* result: the cells it intends to walk, the upfront
-/// time estimate, and (for route walks) the avenue waypoints that were requested.
-/// </summary>
+/// <summary>One unit's planned path, time estimate and walked result.</summary>
 [System.Serializable]
 public class UnitPathPlan
 {
@@ -141,26 +110,18 @@ public class UnitPathPlan
     public bool failed;
     public float recordedAt;
 
-    // Filled in as the unit actually walks the path. completed=true once it arrives.
+    // Filled in as the unit walks; completed = true once it arrives.
     public List<Vector2Int> actualPath = new List<Vector2Int>();
     public float actualSeconds;
     public bool completed;
 }
 
-/// <summary>
-/// One row of the obstacle cost summary: a placed obstacle type and the total number of
-/// segments currently on the map. Point placements contribute 1 segment; line placements
-/// contribute one per generated segment. Cost is derived from <see cref="ObstacleSO.cost"/>
-/// so the SO stays the single source of truth.
-/// </summary>
+/// <summary>One obstacle type and the number of cost-bearing segments currently placed.</summary>
 [System.Serializable]
 public class ObstacleCostEntry
 {
     public ObstacleSO obstacleType;
-
-    /// <summary>Total cost-bearing segments of this type currently placed (sum across all placements).</summary>
     public int count;
 
-    /// <summary>Cost contribution of this type: per-segment cost from the SO multiplied by <see cref="count"/>.</summary>
     public int CostPerType => obstacleType != null ? obstacleType.cost * count : 0;
 }

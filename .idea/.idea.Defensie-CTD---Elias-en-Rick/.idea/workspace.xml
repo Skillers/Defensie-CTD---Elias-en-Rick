@@ -5,11 +5,148 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="2719ef14-fe85-4389-85f2-34cbfe22855b" name="Changes" comment="">
+      <change afterPath="$PROJECT_DIR$/Assets/Scripts/Mission/MissionFlowController.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Assets/Scripts/Terrain/CellEffect.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Assets/Scripts/Terrain/SaveData.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/.idea.Defensie-CTD---Elias-en-Rick/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.Defensie-CTD---Elias-en-Rick/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/UnitGhost.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/UnitGhost.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/UnitMover.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/UnitMover.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/UnitSpawner.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/UnitSpawner.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Soldier.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Soldier.prefab" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/AOASPHERE.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Prefabs/AOASPHERE.prefab" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/AOASPHERE.prefab.meta" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Prefabs/AOASPHERE.prefab.meta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/AoA_LineMaterial.mat" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Materials/AoA_LineMaterial.mat" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/AoA_LineMaterial.mat.meta" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Materials/AoA_LineMaterial.mat.meta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Button.controller" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Prefabs/Button.controller" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Button.controller.meta" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Prefabs/Button.controller.meta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Cancel 1.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Prefabs/Cancel 1.prefab" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Cancel 1.prefab.meta" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Prefabs/Cancel 1.prefab.meta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Cancel.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Prefabs/Cancel.prefab" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Cancel.prefab.meta" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Prefabs/Cancel.prefab.meta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Flag.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Prefabs/Flag.prefab" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Flag.prefab.meta" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Prefabs/Flag.prefab.meta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Flatten Button.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Prefabs/Flatten Button.prefab" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Flatten Button.prefab.meta" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Prefabs/Flatten Button.prefab.meta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/LevelEditor.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/LevelEntry.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Prefabs/LevelEntry.prefab" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/LevelEntry.prefab.meta" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Prefabs/LevelEntry.prefab.meta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/New Material 1.mat" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Materials/New Material 1.mat" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/New Material 1.mat.meta" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Materials/New Material 1.mat.meta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/New Material 2.mat" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Materials/New Material 2.mat" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/New Material 2.mat.meta" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Materials/New Material 2.mat.meta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/New Material.mat" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Materials/New Material.mat" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/New Material.mat.meta" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Materials/New Material.mat.meta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/PrivateArrow.png" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/UI/Sprites/PrivateArrow.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/PrivateArrow.png.meta" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/UI/Sprites/PrivateArrow.png.meta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/RedCross.png" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/UI/Sprites/RedCross.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/RedCross.png.meta" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/UI/Sprites/RedCross.png.meta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/RoundedRectange.png" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/UI/Sprites/RoundedRectange.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/RoundedRectange.png.meta" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/UI/Sprites/RoundedRectange.png.meta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/RuggedTablet.png" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/UI/Sprites/RuggedTablet.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/RuggedTablet.png.meta" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/UI/Sprites/RuggedTablet.png.meta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/AStarPathGeneration.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Pathfinding/AStarPathGeneration.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/AStarPathGeneration.cs.meta" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Pathfinding/AStarPathGeneration.cs.meta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Astarpathfinder.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Pathfinding/AStarPathfinder.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Astarpathfinder.cs.meta" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Pathfinding/AStarPathfinder.cs.meta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/AvenuesOfApproach/AvenueRuntimeStore.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/AvenuesOfApproach/AvenueRuntimeStore.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/AvenuesOfApproach/AvenuesOfApproachHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/AvenuesOfApproach/AvenuesOfApproachHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/AvenuesOfApproach/ScrubbableNumberField.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/AvenuesOfApproach/ScrubbableNumberField.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/AvenuesOfApproach/TabletToggle.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/AvenuesOfApproach/TabletToggle.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/CraterMesh.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Terrain/CraterMesh.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/CraterMesh.cs.meta" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Terrain/CraterMesh.cs.meta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/FlagMover.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Terrain/FlagMover.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/FlagMover.cs.meta" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Terrain/FlagMover.cs.meta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/LevelSelection.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/LevelSelect/LevelSelection.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/LevelSelection.cs.meta" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/LevelSelect/LevelSelection.cs.meta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/LoadingScreen.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/UI/LoadingScreen.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/LoadingScreen.cs.meta" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/UI/LoadingScreen.cs.meta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/MainMenu.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/UI/MainMenu.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/MainMenu.cs.meta" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/UI/MainMenu.cs.meta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Maprenderer.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Terrain/MapRenderer.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Maprenderer.cs.meta" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Terrain/MapRenderer.cs.meta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/MissionEndWatcher.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Mission/MissionEndWatcher.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/MissionEndWatcher.cs.meta" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Mission/MissionEndWatcher.cs.meta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/MissionFlowController.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/MissionFlowController.cs.meta" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Mission/MissionFlowController.cs.meta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/MissionSession.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Mission/MissionSession.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/MissionSession.cs.meta" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Mission/MissionSession.cs.meta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/ObstacleInventorySO.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Obstacles/ObstacleInventorySO.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/ObstacleInventorySO.cs.meta" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Obstacles/ObstacleInventorySO.cs.meta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/ObstacleOverlay.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Obstacles/ObstacleOverlay.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/ObstacleOverlay.cs.meta" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Obstacles/ObstacleOverlay.cs.meta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/ObstaclePlacementManager.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Obstacles/ObstaclePlacementManager.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/ObstaclePlacementManager.cs.meta" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Obstacles/ObstaclePlacementManager.cs.meta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/ObstacleSO.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Obstacles/ObstacleSO.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/ObstacleSO.cs.meta" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Obstacles/ObstacleSO.cs.meta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/PathPreviewRenderer.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Pathfinding/PathPreviewRenderer.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/PathPreviewRenderer.cs.meta" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Pathfinding/PathPreviewRenderer.cs.meta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/PlacedObstacle.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Obstacles/PlacedObstacle.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/PlacedObstacle.cs.meta" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Obstacles/PlacedObstacle.cs.meta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/ResultsMapRenderer.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Mission/ResultsMapRenderer.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/ResultsMapRenderer.cs.meta" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Mission/ResultsMapRenderer.cs.meta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/ResultsSceneController.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Mission/ResultsSceneController.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/ResultsSceneController.cs.meta" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Mission/ResultsSceneController.cs.meta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/SaveFileLoader.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Mission/SaveFileLoader.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/SaveFileLoader.cs.meta" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Mission/SaveFileLoader.cs.meta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/SimulationCameraController.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Mission/SimulationCameraController.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/SimulationCameraController.cs.meta" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Mission/SimulationCameraController.cs.meta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/TerrainScripts.meta" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Terrain.meta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/TerrainScripts/BiomeAssigner.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Terrain/BiomeAssigner.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/TerrainScripts/BiomeAssigner.cs.meta" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Terrain/BiomeAssigner.cs.meta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/TerrainScripts/BiomeSO.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Terrain/BiomeSO.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/TerrainScripts/BiomeSO.cs.meta" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Terrain/BiomeSO.cs.meta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/TerrainScripts/CellData.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Terrain/CellData.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/TerrainScripts/CellData.cs.meta" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Terrain/CellData.cs.meta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/TerrainScripts/CellEffect.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/TerrainScripts/CellEffect.cs.meta" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Terrain/CellEffect.cs.meta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/TerrainScripts/CellPathing.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Terrain/CellPathing.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/TerrainScripts/CellPathing.cs.meta" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Terrain/CellPathing.cs.meta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/TerrainScripts/FlagDisplay.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Terrain/FlagDisplay.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/TerrainScripts/FlagDisplay.cs.meta" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Terrain/FlagDisplay.cs.meta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/TerrainScripts/GameTerrainBuilder.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Terrain/GameTerrainBuilder.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/TerrainScripts/GameTerrainBuilder.cs.meta" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Terrain/GameTerrainBuilder.cs.meta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/TerrainScripts/MapGenerator.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Terrain/MapGenerator.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/TerrainScripts/MapGenerator.cs.meta" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Terrain/MapGenerator.cs.meta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/TerrainScripts/MarchingCubesTerrain.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Terrain/MarchingCubesTerrain.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/TerrainScripts/MarchingCubesTerrain.cs.meta" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Terrain/MarchingCubesTerrain.cs.meta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/TerrainScripts/ObstacleGridHelper.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Obstacles/ObstacleGridHelper.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/TerrainScripts/ObstacleGridHelper.cs.meta" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Obstacles/ObstacleGridHelper.cs.meta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/TerrainScripts/PerlinNoisePlane.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Terrain/PerlinNoisePlane.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/TerrainScripts/PerlinNoisePlane.cs.meta" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Terrain/PerlinNoisePlane.cs.meta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/TerrainScripts/SaveData.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/TerrainScripts/SaveData.cs.meta" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Terrain/SaveData.cs.meta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/TerrainScripts/SlopeMap.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Terrain/SlopeMap.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/TerrainScripts/SlopeMap.cs.meta" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Terrain/SlopeMap.cs.meta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/TerrainScripts/TerrainDataStore.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Terrain/TerrainDataStore.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/TerrainScripts/TerrainDataStore.cs.meta" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Terrain/TerrainDataStore.cs.meta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/TerrainScripts/UnitTypeSO.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Units/UnitTypeSO.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/TerrainScripts/UnitTypeSO.cs.meta" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Units/UnitTypeSO.cs.meta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/UnitDataCard.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/UI/UnitDataCard.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/UnitDataCard.cs.meta" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/UI/UnitDataCard.cs.meta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/UnitFacer.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Units/UnitFacer.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/UnitFacer.cs.meta" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Units/UnitFacer.cs.meta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/UnitGhost.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Units/UnitGhost.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/UnitGhost.cs.meta" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Units/UnitGhost.cs.meta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/UnitMover.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Units/UnitMover.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/UnitMover.cs.meta" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Units/UnitMover.cs.meta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/UnitSpawner.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Units/UnitSpawner.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/UnitSpawner.cs.meta" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Units/UnitSpawner.cs.meta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/WarningDisplay.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/UI/WarningDisplay.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/WarningDisplay.cs.meta" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/UI/WarningDisplay.cs.meta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Soldier.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Prefabs/Soldier.prefab" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Soldier.prefab.meta" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Prefabs/Soldier.prefab.meta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sphere.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Prefabs/Sphere.prefab" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sphere.prefab.meta" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Prefabs/Sphere.prefab.meta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/TerrainScripts.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/UI/Fonts/Jovanny Lemonad - Bender SDF.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/UI/Fonts/Jovanny Lemonad - Bender SDF.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/UI/Scripts.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/UI/Scripts/PlacableObstacleButton.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/UI/PlacableObstacleButton.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/UI/Scripts/PlacableObstacleButton.cs.meta" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/UI/PlacableObstacleButton.cs.meta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/URP_Lit.mat" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Materials/URP_Lit.mat" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/URP_Lit.mat.meta" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Materials/URP_Lit.mat.meta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Unit data.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Prefabs/Unit data.prefab" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Unit data.prefab.meta" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Prefabs/Unit data.prefab.meta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/_Recovery.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/_Recovery/0 (1).unity" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/_Recovery/0 (1).unity.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/_Recovery/0.unity" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/_Recovery/0.unity.meta" beforeDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -50,7 +187,7 @@
 }</component>
   <component name="RunManager" selected="Attach to Unity Editor.Attach to Unity Editor">
     <configuration name="Standalone Player" type="RunUnityExe" factoryName="Unity Executable">
-      <option name="EXE_PATH" value="$USER_HOME$/Desktop/CTD\Defensie-CTD---Elias-en-Rick-.exe" />
+      <option name="EXE_PATH" value="$USER_HOME$/Desktop/CTD/Build\Defensie-CTD---Elias-en-Rick-.exe" />
       <option name="PROGRAM_PARAMETERS" value="" />
       <option name="WORKING_DIRECTORY" value="C:\Users\Skillers\Desktop\CTD" />
       <option name="PASS_PARENT_ENVS" value="1" />
@@ -127,6 +264,10 @@
       <workItem from="1778840480575" duration="2575000" />
       <workItem from="1779121795486" duration="1000" />
       <workItem from="1779721415391" duration="616000" />
+      <workItem from="1786547594479" duration="281000" />
+      <workItem from="1786554105749" duration="607000" />
+      <workItem from="1786606525571" duration="4257000" />
+      <workItem from="1786948441947" duration="3356000" />
     </task>
     <servers />
   </component>

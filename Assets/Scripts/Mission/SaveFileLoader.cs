@@ -9,10 +9,7 @@ using UnityEngine;
 /// </summary>
 public static class SaveFileLoader
 {
-    /// <summary>
-    /// Loads and parses <paramref name="fileName"/> from <see cref="Application.persistentDataPath"/>.
-    /// Returns null on any failure (missing file, parse error, empty name); logs the cause.
-    /// </summary>
+    /// <summary>Loads a save from persistentDataPath. Null on any failure; the cause is logged.</summary>
     public static SaveData LoadSave(string fileName)
     {
         if (string.IsNullOrEmpty(fileName))
@@ -40,11 +37,7 @@ public static class SaveFileLoader
         }
     }
 
-    /// <summary>
-    /// Builds a name → BiomeSO map from every BiomeSO asset under Resources/Biomes.
-    /// Mirrors <see cref="TerrainDataStore"/>'s lookup so colors and movement costs match
-    /// what gameplay used.
-    /// </summary>
+    /// <summary>Name → BiomeSO map from Resources/Biomes, mirroring TerrainDataStore's lookup.</summary>
     public static IReadOnlyDictionary<string, BiomeSO> LoadBiomeLookup()
     {
         Dictionary<string, BiomeSO> map = new Dictionary<string, BiomeSO>();

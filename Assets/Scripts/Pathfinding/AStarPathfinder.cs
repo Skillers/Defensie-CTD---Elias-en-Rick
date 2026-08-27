@@ -8,28 +8,13 @@ public static class AStarPathfinder
     private class Node
     {
         public Vector2Int pos;
-
         public float gCost;
-
         public float hCost;
-
         public float fCost => gCost + hCost;
-
         public Node parent;
     }
 
-    /// <summary>
-    ///     Returns a list of grid positions from start to goal (inclusive).
-    ///     Returns empty list if no path found.
-    ///     <paramref name="totalCost" /> is set to the goal node's accumulated A* gCost on success,
-    ///     or 0 when no path exists. Multiply by cell step and divide by move speed to get seconds —
-    ///     see <see cref="CostToSeconds" />.
-    ///     Supports 8-directional movement; diagonal steps cost sqrt(2) * terrain cost.
-    ///     Step cost is also multiplied by the unit's slope rule for the outgoing direction
-    ///     of the cell being stepped from. A blocked slope rule prunes the neighbour entirely.
-    ///     unitSize: the squad footprint in cells (e.g. 5 = 5x5).
-    ///     unitType: optional unit type for resolving per-biome movement costs and slope rules.
-    /// </summary>
+    /// <summary>Grid path from start to goal (inclusive), empty if none. totalCost converts to seconds via <see cref="CostToSeconds"/>.</summary>
     public static List<Vector2Int> FindPath(
         CellData[,] grid,
         int gridWidth,
@@ -81,10 +66,7 @@ public static class AStarPathfinder
 
                 if (blocked) continue;
 
-                // Walk every cell the step physically crosses (excluding the start).
-                // For cardinal / single-diagonal that's just the destination; for
-                // knight moves it's the two intermediates plus the destination,
-                // each charged 1/3 of the step. Any blocked crossing kills the move.
+                // Charge every cell the step crosses; any blocked crossing kills the move.
                 CellCrossing[] crossings = CellPathing.Crossings[d];
                 float weightedCellCost   = 0f;
                 bool  pathBlocked        = false;
@@ -137,27 +119,13 @@ public static class AStarPathfinder
         return new List<Vector2Int>();
     }
 
-    /// <summary>
-    ///     Converts an A* total cost (sum of per-step weighted cell distances) into seconds
-    ///     of travel time for a unit moving at <paramref name="moveSpeed" /> world units per second
-    ///     on a grid with <paramref name="cellStep" /> world units between adjacent cells.
-    ///     Returns +infinity when moveSpeed is non-positive.
-    /// </summary>
+    /// <summary>Converts an A* total cost into seconds of travel time. +Infinity when moveSpeed is non-positive.</summary>
     public static float CostToSeconds(float totalCost, float cellStep, float moveSpeed)
     {
         return moveSpeed > 0f ? totalCost * cellStep / moveSpeed : float.PositiveInfinity;
     }
 
-    /// <summary>
-    ///     Computes the total A* cost of walking an already-built <paramref name="path" />.
-    ///     Mirrors <see cref="FindPath" />'s per-step formula:
-    ///         stepCost = StepLengths[d] × Σ(portion × biomeMul × obstacleMul) × slopeMul
-    ///     summed across all crossed cells (cardinal/diagonal: destination only; knight:
-    ///     two intermediates + destination, each ⅓). Returns +infinity if any step is
-    ///     blocked (slope/biome/obstacle) or crosses off-grid. Useful for re-pricing a
-    ///     path that's been mutated by shortcut / bevel passes after the initial A* ran.
-    ///     Safe to call on a worker thread as long as the grid isn't being mutated.
-    /// </summary>
+    /// <summary>A* cost of walking an already-built path; +Infinity if any step is blocked. Thread-safe while the grid isn't mutated.</summary>
     public static float ComputePathCost(CellData[,] grid, int gridWidth, int gridHeight,
                                         List<Vector2Int> path, UnitTypeSO unitType,
                                         bool ignoreObstacles = false)
@@ -202,11 +170,7 @@ public static class AStarPathfinder
         return totalCost;
     }
 
-    /// <summary>
-    ///     Returns the slope multiplier for stepping from <paramref name="fromCell" /> in the given delta direction.
-    ///     Sets <paramref name="blocked" /> to true if the unit cannot make this step.
-    ///     Falls back to 1f when no unit type is supplied or slope data is missing.
-    /// </summary>
+    /// <summary>Slope multiplier for stepping from a cell in the given direction; blocked = true when the step is impossible.</summary>
     public static float ResolveSlopeMultiplier(
         CellData fromCell,
         Vector2Int delta,
@@ -227,12 +191,7 @@ public static class AStarPathfinder
         return unitType.EvaluateSlope(slope, out blocked);
     }
 
-    /// <summary>
-    ///     Returns the biome cost multiplier for entering <paramref name="cell" /> as the given
-    ///     <paramref name="unitType" />. Sets <paramref name="blocked" /> to true if the resolved
-    ///     biome effect forbids entry. Returns 1f when the cell has no biome or the resolved
-    ///     effect has no cost impact.
-    /// </summary>
+    /// <summary>Biome cost multiplier for entering the cell; blocked = true when entry is forbidden.</summary>
     public static float ResolveBiomeMultiplier(CellData cell, UnitTypeSO unitType, out bool blocked)
     {
         blocked = false;
@@ -253,16 +212,7 @@ public static class AStarPathfinder
         }
     }
 
-    /// <summary>
-    ///     Returns the obstacle cost multiplier for entering <paramref name="cell" /> as the given
-    ///     <paramref name="unitType" />. Sets <paramref name="blocked" /> to true if the resolved
-    ///     effect forbids entry. Returns 1f when no obstacle is registered or the resolved effect
-    ///     has no cost impact. Composes footprint and radius layers multiplicatively; among
-    ///     overlapping radius sources, the strongest single effect contributes.
-    ///     When <paramref name="ignoreObstacles" /> is true, the entire obstacle layer (footprint
-    ///     and radius) is skipped: returns 1f with blocked=false. Used to derive the obstacle-free
-    ///     time estimate that catch-up A* rerouting approximates at runtime.
-    /// </summary>
+    /// <summary>Obstacle cost multiplier for entering the cell. Footprint and radius layers compose; the strongest radius source wins.</summary>
     public static float ResolveObstacleMultiplier(CellData cell, UnitTypeSO unitType, out bool blocked, bool ignoreObstacles = false)
     {
         blocked = false;
@@ -336,10 +286,7 @@ public static class AStarPathfinder
         }
     }
 
-    /// <summary>
-    ///     Maps an 8-neighbour delta (each component in {-1, 0, 1}, not both zero) to the
-    ///     index in <see cref="CellData.Directions" />. Returns -1 for invalid deltas.
-    /// </summary>
+    /// <summary>Index of the delta in <see cref="CellData.Directions"/>, or -1 for invalid deltas.</summary>
     public static int GetDirectionIndex(Vector2Int delta)
     {
         for (int i = 0; i < CellData.Directions.Length; i++)

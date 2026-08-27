@@ -6,11 +6,7 @@ using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
-/// <summary>
-/// One avenue of approach the player has defined: a title and an ordered
-/// list of grid-cell waypoints. The runtime sphere instances live on the
-/// avenue too so removal can clean them up.
-/// </summary>
+/// <summary>One player-defined avenue of approach: a title, ordered grid waypoints and their runtime visuals.</summary>
 [Serializable]
 public class AvenueOfApproach
 {
@@ -22,47 +18,37 @@ public class AvenueOfApproach
 }
 
 /// <summary>
-/// Top-level handler for the Avenues of Approach tool. Owns the open/close
-/// state of the tool's UI panel, gates opening on start/target flags being
-/// placed, manages the list of avenues the player is editing, and handles
-/// click-to-place waypoint spheres on the terrain.
+/// Handler for the Avenues of Approach tool: panel open/close state, the avenue
+/// list, and click-to-place waypoint editing on the terrain.
 /// </summary>
 public class AvenuesOfApproachHandler : MonoBehaviour
 {
     [Header("References")]
-    [Tooltip("Used to verify that start AND target flags have been placed before the tool can open.")]
+    [Tooltip("Used to verify start and target flags before the tool can open.")]
     [SerializeField] private TerrainDataStore terrainDataStore;
 
-    [Tooltip("Camera used to raycast click positions onto the terrain.")]
+    [Tooltip("Camera used to raycast clicks onto the terrain.")]
     [SerializeField] private Camera editorCamera;
 
     [Header("UI")]
-    [Tooltip("Button that toggles the AoA tool open/closed.")]
     [SerializeField] private Button toggleButton;
 
-    [Tooltip("Centered warning shown when the user tries to open the tool without start/target flags placed.")]
+    [Tooltip("Warning shown when opening without start/target flags placed.")]
     [SerializeField] private GameObject warningPanel;
 
-    [Tooltip("Text inside the warning panel. The handler rewrites it based on which flag(s) are missing.")]
+    [Tooltip("Rewritten based on which flag(s) are missing.")]
     [SerializeField] private TMP_Text warningText;
 
-    [Tooltip("Separate text inside the warning panel that tells the player which tool to use to fix it.")]
+    [Tooltip("Tells the player which tool fixes the missing flags.")]
     [SerializeField] private TMP_Text adviceText;
 
     [Header("Avenue Navigation")]
-    [Tooltip("Steps to the previous avenue in the list.")]
     [SerializeField] private Button previousButton;
-
-    [Tooltip("Steps to the next avenue in the list.")]
     [SerializeField] private Button nextButton;
-
-    [Tooltip("Creates a new empty avenue and switches to it.")]
     [SerializeField] private Button newAvenueButton;
-
-    [Tooltip("Removes the currently selected avenue from the list.")]
     [SerializeField] private Button removeAvenueButton;
 
-    [Tooltip("Input field for editing the current avenue's title.")]
+    [Tooltip("Edits the current avenue's title.")]
     [SerializeField] private TMP_InputField titleInput;
 
     [Tooltip("Shows '<current> / <total>' for the avenues list.")]
@@ -72,82 +58,59 @@ public class AvenuesOfApproachHandler : MonoBehaviour
     [Tooltip("Optional. If null, a default sphere primitive is created per waypoint.")]
     [SerializeField] private GameObject waypointSpherePrefab;
 
-    [Tooltip("Extra height above the terrain surface when positioning a waypoint sphere.")]
+    [Tooltip("Extra height above the terrain surface.")]
     [SerializeField] private float waypointHeightOffset = 0.2f;
 
     [Header("Waypoint Editing")]
-    [Tooltip("Screen-space pixel radius around an existing waypoint of the current avenue. A left-press within this radius grabs and drags that waypoint instead of placing a new one. Larger = more forgiving.")]
+    [Tooltip("Pixel radius within which a left-press grabs an existing waypoint instead of placing a new one.")]
     [SerializeField] private float grabPixelRadius = 24f;
 
-    [Tooltip("Steps the selection to the previous waypoint of the current avenue.")]
     [SerializeField] private Button prevWaypointButton;
-
-    [Tooltip("Steps the selection to the next waypoint of the current avenue.")]
     [SerializeField] private Button nextWaypointButton;
-
-    [Tooltip("Moves the selected waypoint one grid cell in -X.")]
     [SerializeField] private Button waypointXMinusButton;
-
-    [Tooltip("Moves the selected waypoint one grid cell in +X.")]
     [SerializeField] private Button waypointXPlusButton;
-
-    [Tooltip("Moves the selected waypoint one grid cell in -Z.")]
     [SerializeField] private Button waypointZMinusButton;
-
-    [Tooltip("Moves the selected waypoint one grid cell in +Z.")]
     [SerializeField] private Button waypointZPlusButton;
 
-    [Tooltip("Integer grid X of the selected waypoint. Editable; commits on end-edit.")]
+    [Tooltip("Grid X of the selected waypoint. Commits on end-edit.")]
     [SerializeField] private TMP_InputField waypointXInput;
 
-    [Tooltip("Integer grid Z of the selected waypoint. Editable; commits on end-edit.")]
+    [Tooltip("Grid Z of the selected waypoint. Commits on end-edit.")]
     [SerializeField] private TMP_InputField waypointZInput;
 
     [Tooltip("Optional. Shows '<selected> / <total>' for the current avenue's waypoints.")]
     [SerializeField] private TMP_Text waypointCounterText;
 
-    [Tooltip("Optional. Drag-scrub overlay sitting over the X field (Unity-Inspector style: click to type, horizontal drag to change).")]
+    [Tooltip("Optional drag-scrub overlay over the X field.")]
     [SerializeField] private ScrubbableNumberField waypointXScrub;
 
-    [Tooltip("Optional. Drag-scrub overlay sitting over the Z field.")]
+    [Tooltip("Optional drag-scrub overlay over the Z field.")]
     [SerializeField] private ScrubbableNumberField waypointZScrub;
 
     [Header("Waypoint Visuals")]
-    [Tooltip("Diameter of waypoints belonging to the currently selected avenue (except the last one).")]
+    [Tooltip("Diameter of the selected avenue's waypoints (except the last).")]
     [SerializeField] private float currentSphereSize = 0.5f;
 
-    [Tooltip("Diameter of the last-placed waypoint of the currently selected avenue.")]
+    [Tooltip("Diameter of the selected avenue's last waypoint.")]
     [SerializeField] private float lastSphereSize = 0.7f;
 
-    [Tooltip("Diameter of waypoints belonging to other (non-selected) avenues.")]
+    [Tooltip("Diameter of other avenues' waypoints.")]
     [SerializeField] private float otherSphereSize = 0.35f;
 
-    [Tooltip("Color of waypoints belonging to the currently selected avenue (except the last one).")]
-    [SerializeField] private Color currentSphereColor = new Color(0.878f, 0.447f, 0.031f, 1f); // #E07208 — slightly darker amber so spheres ride on the line
-
-    [Tooltip("Color of the last-placed waypoint of the currently selected avenue (most vibrant).")]
+    [SerializeField] private Color currentSphereColor = new Color(0.878f, 0.447f, 0.031f, 1f);
     [SerializeField] private Color lastSphereColor    = new Color(1f,   0.95f, 0.2f, 1f);
-
-    [Tooltip("Color of waypoints belonging to other (non-selected) avenues.")]
     [SerializeField] private Color otherSphereColor   = new Color(0.55f, 0.55f, 0.6f, 1f);
 
     [Header("Line Visuals")]
-    [Tooltip("Optional. Material used for every avenue line — instanced per avenue so colors don't bleed. If null, an Unlit material is created at runtime.")]
+    [Tooltip("Optional. Instanced per avenue so colors don't bleed; an Unlit material is created when null.")]
     [SerializeField] private Material lineMaterial;
 
-    [Tooltip("Width of the line for the currently selected avenue.")]
     [SerializeField] private float currentLineWidth = 0.25f;
-
-    [Tooltip("Width of the line for non-selected avenues.")]
     [SerializeField] private float otherLineWidth = 0.12f;
-
-    [Tooltip("Color of the line for the currently selected avenue.")]
-    [SerializeField] private Color currentLineColor = new Color(1f, 0.549f, 0f, 1f); // #FF8C00 — brighter pure orange
-
-    [Tooltip("Color of the line for non-selected avenues.")]
+    [SerializeField] private Color currentLineColor = new Color(1f, 0.549f, 0f, 1f);
     [SerializeField] private Color otherLineColor   = new Color(0.45f, 0.45f, 0.5f, 1f);
 
-    [Tooltip("Spacing between intermediate terrain-following samples between waypoints. Smaller = smoother line but more LineRenderer vertices. Set to 0 to disable sampling (straight 3D segments).")]
+    [Tooltip("Spacing of terrain-following samples between waypoints. 0 disables sampling (straight segments).")]
     [SerializeField] private float lineSampleSpacing = 0.5f;
 
     [Header("Initial State")]
@@ -343,12 +306,7 @@ public class AvenuesOfApproachHandler : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Finds the waypoint of the <em>current</em> avenue whose on-screen
-    /// position is nearest the cursor, within <see cref="grabPixelRadius"/>.
-    /// Only the active avenue's waypoints are grabbable; other avenues' orbs
-    /// stay transparent to input.
-    /// </summary>
+    /// <summary>Nearest current-avenue waypoint to the cursor within grabPixelRadius. Other avenues' orbs are not grabbable.</summary>
     bool TryPickOrbOnCurrentAvenue(Vector2 screenPos, out int index)
     {
         index = -1;
@@ -379,11 +337,7 @@ public class AvenuesOfApproachHandler : MonoBehaviour
         return index >= 0;
     }
 
-    /// <summary>
-    /// Moves the waypoint being dragged to the terrain cell under the cursor.
-    /// Updates data and visuals live; the drag stays alive (but the orb holds
-    /// position) while the cursor is over panel UI.
-    /// </summary>
+    /// <summary>Moves the dragged waypoint to the cell under the cursor. The drag stays alive while over panel UI.</summary>
     void DragOrbToCursor(Vector2 screenPos)
     {
         var avenue = CurrentAvenue;
@@ -547,12 +501,7 @@ public class AvenuesOfApproachHandler : MonoBehaviour
         if (ApplySelectedWaypointMove(cell)) OnAvenueChanged?.Invoke();
     }
 
-    /// <summary>
-    /// Clamps into the terrain grid, applies the move, and refreshes visuals.
-    /// Returns true if the waypoint actually changed cell. Does NOT fire
-    /// OnAvenueChanged — the caller decides when to notify (immediately for
-    /// type/nudge, deferred to drag-end for scrub).
-    /// </summary>
+    /// <summary>Clamps, applies the move and refreshes visuals. Does not fire OnAvenueChanged; the caller decides when.</summary>
     bool ApplySelectedWaypointMove(Vector2Int cell)
     {
         var avenue = CurrentAvenue;

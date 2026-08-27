@@ -2,48 +2,42 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// Drives the prep → play → walk flow for a single unit. After the terrain is ready
-/// the spawner enters the prep phase: the route built by <see cref="AStarPathGeneration"/>
-/// is shown via <see cref="PathPreviewRenderer"/> and the AoA warning naming the
-/// chosen avenue is displayed once. The unit prefab itself is not instantiated yet.
-/// Pressing the play button on <see cref="MissionFlowController"/> ends prep — the
-/// spawner then instantiates the unit at the start cell and hands it the route via
-/// <see cref="UnitMover.FollowPath"/>, which is when the mission timer begins.
-/// Path <em>making</em> lives in the scene path maker, not on the unit.
+/// Drives the prep → play → walk flow for a single unit: shows the route preview during
+/// prep, then on Play instantiates the unit at the start cell and hands it the route.
 /// </summary>
 public class UnitSpawner : MonoBehaviour
 {
     [Header("References")]
     public TerrainDataStore terrainDataStore;
-    [Tooltip("Recommended. Builder that does the async visual terrain build. When wired, the spawner waits for OnBuildComplete (terrain visually ready) instead of OnSaveLoaded (data only).")]
+    [Tooltip("When wired, the spawner waits for OnBuildComplete (terrain visually ready) instead of OnSaveLoaded (data only).")]
     public GameTerrainBuilder gameTerrainBuilder;
-    [Tooltip("Optional. Black-screen overlay shown while the terrain builds. Hides itself before prep begins.")]
+    [Tooltip("Optional overlay shown while the terrain builds.")]
     public LoadingScreen loadingScreen;
-    [Tooltip("Scene path maker. Generates one route per unit type. Auto-found if left empty.")]
+    [Tooltip("Generates one route per unit type. Auto-found if empty.")]
     public AStarPathGeneration pathGeneration;
-    [Tooltip("Optional. If set, the avenue title is shown on screen for warningSeconds at the start of prep.")]
+    [Tooltip("Optional. Shows the avenue title at the start of prep.")]
     public WarningDisplay warningDisplay;
-    [Tooltip("Owns the Play button. Spawn is gated on its OnPlay event. Auto-found if left empty; without one the spawner falls back to auto-start (no prep phase).")]
+    [Tooltip("Owns the Play button. Auto-found if empty; without one the spawner auto-starts (no prep phase).")]
     public MissionFlowController flowController;
-    [Tooltip("Optional. Renders the precomputed path during prep. Auto-created if left empty.")]
+    [Tooltip("Optional. Renders the precomputed path during prep. Auto-created if empty.")]
     public PathPreviewRenderer pathPreview;
 
     [Header("Unit")]
-    [Tooltip("Prefab spawned at the start cell when the player presses Play. Must have a UnitMover component on its root.")]
+    [Tooltip("Must have a UnitMover on its root.")]
     public GameObject unitPrefab;
-    [Tooltip("Unit type used for biome cost lookup and slope rules.")]
+    [Tooltip("Unit type for biome cost lookup and slope rules.")]
     public UnitTypeSO unitType;
 
     [Header("Placement")]
-    [Tooltip("Extra height added to the terrain surface at the spawn position.")]
+    [Tooltip("Extra height above the terrain at the spawn position.")]
     public float heightOffset = 0f;
 
     [Header("AoA Warning")]
-    [Tooltip("Seconds the on-screen warning is displayed at the start of prep. Purely informational now — Play is what triggers the unit, not this timer.")]
+    [Tooltip("Seconds the avenue warning is displayed. Informational only.")]
     public float warningSeconds = 3f;
 
     [Header("Ghost")]
-    [Tooltip("Behavioural settings for the unit's ghost orb. Pushed into UnitMover at spawn time. Visual fields (colour / size / hover / stem) live on the UnitGhost prefab.")]
+    [Tooltip("Behavioural ghost settings. Visual fields live on the UnitGhost prefab.")]
     public GhostSettings ghostSettings = new GhostSettings();
 
     GameObject _spawned;
@@ -60,11 +54,7 @@ public class UnitSpawner : MonoBehaviour
         public UnitTypeSO unitType;
     }
 
-    /// <summary>
-    /// The units this spawner will spawn, read by <see cref="AStarPathGeneration"/>
-    /// to generate one route per type. Single entry today; becomes a real list when
-    /// multi-type spawning is added.
-    /// </summary>
+    /// <summary>Units this spawner will spawn, read by <see cref="AStarPathGeneration"/>. Single entry for now.</summary>
     public IEnumerable<SpawnRequest> GetSpawnRequests()
     {
         yield return new SpawnRequest { prefab = unitPrefab, unitType = unitType };
@@ -75,8 +65,7 @@ public class UnitSpawner : MonoBehaviour
         if (pathGeneration  == null) pathGeneration  = FindFirstObjectByType<AStarPathGeneration>();
         if (flowController  == null) flowController  = FindFirstObjectByType<MissionFlowController>();
 
-        // Prefer OnBuildComplete: data-only OnSaveLoaded fires before the terrain mesh exists,
-        // so the unit would spawn into a void. Fall back to OnSaveLoaded for scenes without a builder.
+        // Prefer OnBuildComplete: OnSaveLoaded fires before the terrain mesh exists.
         if (gameTerrainBuilder != null)
             gameTerrainBuilder.OnBuildComplete += HandleReady;
         else if (terrainDataStore != null)
@@ -99,20 +88,14 @@ public class UnitSpawner : MonoBehaviour
 
     void HandleReady()
     {
-        // Loading screen waits out its min-display time, then chains into prep.
-        // Without one, enter prep immediately.
         if (loadingScreen != null) loadingScreen.Hide(BeginPrep);
         else BeginPrep();
     }
 
-    /// <summary>
-    /// Prep phase: show the precomputed path and AoA warning, then wait on
-    /// <see cref="MissionFlowController.OnPlay"/>. If no flow controller is wired,
-    /// auto-starts so older scenes without a Play button still work.
-    /// </summary>
+    /// <summary>Shows the path preview and AoA warning, then waits on OnPlay. Auto-starts without a flow controller.</summary>
     void BeginPrep()
     {
-        if (_prepped) return;  // Re-fired OnSaveLoaded / OnBuildComplete shouldn't double-prep.
+        if (_prepped) return;  // re-fired ready events must not double-prep
         if (!ValidateForSpawn()) return;
         _prepped = true;
 
@@ -141,12 +124,7 @@ public class UnitSpawner : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Play handler: tears down the prep visuals, instantiates the unit at the start
-    /// cell and hands it the cached route. <see cref="UnitMover.FollowPath"/> is what
-    /// kicks off movement and starts the mission timer, so this is also where the
-    /// plan is registered with <see cref="MissionSession"/>.
-    /// </summary>
+    /// <summary>Tears down prep visuals, spawns the unit and hands it the cached route.</summary>
     void HandlePlay()
     {
         if (_prepSubscribed && flowController != null)
@@ -157,7 +135,7 @@ public class UnitSpawner : MonoBehaviour
 
         if (pathPreview != null) pathPreview.Hide();
 
-        // Re-fetch in case _prepRoute was never set (auto-start path with no prep).
+        // _prepRoute is null on the auto-start path with no prep.
         AStarPathGeneration.GeneratedRoute route = _prepRoute ?? pathGeneration.GetRoute(unitType);
         if (route == null)
         {

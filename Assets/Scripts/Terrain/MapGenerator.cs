@@ -1,16 +1,6 @@
 using UnityEngine;
 
-/// <summary>
-/// Main orchestrator that creates the CellData grid and drives the terrain
-/// generation pipeline step-by-step:
-///   1. Create empty grid
-///   2. Generate Perlin noise → bake raw heights
-///   3. Compute outgoing slopes (from raw heights — smoother than rounded)
-///   4. Assign biomes (via BiomeAssigner)
-///   5. Hand grid to TerrainDataStore
-///   6. Build visual meshes (noise plane, slope map)
-///   7. Generate marching cubes mesh (also bakes rounded heights)
-/// </summary>
+/// <summary>Creates the CellData grid and drives the terrain generation pipeline: noise → slopes → biomes → visuals.</summary>
 public class MapGenerator : MonoBehaviour
 {
     [Header("Pipeline Steps")]
@@ -26,8 +16,7 @@ public class MapGenerator : MonoBehaviour
     {
         if (terrainDataStore == null) { Debug.LogError("MapGenerator: no TerrainDataStore assigned."); return; }
 
-        // Subscribe in Awake so we're registered before TerrainDataStore's Start
-        // auto-load fires its event.
+        // Subscribe in Awake, before TerrainDataStore's Start auto-load fires.
         terrainDataStore.OnSaveLoaded  += HandleSaveLoaded;
         terrainDataStore.OnSaveCreated += HandleSaveCreated;
         terrainDataStore.OnSaveFailed  += HandleSaveFailed;
@@ -62,11 +51,7 @@ public class MapGenerator : MonoBehaviour
         terrainDataStore.WriteSave();
     }
 
-    /// <summary>
-    /// Rebuilds the visual meshes from the already-loaded grid. Called after a
-    /// save is loaded. The noise plane reads heights directly from the grid, so
-    /// no re-sampling of Perlin is needed.
-    /// </summary>
+    /// <summary>Rebuilds the visual meshes from the loaded grid; no Perlin re-sampling needed.</summary>
     void BuildVisualsFromGrid()
     {
         if (noisePlane != null) noisePlane.BuildVisual();

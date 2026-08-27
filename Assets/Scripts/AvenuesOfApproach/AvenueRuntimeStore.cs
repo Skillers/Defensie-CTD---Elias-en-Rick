@@ -1,12 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-/// <summary>
-/// Runtime-only mirror of the avenues stored in the save file. Subscribes to
-/// <see cref="TerrainDataStore.OnApplyingSaveData"/> and rebuilds a plain list
-/// of title + waypoint cells that gameplay systems (e.g. UnitSpawner) can read.
-/// No UI, no scene visuals — that lives in AvenuesOfApproachHandler in the editor scene.
-/// </summary>
+/// <summary>Runtime-only mirror of the avenues in the save file. No UI or visuals; those live in AvenuesOfApproachHandler.</summary>
 public class AvenueRuntimeStore : MonoBehaviour
 {
     [Header("References")]
@@ -19,8 +14,7 @@ public class AvenueRuntimeStore : MonoBehaviour
 
     void Awake()
     {
-        // Subscribe in Awake so we're hooked up before TerrainDataStore.Start
-        // fires its auto-load and we'd miss OnApplyingSaveData.
+        // Subscribe in Awake, before TerrainDataStore's Start auto-load fires.
         if (terrainDataStore != null)
             terrainDataStore.OnApplyingSaveData += HandleApplyingSaveData;
     }
@@ -54,10 +48,7 @@ public class AvenueRuntimeStore : MonoBehaviour
     }
 }
 
-/// <summary>
-/// Plain-data view of an avenue of approach for runtime gameplay use. Distinct
-/// from the editor's AvenueOfApproach class, which also owns scene visuals.
-/// </summary>
+/// <summary>Plain-data view of an avenue for runtime use, distinct from the editor's AvenueOfApproach.</summary>
 public class AvenueData
 {
     public string title;

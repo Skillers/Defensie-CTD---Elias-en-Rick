@@ -2,56 +2,47 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using UnityEngine;
 
-/// <summary>
-/// Walks a unit along a precomputed A* path. Path <em>making</em> lives in the
-/// scene (<see cref="AStarPathGeneration"/>) — this component never runs A* itself.
-/// Drive it with <see cref="FollowPath"/>: the caller supplies the cells to walk,
-/// the goal, and the <see cref="UnitPathPlan"/> to fill in as the unit moves.
-/// Speed is divided by the biome cost AND the unit's slope multiplier of the cell
-/// being stepped from, so visual movement matches A*'s path cost.
-/// Y is snapped to the terrain's rounded height every frame so the unit follows hills.
-/// </summary>
+/// <summary>Walks a unit along a precomputed A* path. Never runs route A* itself; drive it with <see cref="FollowPath"/>.</summary>
 public class UnitMover : MonoBehaviour
 {
     [Header("References")]
     public TerrainDataStore terrainDataStore;
 
     [Header("Unit")]
-    [Tooltip("Resolves per-biome movement costs and slope rules. Set by the scene path maker.")]
+    [Tooltip("Per-biome movement costs and slope rules.")]
     public UnitTypeSO unitType;
-    [Tooltip("Square footprint in cells. Read by AStarPathGeneration for A*'s CanFit check.")]
+    [Tooltip("Square footprint in cells, used by A*'s fit check.")]
     public int unitSize = 5;
-    [Tooltip("Set by UnitSpawner. Used as the key when registering this unit's plan in MissionSession.")]
     [HideInInspector] public int unitId;
 
     [Header("Movement")]
     public float moveSpeed   = 6f;
     public float turnSpeed   = 90f;
-    [Tooltip("Extra height added to the terrain surface when sticking the unit to the ground.")]
+    [Tooltip("Extra height above the terrain surface.")]
     public float groundOffset = 0f;
 
     [Header("Ghost")]
-    [Tooltip("Height above terrain at which the ghost's foot (stem base and the ghost's own path line) sits.")]
+    [Tooltip("Height above terrain of the ghost's foot and path line.")]
     public float pathLineLift  = 0.1f;
 
     [Header("Catch-up Path (unit → ghost)")]
-    [Tooltip("Live best A* path from the unit to the ghost. Recomputed asynchronously every refresh interval. Obeys the same biome / slope rules as the main A* line. Disabling this stops the recompute AND the obstacle reroute — for visual-only hiding use catchUpPathVisible instead.")]
+    [Tooltip("Recompute the unit → ghost A* path. Disabling also stops the obstacle reroute; use catchUpPathVisible to only hide the line.")]
     public bool  catchUpPathEnabled  = true;
-    [Tooltip("Show the purple catch-up line. Runtime-toggleable: flipping this off hides the line without touching the underlying A* / reroute logic.")]
+    [Tooltip("Show the catch-up line. Visual only.")]
     public bool  catchUpPathVisible  = true;
     public Color catchUpPathColor    = new Color(0.85f, 0.15f, 1f, 1f);
     public float catchUpPathWidth    = 0.4f;
-    [Tooltip("Extra height above terrain at which the catch-up line is drawn. Keep slightly above the main path line so they don't z-fight.")]
+    [Tooltip("Draw height above terrain. Keep above the main path line to avoid z-fighting.")]
     public float catchUpPathLift     = 0.2f;
-    [Tooltip("Seconds between async re-computations.")]
+    [Tooltip("Seconds between async recomputes.")]
     public float catchUpPathInterval = 0.2f;
 
     [HideInInspector] public Vector3 moveDirection = Vector3.forward;
 
-    /// <summary>Goal cell of the path this unit is following. Read by the scene path maker when re-routing.</summary>
+    /// <summary>Goal cell of the followed path, read by the scene path maker when re-routing.</summary>
     public Vector2Int GoalCell { get; private set; }
 
-    /// <summary>True once <see cref="FollowPath"/> has been called — i.e. this unit has been given a route.</summary>
+    /// <summary>True once this unit has been given a route.</summary>
     public bool HasPath { get; private set; }
 
     Vector3 squadDirection = Vector3.forward;
@@ -75,11 +66,7 @@ public class UnitMover : MonoBehaviour
     float                   catchUpLastFireTime;
     TerrainDataStore        _subscribedStore;
 
-    /// <summary>
-    /// Configure the mover and start walking <paramref name="precomputedPath"/> (built
-    /// by <see cref="AStarPathGeneration"/>). <paramref name="plan"/> is filled in with
-    /// the actual path/seconds as the unit walks; pass null to skip tracking.
-    /// </summary>
+    /// <summary>Starts walking the precomputed path. The plan is filled in as the unit walks; pass null to skip tracking.</summary>
     public void FollowPath(TerrainDataStore tds, UnitTypeSO type, Vector2Int goalCell,
                            List<Vector2Int> precomputedPath, UnitPathPlan plan)
     {
@@ -93,8 +80,7 @@ public class UnitMover : MonoBehaviour
 
         SnapToTerrain();
 
-        // Only track a plan that has a walkable path — a failed/empty path leaves
-        // the registered plan flagged failed and Update never finalizes it.
+        // Only track a plan with a walkable path; a failed plan stays flagged failed.
         _activePlan = (plan != null && precomputedPath != null && precomputedPath.Count > 1) ? plan : null;
 
         StartFollowingPath(precomputedPath ?? new List<Vector2Int>());
@@ -132,8 +118,6 @@ public class UnitMover : MonoBehaviour
         TickCatchUpPath();
         if (!moving) return;
 
-        // Rotation runs once per frame using the current bearing — visual only,
-        // doesn't gate movement.
         Vector3 toTarget = currentTarget - transform.position;
         toTarget.y = 0f;
         Vector3 desiredDir = toTarget.sqrMagnitude > 0f ? toTarget.normalized : moveDirection;
@@ -147,9 +131,8 @@ public class UnitMover : MonoBehaviour
         );
         transform.rotation = Quaternion.LookRotation(squadDirection);
 
-        // Consume the frame's time budget across as many waypoints as the speed allows.
-        // Carrying the remainder between waypoints prevents per-step rounding from
-        // accumulating into a measurable drift between actualSeconds and estimatedSeconds.
+        // Spend the frame's time budget across waypoints; carrying the remainder keeps
+        // actualSeconds from drifting away from estimatedSeconds.
         float remainingTime = Time.deltaTime;
         while (remainingTime > 0f && moving)
         {
@@ -160,9 +143,7 @@ public class UnitMover : MonoBehaviour
             float effectiveSpeed = ResolveStepSpeed();
             if (effectiveSpeed <= 0f)
             {
-                // The current step is blocked by slope, biome or obstacle. Force the
-                // next TickCatchUpPath to dispatch a fresh A* instead of waiting out
-                // the interval, so the unit re-routes around whatever blocked it.
+                // Step blocked: request an immediate reroute instead of waiting out the interval.
                 ForceCatchUpRefire();
                 break;
             }
@@ -171,7 +152,6 @@ public class UnitMover : MonoBehaviour
 
             if (canMove < dist)
             {
-                // Partial step inside the current cell — consume the whole frame.
                 Vector3 dir = dist > 0f ? delta / dist : Vector3.zero;
                 transform.position += dir * canMove;
                 SnapToTerrain();
@@ -179,8 +159,7 @@ public class UnitMover : MonoBehaviour
             }
             else
             {
-                // Reached this waypoint with time to spare. Snap exactly to it, charge only
-                // the time it actually took, then loop to spend the rest on the next cell.
+                // Waypoint reached with time to spare: snap to it and spend the rest on the next cell.
                 transform.position = currentTarget;
                 SnapToTerrain();
                 currentCell = path[waypointIndex];
@@ -192,9 +171,7 @@ public class UnitMover : MonoBehaviour
 
                 if (waypointIndex >= path.Count)
                 {
-                    // Reached end of the current followed segment. The followed path is
-                    // now a per-tick catch-up to the ghost, so end-of-segment is normal:
-                    // only finalise the mission if this segment's end is the actual goal.
+                    // End of the followed segment. Only finalise if this is the actual goal.
                     moving = false;
                     if (currentCell == GoalCell)
                     {
@@ -208,8 +185,7 @@ public class UnitMover : MonoBehaviour
                             _activePlan               = null;
                         }
                     }
-                    // If not at goal, stay paused — TickCatchUpPath keeps firing and the
-                    // next arriving path swaps us back into motion via SwitchFollowedPath.
+                    // Not at goal: stay paused until the next catch-up path arrives.
                     return;
                 }
 
@@ -218,14 +194,7 @@ public class UnitMover : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Speed for the current step. Mirrors <see cref="AStarPathfinder.FindPath"/>'s
-    /// per-step cost formula: walk every cell the step physically crosses (the
-    /// destination for cardinal/diagonal, the two intermediates + destination for
-    /// knight), combine biome * obstacle per cell weighted by the cell's portion of
-    /// the step, then divide moveSpeed by (weightedCellCost * slopeMul). Returns 0
-    /// if slope blocks the direction or any crossed cell blocks biome/obstacle.
-    /// </summary>
+    /// <summary>Speed for the current step, mirroring A*'s per-step cost formula. 0 if the step is blocked.</summary>
     float ResolveStepSpeed()
     {
         if (terrainDataStore == null || terrainDataStore.grid == null) return moveSpeed;
@@ -277,11 +246,7 @@ public class UnitMover : MonoBehaviour
 
     // --- Ghost ---------------------------------------------------------------
 
-    /// <summary>
-    /// Push the ghost configuration in from the spawner. Call before
-    /// <see cref="FollowPath"/> so InitGhostOnPath sees the right values.
-    /// Defaults are used if never called.
-    /// </summary>
+    /// <summary>Sets the ghost configuration. Call before <see cref="FollowPath"/>.</summary>
     public void ApplyGhostSettings(GhostSettings settings)
     {
         if (settings != null) ghostSettings = settings;
@@ -318,10 +283,8 @@ public class UnitMover : MonoBehaviour
     {
         if (!ghostSettings.enabled || ghost == null || !ghost.HasPath) return;
 
-        // 1) Leash floor: if the unit has closed inside the minimum, snap the
-        // ghost forward along its path until it sits at the minimum again.
-        // Iterates because one Advance can cross a corner and change the
-        // bearing back to the unit.
+        // Leash floor: keep the ghost at least minDistance ahead. Iterates because one
+        // Advance can cross a corner and change the bearing back to the unit.
         for (int i = 0; i < ghostSettings.maxStepsPerFrame; i++)
         {
             if (ghost.IsFinished) break;
@@ -336,9 +299,8 @@ public class UnitMover : MonoBehaviour
 
         if (ghost.IsFinished) return;
 
-        // 2) Free-run: ghost moves at the unit's nominal moveSpeed (unaffected
-        // by terrain), so it pulls ahead while the unit is biome/slope-slowed.
-        // Scale by a slow/stop falloff once it gets uncomfortably far ahead.
+        // Free-run at nominal moveSpeed (terrain-independent), with a slow/stop falloff
+        // once the ghost gets too far ahead.
         Vector3 toUnitNow = ghost.GetFootPosition() - transform.position;
         toUnitNow.y = 0f;
         float distAhead = toUnitNow.magnitude;
@@ -382,12 +344,7 @@ public class UnitMover : MonoBehaviour
 
     void HandleObstacleChange(PlacedObstacle po) => ForceCatchUpRefire();
 
-    /// <summary>
-    /// Resets the catch-up throttle so the next <see cref="TickCatchUpPath"/> dispatches
-    /// a fresh A* immediately, instead of waiting for the interval to elapse. Used both
-    /// reactively (when a step is blocked) and proactively (when an obstacle change fires).
-    /// If a task is already in-flight, the request is satisfied as soon as it completes.
-    /// </summary>
+    /// <summary>Resets the throttle so the next tick dispatches a fresh catch-up A* immediately.</summary>
     void ForceCatchUpRefire()
     {
         catchUpLastFireTime = -float.MaxValue;
@@ -397,15 +354,12 @@ public class UnitMover : MonoBehaviour
 
     void TickCatchUpPath()
     {
-        // Sync line visibility with the visual-only toggle so flipping catchUpPathVisible
-        // at runtime hides/reveals the purple line without touching the A* recompute below.
         if (catchUpLine != null && catchUpLine.gameObject.activeSelf != catchUpPathVisible)
             catchUpLine.gameObject.SetActive(catchUpPathVisible);
 
         if (!catchUpPathEnabled) return;
         if (terrainDataStore == null || terrainDataStore.grid == null) return;
 
-        // Apply finished work from the previous fire.
         if (catchUpTask != null && catchUpTask.IsCompleted)
         {
             if (catchUpTask.Status == TaskStatus.RanToCompletion)
@@ -415,16 +369,14 @@ public class UnitMover : MonoBehaviour
             catchUpTask = null;
         }
 
-        // Only fire while there's something to chase. Note: we fire even when paused
-        // (moving == false) because the unit pauses at the end of each catch-up segment
-        // and needs the next one to resume.
+        // Fires even while paused: the unit needs the next catch-up segment to resume.
         if (ghost == null || !ghost.HasPath) return;
 
         if (catchUpTask == null && Time.time - catchUpLastFireTime >= catchUpPathInterval)
         {
             catchUpLastFireTime = Time.time;
 
-            // Snapshot everything the worker needs on the main thread.
+            // Snapshot on the main thread; the task runs off it.
             CellData[,] grid = terrainDataStore.grid;
             int w = terrainDataStore.GridWidth;
             int h = terrainDataStore.GridHeight;
@@ -456,18 +408,11 @@ public class UnitMover : MonoBehaviour
             catchUpLine.SetPosition(i, wp);
         }
 
-        // The catch-up path is what the unit actually walks now: hand it to the
-        // mover's follow state. Ghost still walks the original precomputed main
-        // path so the catch-up has a moving goal.
+        // The catch-up path is what the unit walks; the ghost stays on the main path.
         SwitchFollowedPath(cells);
     }
 
-    /// <summary>
-    /// Mid-walk path swap. Replaces the followed path with <paramref name="newPath"/>
-    /// without touching the ghost, the plan, or timing state. Resumes from the cell
-    /// in newPath closest to the unit's current position so a stale catch-up snapshot
-    /// doesn't make the unit backtrack.
-    /// </summary>
+    /// <summary>Mid-walk path swap, resuming from the cell closest to the unit so it never backtracks.</summary>
     void SwitchFollowedPath(List<Vector2Int> newPath)
     {
         if (newPath == null || newPath.Count < 2 || terrainDataStore == null) return;

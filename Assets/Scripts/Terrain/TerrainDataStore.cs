@@ -3,11 +3,7 @@ using System.IO;
 using UnityEngine;
 using UnityEngine.Pool;
 
-/// <summary>
-/// Central data holder for the pre-computed CellData grid.
-/// Provides queries and grid/world coordinate conversion for all gameplay systems.
-/// The grid is populated by MapGenerator.
-/// </summary>
+/// <summary>Central holder of the CellData grid: queries, grid/world conversion, save/load and obstacle registration.</summary>
 public class TerrainDataStore : MonoBehaviour
 {
     [Header("Plane Extents (units from center)")]
@@ -26,14 +22,14 @@ public class TerrainDataStore : MonoBehaviour
 
     [Header("Save / Load")]
     [SerializeField] string saveFileName = "level.json";
-    [Tooltip("If true, the store checks its save file automatically on Start. Subscribers should register in Awake so they see the fired event.")]
+    [Tooltip("Check the save file on Start. Subscribers must register in Awake.")]
     [SerializeField] bool autoLoadOnStart = true;
     [Tooltip("Base biome always registered as used by this terrain.")]
     [SerializeField] BiomeSO baseBiome;
 
     [HideInInspector] public CellData[,] grid;
 
-    // Runtime list of biomes actually used in this terrain. Base is always present.
+    // Biomes actually used in this terrain; base is always present.
     readonly List<BiomeSO> _usedBiomes = new List<BiomeSO>();
     public IReadOnlyList<BiomeSO> UsedBiomes => _usedBiomes;
 
@@ -42,21 +38,14 @@ public class TerrainDataStore : MonoBehaviour
 
     public event System.Action OnGridReady;
 
-    // ── Obstacle events ──────────────────────────────────────────────────
-    // Fired by Register/UnregisterObstacleCells so change-driven listeners
-    // (e.g. the obstacle overlay) can refresh without polling.
     public event System.Action<PlacedObstacle> OnObstacleRegistered;
     public event System.Action<PlacedObstacle> OnObstacleUnregistered;
 
-    // ── Save / Load events ───────────────────────────────────────────────
     public event System.Action OnSaveLoaded;
     public event System.Action OnSaveCreated;
     public event System.Action<string> OnSaveFailed;
 
-    // Subscribers populate extra fields on the SaveData payload right before
-    // it is written to disk (build) or read back into the scene (apply).
-    // Apply fires after the grid has been restored, so handlers can rely on
-    // grid-dependent queries like GetRoundedHeight.
+    // Subscribers add extra fields to the SaveData payload before write / after grid restore.
     public event System.Action<SaveData> OnBuildingSaveData;
     public event System.Action<SaveData> OnApplyingSaveData;
 
@@ -79,11 +68,8 @@ public class TerrainDataStore : MonoBehaviour
         ApplyLevelSelection();
     }
 
-    // If a LevelSelection singleton is present (player entered through the
-    // selector scene), override the serialized fallback name and derive a
-    // starting seed from it so brand-new levels generate unique terrain.
-    // For existing saves the persisted seed wins, because the load path
-    // overwrites this field with data.seed after Awake.
+    // Derive file name and seed from the level selector when present. For existing
+    // saves the persisted seed wins; the load path overwrites it after Awake.
     void ApplyLevelSelection()
     {
         if (LevelSelection.Instance == null) return;
@@ -93,10 +79,7 @@ public class TerrainDataStore : MonoBehaviour
         seed = DeterministicHash(selected);
     }
 
-    // System.String.GetHashCode is randomized per-process in modern .NET,
-    // which would give different terrain each Unity session for the same
-    // level name. This stable variant keeps the name-to-seed mapping
-    // reproducible across runs.
+    // string.GetHashCode is randomized per-process; this keeps name → seed stable across runs.
     static int DeterministicHash(string s)
     {
         unchecked
@@ -112,10 +95,7 @@ public class TerrainDataStore : MonoBehaviour
         if (autoLoadOnStart) CheckSaveFile();
     }
 
-    /// <summary>
-    /// Adds a biome to the used-biome list if not already present. Called when a
-    /// biome is applied to a cell (by BiomeAssigner or the paint brush).
-    /// </summary>
+    /// <summary>Adds a biome to the used-biome list if not already present.</summary>
     public void RegisterBiome(BiomeSO biome)
     {
         if (biome == null) return;
@@ -246,11 +226,7 @@ public class TerrainDataStore : MonoBehaviour
 
     // ── Save / Load ──────────────────────────────────────────────────────
 
-    /// <summary>
-    /// Checks for a save file on disk. If present, loads it and fires OnSaveLoaded.
-    /// If absent, fires OnSaveCreated so a subscriber can run generation and then call WriteSave().
-    /// On IO / parse errors, fires OnSaveFailed with a reason string.
-    /// </summary>
+    /// <summary>Loads the save if present (OnSaveLoaded), fires OnSaveCreated if absent, OnSaveFailed on errors.</summary>
     public void CheckSaveFile()
     {
         Debug.Log($"TerrainDataStore: checking for save at {SaveFilePath} (exists={SaveFileExists}).");
@@ -280,9 +256,7 @@ public class TerrainDataStore : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Serializes the current grid, settings, and flag positions to disk.
-    /// </summary>
+    /// <summary>Serializes the current grid, settings and flag positions to disk.</summary>
     public void WriteSave()
     {
         if (grid == null)
@@ -352,7 +326,6 @@ public class TerrainDataStore : MonoBehaviour
 
     void ApplySaveData(SaveData data)
     {
-        // Restore settings
         extentX = data.extentX;
         extentZ = data.extentZ;
         step = data.step;
@@ -362,11 +335,9 @@ public class TerrainDataStore : MonoBehaviour
         noiseOffset = data.noiseOffset;
         heightMultiplier = data.heightMultiplier;
 
-        // Restore flags
         _startCell = data.hasStart ? new Vector2Int(data.startX, data.startZ) : (Vector2Int?)null;
         _endCell   = data.hasEnd   ? new Vector2Int(data.endX,   data.endZ)   : (Vector2Int?)null;
 
-        // Restore grid
         if (data.cells != null && data.gridWidth > 0 && data.gridHeight > 0)
         {
             Dictionary<string, BiomeSO> lookup = BuildBiomeLookup();
@@ -392,9 +363,7 @@ public class TerrainDataStore : MonoBehaviour
                 }
             }
 
-            // slopeOutgoing is fully derived from rawHeight, so it isn't serialized.
-            // Re-bake it (all CellData.Directions, incl. knight moves) before any
-            // consumer reads the grid.
+            // slopeOutgoing is derived from rawHeight and not serialized; re-bake before use.
             SlopeMap.BakeSlopesIntoGrid(restored, data.gridWidth, data.gridHeight, step);
 
             SetGrid(restored);
@@ -403,11 +372,7 @@ public class TerrainDataStore : MonoBehaviour
         OnApplyingSaveData?.Invoke(data);
     }
 
-    /// <summary>
-    /// Builds a name -> BiomeSO map from every BiomeSO asset under Resources/Biomes.
-    /// Move your BiomeSO assets into Assets/Resources/Biomes/ so they can be loaded
-    /// in builds.
-    /// </summary>
+    // BiomeSO assets must live under Assets/Resources/Biomes/ to load in builds.
     Dictionary<string, BiomeSO> BuildBiomeLookup()
     {
         Dictionary<string, BiomeSO> map = new Dictionary<string, BiomeSO>();
@@ -421,8 +386,7 @@ public class TerrainDataStore : MonoBehaviour
 
     public void RegisterObstacleCells(PlacedObstacle po)
     {
-        // Clear any prior footprint so re-registration (e.g. after rotation)
-        // doesn't leave stale grid[].obstacle entries from the old position.
+        // Clear the prior footprint so re-registration (e.g. after rotation) leaves no stale entries.
         if (po.affectedCells != null)
         {
             foreach (Vector2Int cell in po.affectedCells)
@@ -446,8 +410,7 @@ public class TerrainDataStore : MonoBehaviour
             }
             po.affectedRadiusCells.Clear();
         }
-        
-        // Rent lists from Unity pool
+
         List<Renderer> renderers = ListPool<Renderer>.Get();
         List<Collider> colliders = ListPool<Collider>.Get();
 
@@ -468,7 +431,6 @@ public class TerrainDataStore : MonoBehaviour
             if (c.enabled) partObjects.Add(c.gameObject);
         }
 
-        // Release lists back to pool
         ListPool<Renderer>.Release(renderers);
         ListPool<Collider>.Release(colliders);
 
@@ -540,10 +502,8 @@ public class TerrainDataStore : MonoBehaviour
             }
         }
 
-        // Radius pass: stamp every cell within radiusCells of each footprint cell
-        // (in the configured shape). Skip the obstacle's own footprint cells —
-        // they already carry the primary effect. Other obstacles' footprints are
-        // included, so radius bleeds across them.
+        // Radius pass. Skips the obstacle's own footprint cells; other obstacles'
+        // footprints are included, so radius bleeds across them.
         if (po.obstacleSo != null
             && po.obstacleSo.radiusShape != RadiusShape.None
             && po.obstacleSo.radiusCells > 0

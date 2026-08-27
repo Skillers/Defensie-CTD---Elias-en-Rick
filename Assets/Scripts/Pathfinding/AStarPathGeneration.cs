@@ -1,57 +1,40 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-/// <summary>
-/// Scene-level path maker. Owns all A* path generation that used to live on the
-/// unit (<see cref="UnitMover"/>): it asks <see cref="UnitSpawner"/> which units
-/// will spawn, then builds one route per unit type — picking a random avenue and
-/// concatenating the start → avenue waypoints → end legs — and registers the
-/// resulting <see cref="UnitPathPlan"/> with <see cref="MissionSession"/>.
-///
-/// The unit is now a pure follower: it receives a precomputed path via
-/// <see cref="UnitMover.FollowPath"/> and never runs A* itself.
-///
-/// Generation is per type and lazy: the first <see cref="GetRoute"/> /
-/// <see cref="BuildAndRegisterPlan"/> call after the terrain + avenues are loaded
-/// triggers <see cref="GenerateAll"/>, so there is no event-ordering coupling with
-/// the spawner.
-/// </summary>
+/// <summary>Builds one A* route per unit type (start → avenue waypoints → end) and registers the plans with <see cref="MissionSession"/>.</summary>
 public class AStarPathGeneration : MonoBehaviour
 {
     [Header("References")]
-    [Tooltip("Source of the grid, start/end flags and world<->grid conversion. Auto-found if left empty.")]
+    [Tooltip("Grid, flags and world<->grid conversion. Auto-found if empty.")]
     public TerrainDataStore terrainDataStore;
-    [Tooltip("Supplies the unit types that will spawn. Auto-found if left empty.")]
+    [Tooltip("Supplies the unit types that will spawn. Auto-found if empty.")]
     public UnitSpawner unitSpawner;
-    [Tooltip("Optional. If set and the save has avenues, each type's route is built through a randomly chosen avenue.")]
+    [Tooltip("Optional source of avenues to route through.")]
     public AvenueRuntimeStore avenueStore;
 
     [Header("Proximity Shortcuts")]
-    [Tooltip("Horizontal (XZ) distance: flag the pair when the two cells are closer than this.")]
+    [Tooltip("Max XZ distance between two cells to count as a shortcut pair.")]
     public float proximityWorldDistance = 3f;
-    [Tooltip("Steps to skip before checking begins — the first checked cell is this many steps ahead (e.g. 8 = skip the next 7, start at the 8th).")]
+    [Tooltip("Steps ahead of the anchor where the check window starts.")]
     public int proximityLookaheadSteps = 8;
-    [Tooltip("How many consecutive cells to check from the lookahead onward (e.g. 5 = check i, j, k, l, m).")]
+    [Tooltip("Consecutive cells checked per window.")]
     public int proximityWindowSteps = 5;
-    [Tooltip("Replace the detour cells between each pair with a straight 8-direction segment (the unit walks the result).")]
+    [Tooltip("Replace detected detours with straight segments.")]
     public bool applyShortcuts = true;
 
     [Header("Corner Bevel")]
-    [Tooltip("Minimum turn angle (degrees) for a vertex to count as a sharp corner. The 16-direction grid bends by ~22-27° at its gentlest, so keep this above that to skip stair-step jitter and only catch real corners.")]
+    [Tooltip("Minimum turn angle (degrees) to count as a sharp corner. Keep above ~27 so grid stair-steps don't count.")]
     public float cornerAngleThresholdDeg = 60f;
-    [Tooltip("Bevel each detected sharp corner: step a few cells back and forward along the path, then replace the corner in between with a curve. NOTE: the bevel is geometric and ignores obstacles/blocked biomes/steep slopes.")]
+    [Tooltip("Round sharp corners with a bevel curve. Geometric: ignores obstacles and slopes.")]
     public bool useBeveledPathForUnit = true;
-    [Tooltip("How many path cells to step outward from each sharp corner along each side before bridging. Larger = a bigger bite taken out of the corner.")]
+    [Tooltip("Cells stepped outward from a corner on each side before bridging.")]
     [Range(1, 20)]
     public int bevelStepsPerSide = 4;
-    [Tooltip("How many straight segments the bevel curve is split into. 1 = a single straight chamfer (no rounding). Higher = a progressively smoother/rounder corner.")]
+    [Tooltip("Straight segments per bevel curve. 1 = flat chamfer.")]
     [Range(1, 16)]
     public int bevelSegments = 1;
 
-    /// <summary>
-    /// One generated route, keyed by unit type. <see cref="path"/> is the full
-    /// concatenated walk (or a direct start→end fallback if any avenue leg failed).
-    /// </summary>
+    /// <summary>One generated route for a unit type.</summary>
     public class GeneratedRoute
     {
         public UnitTypeSO unitType;
@@ -63,14 +46,11 @@ public class AStarPathGeneration : MonoBehaviour
         public float totalCost;
         public bool failed;
 
-        // Footprint + visual speed read off the type's prefab UnitMover, used for
-        // the A* fit check and the upfront time estimate.
+        // Read off the type's prefab UnitMover.
         public int unitSize = 5;
         public float moveSpeed = 6f;
 
-        // The post-proximity-shortcut path, snapshotted before beveling. Stable
-        // source for corner detection + the bevel so repeated bevel passes never
-        // compound; also the fallback when the bevel is disabled or unusable.
+        // Post-shortcut path; the bevel always derives from this so repeated passes don't compound.
         public List<Vector2Int> basePath = new List<Vector2Int>();
     }
 
@@ -84,21 +64,14 @@ public class AStarPathGeneration : MonoBehaviour
         if (avenueStore == null)      avenueStore      = FindFirstObjectByType<AvenueRuntimeStore>();
     }
 
-    /// <summary>
-    /// Returns the route generated for <paramref name="type"/>, generating all
-    /// routes on first use. Null if generation cannot run or the type is unknown.
-    /// </summary>
+    /// <summary>Route for the given type, generating all routes on first use. Null if unknown.</summary>
     public GeneratedRoute GetRoute(UnitTypeSO type)
     {
         if (!_generated) GenerateAll();
         return type != null && _routes.TryGetValue(type, out var r) ? r : null;
     }
 
-    /// <summary>
-    /// Builds one route per distinct unit type that <see cref="UnitSpawner"/> will
-    /// spawn. Safe to call again — clears and rebuilds. Requires the terrain grid
-    /// and start/end flags to be loaded.
-    /// </summary>
+    /// <summary>Builds one route per unit type the spawner will spawn. Clears and rebuilds on repeat calls.</summary>
     public void GenerateAll()
     {
         _generated = true;
@@ -144,20 +117,14 @@ public class AStarPathGeneration : MonoBehaviour
 
         ApplyShortcuts();
 
-        // Snapshot the post-shortcut path as the stable bevel source before any
-        // beveling mutates route.path.
+        // Snapshot the post-shortcut path before beveling mutates route.path.
         foreach (var kv in _routes)
             kv.Value.basePath = new List<Vector2Int>(kv.Value.path);
 
         ApplyBevel();
     }
 
-    /// <summary>
-    /// Creates a <see cref="UnitPathPlan"/> for <paramref name="unitId"/> from the
-    /// stored route for <paramref name="type"/>, registers it with
-    /// <see cref="MissionSession"/> (creating the session if needed) and returns it.
-    /// Returns null if no route exists for the type.
-    /// </summary>
+    /// <summary>Creates and registers a plan for the unit from its type's route. Null if no route exists.</summary>
     public UnitPathPlan BuildAndRegisterPlan(int unitId, UnitTypeSO type)
     {
         GeneratedRoute route = GetRoute(type);
@@ -181,12 +148,7 @@ public class AStarPathGeneration : MonoBehaviour
         return plan;
     }
 
-    /// <summary>
-    /// Re-routes every live unit after the world changed (e.g. an obstacle was
-    /// placed). Mirrors the old per-unit behaviour: a fresh <em>direct</em> A*
-    /// from each unit's current cell to its goal (the avenue is not re-walked),
-    /// re-registered latest-only and handed back to the mover.
-    /// </summary>
+    /// <summary>Re-routes every live unit directly to its goal after the world changed. Avenues are not re-walked.</summary>
     public void RecomputeForLiveUnits()
     {
         if (terrainDataStore == null || terrainDataStore.grid == null) return;
@@ -211,9 +173,7 @@ public class AStarPathGeneration : MonoBehaviour
             if (failed)
                 Debug.LogWarning($"AStarPathGeneration: recompute found no path from {from} to {goal}.");
 
-            // Estimate uses obstacle-free A* from the current position to the goal.
-            // The catch-up A* the mover runs at runtime reroutes around obstacles when
-            // it can, so its walked time approximates this cost.
+            // Estimate is obstacle-free: the mover reroutes around obstacles at runtime, so walked time tracks this cost.
             float estimateSeconds = float.PositiveInfinity;
             if (!failed)
             {
@@ -271,10 +231,7 @@ public class AStarPathGeneration : MonoBehaviour
         if (combined.Count > 1)
         {
             route.path = combined;
-            // Estimate uses the obstacle-free A* cost through the same waypoints. The
-            // real unit's catch-up A* reroutes around obstacles when avoidable, so its
-            // walked time approximates this number rather than the obstacle-aware cost
-            // of the bevel-mutated path.
+            // Obstacle-free cost through the same waypoints, used for the time estimate.
             BuildRoutePath(start, route.requestedWaypoints, end, type, unitSize,
                            out float estimateCost, ignoreObstacles: true);
             route.totalCost = estimateCost;
@@ -282,8 +239,7 @@ public class AStarPathGeneration : MonoBehaviour
             return route;
         }
 
-        // Route through the avenue failed (or there was no avenue) — fall back to a
-        // direct start→end path, matching the old GoToRoute fallback.
+        // Avenue route failed (or no avenue): fall back to a direct start→end path.
         if (route.requestedWaypoints.Count > 0)
             Debug.LogWarning($"AStarPathGeneration: route through {route.requestedWaypoints.Count} avenue waypoint(s) failed for '{type?.typeName}'; falling back to direct path.");
 
@@ -319,16 +275,7 @@ public class AStarPathGeneration : MonoBehaviour
         return route;
     }
 
-    /// <summary>
-    /// Removes loops from <paramref name="path"/>. When a cell repeats, the first
-    /// occurrence is kept and everything after it up to and including the repeat is
-    /// dropped; applied across the whole path so the result has no repeated cells.
-    ///
-    /// Contiguity is preserved: when cell X (kept at result index f) is revisited at
-    /// path position p, the next cell kept is path[p+1], and X→path[p+1] is exactly
-    /// the original adjacent step path[p]→path[p+1] (path[p] == X), so it stays a
-    /// valid grid-adjacent move.
-    /// </summary>
+    /// <summary>Removes loops: on a revisit, everything after the cell's first occurrence is dropped.</summary>
     static List<Vector2Int> RemoveLoops(List<Vector2Int> path)
     {
         if (path == null || path.Count < 2) return path;
@@ -342,8 +289,7 @@ public class AStarPathGeneration : MonoBehaviour
 
             if (indexInResult.TryGetValue(cell, out int firstIdx))
             {
-                // Loop hit: drop everything added after the first occurrence and skip
-                // this repeat. RemoveAt from the tail is O(1) (last element each time).
+                // Tail RemoveAt is O(1).
                 for (int k = result.Count - 1; k > firstIdx; k--)
                 {
                     indexInResult.Remove(result[k]);
@@ -360,13 +306,7 @@ public class AStarPathGeneration : MonoBehaviour
         return result;
     }
 
-    /// <summary>
-    /// Runs A* once per leg (start → each waypoint → finalGoal) and concatenates
-    /// the segments into one path. Returns an empty list if any leg has no path.
-    /// When <paramref name="ignoreObstacles"/> is true the legs ignore the obstacle
-    /// cost layer entirely (biome and slope only), so the returned totalCost is
-    /// the obstacle-free A* cost used to derive estimatedSeconds.
-    /// </summary>
+    /// <summary>Concatenated A* legs start → waypoints → goal. Empty if any leg fails.</summary>
     List<Vector2Int> BuildRoutePath(Vector2Int startCell, IReadOnlyList<Vector2Int> avenueWaypoints,
                                     Vector2Int finalGoal, UnitTypeSO unitType, int unitSize, out float totalCost,
                                     bool ignoreObstacles = false)
@@ -390,7 +330,7 @@ public class AStarPathGeneration : MonoBehaviour
                 unitType: unitType,
                 ignoreObstacles: ignoreObstacles);
 
-            // A* returns an empty list when no path exists — treat the whole route as failed.
+            // Empty segment = no path: fail the whole route.
             if (segment.Count == 0)
             {
                 totalCost = 0f;
@@ -399,8 +339,7 @@ public class AStarPathGeneration : MonoBehaviour
 
             totalCost += legCost;
 
-            // First leg: keep every cell. Later legs: skip the first cell which duplicates the
-            // previous leg's last cell, otherwise the unit pauses on the join.
+            // Later legs skip their first cell; it duplicates the previous leg's last cell.
             int startIdx = combined.Count == 0 ? 0 : 1;
             for (int s = startIdx; s < segment.Count; s++)
                 combined.Add(segment[s]);
@@ -419,16 +358,7 @@ public class AStarPathGeneration : MonoBehaviour
         return list[Random.Range(0, list.Count)];
     }
 
-    /// <summary>
-    /// Walks the cleaned path with an anchor k. It scans a window of
-    /// <see cref="proximityWindowSteps"/> cells starting
-    /// <see cref="proximityLookaheadSteps"/> steps ahead and takes the LAST (farthest)
-    /// cell within <see cref="proximityWorldDistance"/> of k in the horizontal plane,
-    /// then jumps the anchor forward to it — collapsing as much of the detour as
-    /// possible. Each detected pair's interior cells are replaced by a straight
-    /// 8-direction (Bresenham) segment — that becomes the path the unit walks.
-    /// Gated by <see cref="applyShortcuts"/>.
-    /// </summary>
+    /// <summary>Collapses detours: where the path comes back near itself, the cells between are replaced with a straight segment.</summary>
     void ApplyShortcuts()
     {
         if (terrainDataStore == null) return;
@@ -442,18 +372,16 @@ public class AStarPathGeneration : MonoBehaviour
             List<Vector2Int> path = kv.Value.path;
             if (path == null || path.Count <= proximityLookaheadSteps) continue;
 
-            // World position per cell, computed once. Only XZ matters for proximity.
             var world = new Vector3[path.Count];
             for (int i = 0; i < path.Count; i++)
                 world[i] = terrainDataStore.GridToWorld(path[i]);
 
-            // Forward-jumping scan. Collects pair index ranges to splice.
             var pairsIdx = new List<(int a, int b)>();
             int k = 0;
             while (true)
             {
                 int from = k + proximityLookaheadSteps;
-                if (from >= path.Count) break;  // no window left for this or any later k
+                if (from >= path.Count) break;
                 int to = Mathf.Min(from + proximityWindowSteps, path.Count);  // exclusive
 
                 int foundJ = -1;
@@ -462,15 +390,13 @@ public class AStarPathGeneration : MonoBehaviour
                     float dx = world[k].x - world[j].x;
                     float dz = world[k].z - world[j].z;
                     if (dx * dx + dz * dz < sqrThreshold)
-                        foundJ = j;  // keep scanning — overwrite so the LAST (farthest) match wins
+                        foundJ = j;  // last (farthest) match wins
                 }
 
                 if (foundJ >= 0)
                     pairsIdx.Add((k, foundJ));
 
-                // Hit: jump the anchor forward to the matched cell (the farthest in the
-                // window). foundJ > k always (lookahead ≥ 1), so the anchor strictly
-                // advances — no infinite loop.
+                // foundJ > k always (lookahead >= 1), so the anchor strictly advances.
                 k = foundJ >= 0 ? foundJ : k + 1;
             }
 
@@ -479,12 +405,7 @@ public class AStarPathGeneration : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Splices the detours out of <paramref name="original"/>: for each (a,b) pair
-    /// (sorted ascending, non-overlapping) the cells strictly between a and b are
-    /// replaced by a straight 8-direction line from original[a] to original[b].
-    /// Cells outside any pair are kept as-is.
-    /// </summary>
+    /// <summary>Replaces the cells between each (a,b) pair with a straight 8-direction line.</summary>
     static List<Vector2Int> BuildShortcutPath(List<Vector2Int> original, List<(int a, int b)> pairs)
     {
         var result = new List<Vector2Int>(original.Count);
@@ -510,11 +431,7 @@ public class AStarPathGeneration : MonoBehaviour
         return result;
     }
 
-    /// <summary>
-    /// Bresenham line between two grid cells, restricted to the 8 grid directions
-    /// (a diagonal step when both axes advance in the same iteration). Inclusive of
-    /// both endpoints — as straight as an 8-connected grid allows.
-    /// </summary>
+    /// <summary>Bresenham line between two cells using the 8 grid directions, endpoints inclusive.</summary>
     static List<Vector2Int> StraightLine8(Vector2Int a, Vector2Int b)
     {
         var line = new List<Vector2Int>();
@@ -539,13 +456,7 @@ public class AStarPathGeneration : MonoBehaviour
         return line;
     }
 
-    /// <summary>
-    /// Returns the indices into <paramref name="path"/> of every interior vertex
-    /// where the step direction turns by at least <paramref name="minAngleDeg"/>
-    /// degrees. Endpoints are never corners. Inside a run of constant direction the
-    /// per-step delta is identical, so the deviation only has to be measured between
-    /// the step arriving at the vertex and the step leaving it.
-    /// </summary>
+    /// <summary>Indices of interior vertices where the step direction turns by at least minAngleDeg.</summary>
     public static List<int> FindCornerIndices(List<Vector2Int> path, float minAngleDeg)
     {
         var corners = new List<int>();
@@ -567,13 +478,7 @@ public class AStarPathGeneration : MonoBehaviour
         return corners;
     }
 
-    /// <summary>
-    /// Builds each route's beveled curve from its stable
-    /// <see cref="GeneratedRoute.basePath"/>, rasterizes it back onto the grid as
-    /// 8-connected steps, and — when <see cref="useBeveledPathForUnit"/> — makes
-    /// that the route's walked <see cref="GeneratedRoute.path"/>. Idempotent: always
-    /// derives from basePath, never from an already-beveled path.
-    /// </summary>
+    /// <summary>Rebuilds each route's path from basePath with sharp corners beveled.</summary>
     void ApplyBevel()
     {
         if (terrainDataStore == null) return;
@@ -589,8 +494,7 @@ public class AStarPathGeneration : MonoBehaviour
             List<Vector3> curve      = BuildBeveledCurve(src, corners);
             List<Vector2Int> beveled = RasterizeCurveToGrid(curve);
 
-            // Geometric bevel — if rasterizing collapsed it, fall back to the base
-            // path so the unit always has a valid route to walk.
+            // Fall back to the base path if rasterizing collapsed the bevel.
             bool usable = beveled.Count > 1;
             route.path = (useBeveledPathForUnit && usable)
                 ? beveled
@@ -598,13 +502,7 @@ public class AStarPathGeneration : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Snaps a world XZ curve back to grid cells: each point is rounded to its
-    /// cell and consecutive cells are joined with an 8-connected Bresenham line
-    /// (<see cref="StraightLine8"/>), so every step is one of the 16
-    /// <see cref="CellData.Directions"/> the mover understands. Self-intersections
-    /// the bevel may introduce are removed with <see cref="RemoveLoops"/>.
-    /// </summary>
+    /// <summary>Snaps a world XZ curve back to 8-connected grid steps and removes loops.</summary>
     List<Vector2Int> RasterizeCurveToGrid(List<Vector3> curve)
     {
         var cells = new List<Vector2Int>();
@@ -624,18 +522,7 @@ public class AStarPathGeneration : MonoBehaviour
         return RemoveLoops(cells);
     }
 
-    /// <summary>
-    /// Returns <paramref name="path"/> as an XZ world polyline with every sharp
-    /// <paramref name="corners"/> beveled. For each corner at index c the cells
-    /// from c-<see cref="bevelStepsPerSide"/> to c+<see cref="bevelStepsPerSide"/>
-    /// are dropped and replaced by a quadratic Bézier with the two side points as
-    /// endpoints and the corner cell as the control point, sampled into
-    /// <see cref="bevelSegments"/> straight segments. The reach is clamped so a
-    /// bevel never crosses the previous bevel, the neighbouring corner, or the
-    /// path ends; a corner whose window collapses to nothing is left untouched.
-    /// Y is whatever <see cref="CellWorld"/> returns and is ignored by
-    /// <see cref="RasterizeCurveToGrid"/> (XZ only).
-    /// </summary>
+    /// <summary>XZ world polyline of the path with each sharp corner replaced by a sampled quadratic Bézier.</summary>
     List<Vector3> BuildBeveledCurve(List<Vector2Int> path, List<int> corners)
     {
         int n = path.Count;
@@ -654,8 +541,7 @@ public class AStarPathGeneration : MonoBehaviour
         {
             int c = corners[ci];
 
-            // Reach w each side, but never cross the previous bevel (cursor), the
-            // next sharp corner, or the path ends.
+            // Never cross the previous bevel, the next corner, or the path ends.
             int nextLimit = (ci + 1 < corners.Count) ? corners[ci + 1] : n - 1;
             int leftIdx   = Mathf.Max(c - w, cursor);
             int rightIdx  = Mathf.Min(c + w, nextLimit);
@@ -663,19 +549,16 @@ public class AStarPathGeneration : MonoBehaviour
             // Window collapsed (corners too close): leave this corner as-is.
             if (rightIdx - leftIdx < 2) continue;
 
-            // Copy untouched cells up to and including the left side point S1.
             for (int k = cursor; k <= leftIdx; k++)
                 result.Add(CellWorld(path[k]));
 
-            // Quadratic Bézier in XZ: S1 → (corner = control) → S2, sampled into
-            // bevelSegments straight pieces.
+            // Quadratic Bézier in XZ with the corner cell as control point.
             Vector3 p0 = CellWorld(path[leftIdx]);
             Vector3 p1 = CellWorld(path[c]);
             Vector3 p2 = CellWorld(path[rightIdx]);
 
             int segs = Mathf.Max(1, bevelSegments);
-            // p0 == path[leftIdx] is already the last copied cell, so emit the
-            // samples for t = 1/segs .. 1 (the t = 1 sample is exactly S2).
+            // p0 is already the last copied cell, so start sampling at t = 1/segs.
             for (int seg = 1; seg <= segs; seg++)
             {
                 float t = (float)seg / segs;
@@ -702,7 +585,7 @@ public class AStarPathGeneration : MonoBehaviour
 
     void RegisterPlan(UnitPathPlan plan)
     {
-        // The scene owns the session lifecycle now: this is the only place a MissionSession is created.
+        // Sole creation point for MissionSession.
         if (MissionSession.Instance == null)
             new GameObject("MissionSession").AddComponent<MissionSession>();
 

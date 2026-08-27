@@ -4,12 +4,8 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 
 /// <summary>
-/// Game-scene entry point: listens for the TerrainDataStore's auto-load, then
-/// rebuilds the visual terrain asynchronously from the loaded grid. Emits
-/// progress + completion events so a loading UI can follow along.
-///
-/// This builder assumes the save was created by the level editor. If no save
-/// exists it fires OnBuildFailed — the game scene cannot generate fresh terrain.
+/// Rebuilds the visual terrain asynchronously after the save loads, with progress events.
+/// The game scene cannot generate fresh terrain: no save means OnBuildFailed and a redirect to the menu.
 /// </summary>
 public class GameTerrainBuilder : MonoBehaviour
 {
@@ -34,20 +30,17 @@ public class GameTerrainBuilder : MonoBehaviour
     }
 #endif
 
-    // ── Events ───────────────────────────────────────────────────────────
-    /// <summary>Fired once the build coroutine starts.</summary>
     public event Action OnBuildStarted;
 
-    /// <summary>Fired with (progress 0..1, status message) during the build.</summary>
+    /// <summary>(progress 0..1, status message)</summary>
     public event Action<float, string> OnBuildProgress;
 
     /// <summary>Fired once the terrain is fully visual and playable.</summary>
     public event Action OnBuildComplete;
 
-    /// <summary>Fired when the build cannot proceed (no save, failed load, misconfigured).</summary>
     public event Action<string> OnBuildFailed;
 
-    // Phase weights (must sum to 1.0)
+    // Phase weights, must sum to 1.
     const float WEIGHT_VISUAL = 0.10f;
     const float WEIGHT_SLOPE  = 0.10f;
     const float WEIGHT_MC     = 0.80f;
@@ -62,8 +55,7 @@ public class GameTerrainBuilder : MonoBehaviour
             return;
         }
 
-        // Subscribe in Awake so we're registered before TerrainDataStore's Start
-        // auto-load fires.
+        // Subscribe in Awake, before TerrainDataStore's Start auto-load fires.
         terrainDataStore.OnSaveLoaded  += HandleSaveLoaded;
         terrainDataStore.OnSaveCreated += HandleSaveCreated;
         terrainDataStore.OnSaveFailed  += HandleSaveFailed;

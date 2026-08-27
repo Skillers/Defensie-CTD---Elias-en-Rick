@@ -30,10 +30,7 @@ public class SlopeMap : MonoBehaviour
 
     // Generation is driven by MapGenerator — no auto-subscribe or auto-start.
 
-    /// <summary>
-    /// Compute slopes from the given grid and bake directional slopes into each cell.
-    /// Call this before handing the grid to TerrainDataStore.
-    /// </summary>
+    /// <summary>Computes slopes and bakes them into each cell. Call before handing the grid to TerrainDataStore.</summary>
     public void ComputeAndBake(CellData[,] grid, int width, int height)
     {
         if (terrainDataStore == null) return;
@@ -62,12 +59,7 @@ public class SlopeMap : MonoBehaviour
         ApplySlopeTexture(SlopeAngles);
     }
 
-    /// <summary>
-    /// Bakes the signed outgoing slope (degrees) for every <see cref="CellData.Directions"/>
-    /// entry into each cell, from rawHeight. Static so the load path can re-derive
-    /// slopes without a SlopeMap instance. The run length per step is its Euclidean
-    /// magnitude × step (1 / √2 / √5 for cardinal / diagonal / knight).
-    /// </summary>
+    /// <summary>Bakes signed outgoing slopes (degrees) per direction into each cell. Static so the load path can re-derive without an instance.</summary>
     public static void BakeSlopesIntoGrid(CellData[,] grid, int width, int height, float step)
     {
         int dirCount = CellData.Directions.Length;
