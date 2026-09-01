@@ -116,7 +116,6 @@ public class GameTerrainBuilder : MonoBehaviour
         if (noisePlane != null)
         {
             ReportProgress(baseProgress, "Building noise plane visual...");
-            Debug.Log("GameTerrainBuilder: step 1/3 — building noise plane visual.");
             noisePlane.BuildVisual();
             yield return null;
         }
@@ -131,7 +130,6 @@ public class GameTerrainBuilder : MonoBehaviour
         if (slopeMap != null)
         {
             ReportProgress(baseProgress, "Building slope map...");
-            Debug.Log("GameTerrainBuilder: step 2/3 — generating slope map.");
             slopeMap.Generate();
             yield return null;
         }
@@ -141,7 +139,6 @@ public class GameTerrainBuilder : MonoBehaviour
         // 3. Marching cubes — heaviest step; per-chunk progress
         if (marchingCubes != null)
         {
-            Debug.Log("GameTerrainBuilder: step 3/3 — building marching cubes.");
             float mcStart = baseProgress;
             yield return marchingCubes.GenerateAsync(mcFrac =>
             {
@@ -155,7 +152,6 @@ public class GameTerrainBuilder : MonoBehaviour
         }
 
         ReportProgress(1f, "Done.");
-        Debug.Log("GameTerrainBuilder: build complete.");
         OnBuildComplete?.Invoke();
         _building = false;
     }

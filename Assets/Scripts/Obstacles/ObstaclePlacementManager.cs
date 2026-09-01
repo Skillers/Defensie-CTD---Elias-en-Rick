@@ -414,12 +414,6 @@ public class ObstaclePlacementManager : MonoBehaviour
 
     private void Update()
     {
-        // foreach (var item in _placedObstacles)
-        // {
-        //     var bounds = TerrainDataStore.GetWorldBounds(item.gameObject);
-        //     TerrainDataStore.DrawBounds(bounds, Color.red);
-        // }
-        
         if (_selected == null && Mouse.current.leftButton.wasReleasedThisFrame)
         {
             if (_isDragging)

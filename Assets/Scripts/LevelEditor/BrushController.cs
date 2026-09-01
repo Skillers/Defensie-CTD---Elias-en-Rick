@@ -148,14 +148,8 @@ public class BrushController : MonoBehaviour
         if (tool != BrushTool.None && _activeTool == tool) tool = BrushTool.None;
         if (_activeTool == tool) return;
 
-        var prev = _activeTool;
         _activeTool = tool;
         ResetState();
-
-        if (_activeTool == BrushTool.BiomePaint)
-            Debug.Log($"Tool: {prev} -> {_activeTool} (painting: {(paintBiome != null ? paintBiome.biomeName : "NONE")})");
-        else
-            Debug.Log($"Tool: {prev} -> {_activeTool}");
 
         OnToolChanged?.Invoke(_activeTool);
     }
@@ -238,36 +232,30 @@ public class BrushController : MonoBehaviour
         {
             _leftDown = false;
             _leftBlocked = true;
-            Debug.Log("Left RELEASED (switched to right)");
         }
 
         if (_rightDown && leftPressed && !_leftBlocked)
         {
             _rightDown = false;
             _rightBlocked = true;
-            Debug.Log("Right RELEASED (switched to left)");
         }
 
         if (leftPressed && !_leftDown && !_rightDown && !_leftBlocked)
         {
             _leftDown = true;
-            Debug.Log($"Left DOWN at {hit.point}");
         }
         else if (!leftPressed && _leftDown)
         {
             _leftDown = false;
-            Debug.Log($"Left UP at {hit.point}");
         }
 
         if (rightPressed && !_rightDown && !_leftDown && !_rightBlocked)
         {
             _rightDown = true;
-            Debug.Log($"Right DOWN at {hit.point}");
         }
         else if (!rightPressed && _rightDown)
         {
             _rightDown = false;
-            Debug.Log($"Right UP at {hit.point}");
         }
 
         // --- Apply tool on interval (fires immediately on first press) ---

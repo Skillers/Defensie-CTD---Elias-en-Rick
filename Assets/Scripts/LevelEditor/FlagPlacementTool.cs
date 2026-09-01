@@ -70,7 +70,6 @@ public class FlagPlacementTool : MonoBehaviour
         _startPlaced = false;
         _endPlaced = false;
         _phase = FlagPhase.Start;
-        Debug.Log($"FlagPlacement ACTIVATED — next click places {_phase}");
         OnStateChanged?.Invoke();
     }
 
@@ -81,7 +80,6 @@ public class FlagPlacementTool : MonoBehaviour
         _active = false;
         _leftDown = false;
         _rightDown = false;
-        Debug.Log("FlagPlacement DEACTIVATED");
         OnStateChanged?.Invoke();
     }
 
@@ -121,7 +119,6 @@ public class FlagPlacementTool : MonoBehaviour
         {
             _rightDown = true;
             _phase = _phase == FlagPhase.Start ? FlagPhase.End : FlagPhase.Start;
-            Debug.Log($"FlagPlacement: switched to {_phase}");
             OnStateChanged?.Invoke();
         }
         else if (!rightPressed && _rightDown)
@@ -145,7 +142,6 @@ public class FlagPlacementTool : MonoBehaviour
             terrainDataStore.SetStartCell(cell);
             SpawnOrMove(ref _startFlagInstance, startFlagPrefab, worldPos, "StartFlag");
             _startPlaced = true;
-            Debug.Log($"Start placed at grid {cell} (world {worldPos})");
 
             // Auto-advance to End if it hasn't been placed yet
             if (!_endPlaced) _phase = FlagPhase.End;
@@ -156,7 +152,6 @@ public class FlagPlacementTool : MonoBehaviour
             terrainDataStore.SetEndCell(cell);
             SpawnOrMove(ref _endFlagInstance, prefab, worldPos, "EndFlag");
             _endPlaced = true;
-            Debug.Log($"End placed at grid {cell} (world {worldPos})");
 
             // Auto-advance to Start if it hasn't been placed yet
             if (!_startPlaced) _phase = FlagPhase.Start;
@@ -168,7 +163,6 @@ public class FlagPlacementTool : MonoBehaviour
             _active = false;
             _leftDown = false;
             _rightDown = false;
-            Debug.Log("FlagPlacement DEACTIVATED (both flags placed)");
         }
 
         OnStateChanged?.Invoke();
